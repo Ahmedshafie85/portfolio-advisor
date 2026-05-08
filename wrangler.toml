@@ -1,0 +1,20 @@
+name = "portfolio-advisor"
+main = "worker.js"
+compatibility_date = "2025-01-15"
+
+# Daily cron: 1:00 AM Kuwait time = 22:00 UTC (previous day)
+# This runs after US market close, fresh analysis ready when Ahmed wakes up
+[triggers]
+crons = ["0 22 * * *"]
+
+# Secrets (set these in Cloudflare dashboard, NOT here):
+#   ANTHROPIC_API_KEY     — your sk-ant-... key
+#   FIREBASE_PROJECT_ID   — promos-maroc
+#   FIREBASE_API_KEY      — Firebase Web API key (read from Firebase console)
+#   ALLOWED_ORIGIN        — https://ahmedshafie85.github.io
+#
+# We do NOT use service account auth in v1 — the Worker uses the public
+# Firestore REST API with security rules enforcing per-user access.
+
+[vars]
+APP_VERSION = "1.0.0"
