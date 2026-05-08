@@ -124,7 +124,7 @@ body {
   cursor: pointer; transition: color .15s; border-radius: 10px;
 }
 .tab.active { color: var(--ink); }
-.tab svg { width: 22px; height: 22px; stroke-width: 1.5; }
+.tab svg { width: 22px; height: 22px; stroke-width: 1.5; pointer-events: none; }
 .tab.active svg { stroke-width: 2; }
 
 .section { padding: 20px; }
@@ -182,6 +182,7 @@ body {
   cursor: pointer; transition: background .15s; position: relative;
 }
 .holding:hover, .holding:active { background: var(--bg-elev); }
+.holding * { pointer-events: none; }
 .holding-icon {
   width: 38px; height: 38px; border-radius: 50%;
   background: var(--bg-elev);
@@ -362,9 +363,9 @@ body {
   text-transform: uppercase; border: 1px solid var(--rule);
 }
 .signal-pill.bullish          { background: rgba(74,122,74,0.12); color: var(--green); border-color: var(--green-soft); }
-.signal-pill.neutral-bullish  { background: rgba(74,122,74,0.06); color: var(--green-soft); border-color: var(--rule); }
+.signal-pill.neutralbullish   { background: rgba(74,122,74,0.06); color: var(--green-soft); border-color: var(--rule); }
 .signal-pill.neutral          { color: var(--ink-soft); }
-.signal-pill.neutral-bearish  { background: rgba(161,61,45,0.06); color: var(--red-soft); border-color: var(--rule); }
+.signal-pill.neutralbearish   { background: rgba(161,61,45,0.06); color: var(--red-soft); border-color: var(--rule); }
 .signal-pill.bearish          { background: rgba(161,61,45,0.12); color: var(--red); border-color: var(--red-soft); }
 .signal-pill.no-signal        { color: var(--ink-muted); border-style: dashed; }
 
@@ -477,7 +478,6 @@ body {
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .field-hint { font-size: 11px; color: var(--ink-muted); margin-top: 4px; letter-spacing: 0.02em; }
 
-/* Symbol search dropdown */
 .search-results {
   position: absolute; left: 0; right: 0; top: 100%;
   background: var(--bg-card);
@@ -566,6 +566,14 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.error-banner {
+  margin: 12px 20px; padding: 12px 14px;
+  background: rgba(161,61,45,0.08); border: 1px solid var(--red-soft);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono); font-size: 11.5px; color: var(--red);
+  line-height: 1.5; word-break: break-word;
+}
+
 .hidden { display: none !important; }
 ::-webkit-scrollbar { width: 0; }
 </style>
@@ -613,7 +621,7 @@ body {
 
   <div class="view" id="view"></div>
 
-  <div class="tabs">
+  <div class="tabs" id="tabs">
     <button class="tab active" data-view="portfolio">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
@@ -653,6 +661,30 @@ body {
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 
 <script>
+"use strict";
+
+// Global error handler — surfaces any uncaught error so we don't fail silently
+window.addEventListener("error", (e) => {
+  showError(e.message + (e.filename ? ` (${e.filename}:${e.lineno})` : ""));
+});
+window.addEventListener("unhandledrejection", (e) => {
+  showError("Promise: " + (e.reason?.message || e.reason));
+});
+
+function showError(msg) {
+  console.error("APP ERROR:", msg);
+  const view = document.getElementById("view");
+  if (!view) return;
+  let banner = document.getElementById("errBanner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "errBanner";
+    banner.className = "error-banner";
+    view.insertBefore(banner, view.firstChild);
+  }
+  banner.textContent = "⚠ " + String(msg).slice(0, 240);
+}
+
 // ============================================================================
 // CONFIG
 // ============================================================================
@@ -675,24 +707,14 @@ const SEED_HOLDINGS = [
   { symbol: "IGLN", asset_class: "metal",    quantity: 12.881,      avg_cost_total: 1002,  name: "iShares Physical Gold ETC" },
   { symbol: "ETH",  asset_class: "crypto",   quantity: 1.68280236,  avg_cost_total: 6336,  name: "Ethereum" },
   { symbol: "BTC",  asset_class: "crypto",   quantity: 0.10996493,  avg_cost_total: 8855,  name: "Bitcoin" },
-  { symbol: "CASH", asset_class: "cash",     quantity: 1760,        avg_cost_total: 1760,  name: "Cash (USD)" },
 ];
 
 const ALLOC_COLORS = {
-  etf:      "#4a4639",
-  us_stock: "#a13d2d",
-  crypto:   "#b08d3c",
-  metal:    "#d4a85c",
-  cash:     "#8a8473",
+  etf: "#4a4639", us_stock: "#a13d2d", crypto: "#b08d3c", metal: "#d4a85c", cash: "#8a8473",
 };
 const ALLOC_LABELS = {
-  etf: "ETFs",
-  us_stock: "Stocks",
-  crypto: "Crypto",
-  metal: "Metals",
-  cash: "Cash",
+  etf: "ETFs", us_stock: "Stocks", crypto: "Crypto", metal: "Metals", cash: "Cash",
 };
-
 const ASSET_CLASSES = [
   { value: "us_stock", label: "US Stock" },
   { value: "etf",      label: "ETF" },
@@ -710,7 +732,6 @@ const db   = firebase.firestore();
 
 const state = {
   uid: null,
-  pin: null,
   pinAttempts: 0,
   currentView: "portfolio",
   holdings: [],
@@ -726,14 +747,12 @@ document.documentElement.setAttribute("data-theme", state.theme);
 // ============================================================================
 // UTILS
 // ============================================================================
-const $ = sel => document.querySelector(sel);
-const $$ = sel => document.querySelectorAll(sel);
+const $  = (sel, root) => (root || document).querySelector(sel);
+const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
 function fmtUSD(n, decimals = 2) {
   if (n == null || isNaN(n)) return "—";
-  if (Math.abs(n) >= 1000) {
-    return n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-  }
+  if (Math.abs(n) >= 1000) return n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   return n.toFixed(decimals);
 }
 function fmtPct(n, withSign = true) {
@@ -769,10 +788,15 @@ function toast(msg, ms = 2400, type = "default") {
   clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.remove("show"), ms);
 }
+function escAttr(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
 
 // ============================================================================
 // PIN GATE
 // ============================================================================
+let pinBuffer = "", pinMode = "enter", pinFirstTry = "";
+
 function setupPinPad() {
   const pad = $("#pinPad");
   pad.innerHTML = "";
@@ -785,19 +809,13 @@ function setupPinPad() {
     pad.appendChild(b);
   });
 }
-let pinBuffer = "", pinMode = "enter", pinFirstTry = "";
-
 function handlePinKey(k) {
   $("#pinError").textContent = "";
-  if (k === "⌫") {
-    pinBuffer = pinBuffer.slice(0, -1);
-  } else if (typeof k === "number" && pinBuffer.length < 4) {
-    pinBuffer += String(k);
-  } else { return; }
+  if (k === "⌫") pinBuffer = pinBuffer.slice(0, -1);
+  else if (typeof k === "number" && pinBuffer.length < 4) pinBuffer += String(k);
+  else return;
   updatePinDots();
-  if (pinBuffer.length === 4) {
-    setTimeout(() => processPin(), 120);
-  }
+  if (pinBuffer.length === 4) setTimeout(processPin, 120);
 }
 function updatePinDots(error = false) {
   $$("#pinDots .pin-dot").forEach((d, i) => {
@@ -808,9 +826,8 @@ function updatePinDots(error = false) {
 function processPin() {
   const stored = localStorage.getItem("pinHash");
   if (!stored) {
-    if (pinMode === "enter" || pinMode === "create") {
-      pinFirstTry = pinBuffer;
-      pinBuffer = "";
+    if (pinMode === "create") {
+      pinFirstTry = pinBuffer; pinBuffer = "";
       pinMode = "confirm";
       updatePinDots();
       $("#pinPrompt").textContent = "Confirm your PIN";
@@ -853,7 +870,7 @@ function unlockApp() {
   $("#pinScreen").classList.add("hidden");
   $("#app").classList.remove("hidden");
   $("#topbarMeta").textContent = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-  loadInitialData();
+  loadInitialData().catch(e => showError("Init: " + e.message));
 }
 function showPinScreen() {
   $("#loader").classList.add("hidden");
@@ -870,11 +887,9 @@ function showPinScreen() {
 // ============================================================================
 async function ensureAuth() {
   return new Promise((resolve, reject) => {
-    auth.onAuthStateChanged(async user => {
-      if (user) {
-        state.uid = user.uid;
-        resolve(user);
-      } else {
+    const unsub = auth.onAuthStateChanged(async user => {
+      if (user) { state.uid = user.uid; resolve(user); }
+      else {
         try { await auth.signInAnonymously(); }
         catch (e) { reject(e); }
       }
@@ -898,32 +913,32 @@ async function loadHoldingsFromFirestore() {
 
 async function seedHoldings() {
   for (const h of SEED_HOLDINGS) {
-    const doc = {
-      symbol: h.symbol,
-      asset_class: h.asset_class,
-      quantity: h.quantity,
-      avg_cost_total: h.avg_cost_total,
-      avg_cost_unit: h.avg_cost_total / h.quantity,
-      currency: "USD",
-      name: h.name,
-      added_at: firebase.firestore.FieldValue.serverTimestamp(),
-    };
-    await db.collection("users").doc(state.uid).collection("holdings").doc(h.symbol).set(doc);
+    try {
+      await db.collection("users").doc(state.uid).collection("holdings").doc(h.symbol).set({
+        symbol: h.symbol, asset_class: h.asset_class,
+        quantity: h.quantity,
+        avg_cost_total: h.avg_cost_total,
+        avg_cost_unit: h.avg_cost_total / h.quantity,
+        currency: "USD",
+        name: h.name,
+        added_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (e) { console.warn("seed failed for", h.symbol, e); }
   }
   await loadHoldingsFromFirestore();
 }
 
 async function loadAnalysesFromFirestore() {
-  const snap = await db.collection("users").doc(state.uid).collection("analyses")
-    .orderBy("generated_at", "desc").limit(50).get();
-  const latest = {};
-  snap.docs.forEach(d => {
-    const data = d.data();
-    if (!latest[data.symbol] || (data.generated_at > latest[data.symbol].generated_at)) {
-      latest[data.symbol] = data;
-    }
-  });
-  state.analyses = latest;
+  try {
+    const snap = await db.collection("users").doc(state.uid).collection("analyses")
+      .orderBy("generated_at", "desc").limit(50).get();
+    const latest = {};
+    snap.docs.forEach(d => {
+      const data = d.data();
+      if (!latest[data.symbol] || (data.generated_at > latest[data.symbol].generated_at)) latest[data.symbol] = data;
+    });
+    state.analyses = latest;
+  } catch (e) { console.warn("analyses load failed", e); state.analyses = {}; }
 }
 
 async function refreshAllPrices() {
@@ -1010,7 +1025,7 @@ function renderPortfolio() {
     holdingsHtml = `<div class="empty-state">
       <span class="display">No holdings yet</span>
       <p>Tap below to add your first position.</p>
-      <button class="btn" onclick="openAddHolding()">Add Holding</button>
+      <button class="btn" data-act="add-holding">Add Holding</button>
     </div>`;
   } else {
     state.holdings.sort((a, b) => (holdingMetrics(b).value || 0) - (holdingMetrics(a).value || 0));
@@ -1020,11 +1035,11 @@ function renderPortfolio() {
       const isCash = h.asset_class === "cash";
       const pnlClass = isCash ? "flat" : (hm.pnlPct >= 0 ? "pos" : "neg");
       const pnlText = isCash ? "Cash" : fmtPct(hm.pnlPct);
-      return `<div class="holding" onclick="openAsset('${h.symbol}')">
-        <div class="holding-icon" data-class="${h.asset_class}">${h.symbol.slice(0,2)}</div>
+      return `<div class="holding" data-act="open-asset" data-symbol="${escAttr(h.symbol)}">
+        <div class="holding-icon" data-class="${h.asset_class}">${escAttr(h.symbol.slice(0,2))}</div>
         <div class="holding-main">
-          <div class="holding-symbol">${h.symbol}</div>
-          <div class="holding-name">${h.name || ''}</div>
+          <div class="holding-symbol">${escAttr(h.symbol)}</div>
+          <div class="holding-name">${escAttr(h.name || '')}</div>
         </div>
         <div class="holding-right">
           <div class="holding-value">${hm.value != null ? '$' + fmtUSD(hm.value, 0) : '—'}</div>
@@ -1055,7 +1070,7 @@ function renderPortfolio() {
 
     <div class="section-head" style="padding: 0 20px; margin-top: 20px;">
       <h2>Holdings</h2>
-      <button class="btn-ghost" onclick="openAddHolding()" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
+      <button class="btn-ghost" data-act="add-holding" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
     </div>
     <div class="holdings">${holdingsHtml}</div>
   `;
@@ -1078,11 +1093,11 @@ function renderMarketsList() {
     const isCash = h.asset_class === "cash";
     const dayClass = isCash ? "flat" : (dayPct >= 0 ? "pos" : "neg");
     const dayText = isCash ? "Cash" : fmtPct(dayPct);
-    return `<div class="holding" onclick="openAsset('${h.symbol}')">
-      <div class="holding-icon" data-class="${h.asset_class}">${h.symbol.slice(0,2)}</div>
+    return `<div class="holding" data-act="open-asset" data-symbol="${escAttr(h.symbol)}">
+      <div class="holding-icon" data-class="${h.asset_class}">${escAttr(h.symbol.slice(0,2))}</div>
       <div class="holding-main">
-        <div class="holding-symbol">${h.symbol}</div>
-        <div class="holding-name">${h.name || ''}</div>
+        <div class="holding-symbol">${escAttr(h.symbol)}</div>
+        <div class="holding-name">${escAttr(h.name || '')}</div>
       </div>
       <div class="holding-right">
         <div class="holding-value">$${fmtUSD(hm.current_price)}</div>
@@ -1091,15 +1106,15 @@ function renderMarketsList() {
     </div>`;
   }).join("");
   view.innerHTML = `
-    <div class="section-head" style="padding: 20px 20px 0;">
-      <h2>Markets</h2>
-    </div>
+    <div class="section-head" style="padding: 20px 20px 0;"><h2>Markets</h2></div>
     <div class="holdings">${items}</div>
   `;
 }
 function openAsset(symbol) {
   state.selectedSymbol = symbol;
-  setView("markets");
+  state.currentView = "markets";
+  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === "markets"));
+  renderAssetDetail(symbol);
 }
 function backToMarkets() {
   state.selectedSymbol = null;
@@ -1117,8 +1132,8 @@ async function renderAssetDetail(symbol) {
   if (!price) {
     view.innerHTML = `
       <div class="detail-head">
-        <button class="detail-back" onclick="backToMarkets()">← Markets</button>
-        <div class="detail-symbol">${symbol}</div>
+        <button class="detail-back" data-act="back-markets">← Markets</button>
+        <div class="detail-symbol">${escAttr(symbol)}</div>
       </div>
       <div class="empty-state"><span class="spinner"></span><p style="margin-top:14px;">Loading data…</p></div>
     `;
@@ -1148,8 +1163,8 @@ async function renderAssetDetail(symbol) {
         ${!isCashRow ? `<div class="pos-row"><span class="lbl">Current Value</span><span class="val">$${fmtUSD(hm.value, 0)}</span></div>
         <div class="pos-row"><span class="lbl">Unrealized P&L</span><span class="val ${hm.pnlAbs >= 0 ? 'pos' : 'neg'}">${hm.pnlAbs >= 0 ? '+' : ''}$${fmtUSD(Math.abs(hm.pnlAbs), 0)} · ${fmtPct(hm.pnlPct)}</span></div>` : ''}
         <div class="pos-actions">
-          <button class="btn btn-secondary btn-sm" onclick="openEditHolding('${symbol}')">Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="confirmDeleteHolding('${symbol}')">Remove</button>
+          <button class="btn btn-secondary btn-sm" data-act="edit-holding" data-symbol="${escAttr(symbol)}">Edit</button>
+          <button class="btn btn-danger btn-sm" data-act="delete-holding" data-symbol="${escAttr(symbol)}">Remove</button>
         </div>
       </div>
     `;
@@ -1159,13 +1174,12 @@ async function renderAssetDetail(symbol) {
   if (!isCash) aiCard = renderAiCard(symbol, analysis);
 
   let chartBlock = "";
-  let indBlock = "";
   let sentBlock = "";
   if (!isCash) {
     chartBlock = `
       <div class="chart-wrap">
         <div class="chart-controls">
-          ${["1M","3M","6M","1Y","ALL"].map(r => `<button class="range-btn ${r === state.selectedRange ? 'active' : ''}" onclick="setRange('${r}','${symbol}')">${r}</button>`).join("")}
+          ${["1M","3M","6M","1Y","ALL"].map(r => `<button class="range-btn ${r === state.selectedRange ? 'active' : ''}" data-act="set-range" data-range="${r}" data-symbol="${escAttr(symbol)}">${r}</button>`).join("")}
         </div>
         <div id="chart"></div>
       </div>
@@ -1178,9 +1192,9 @@ async function renderAssetDetail(symbol) {
 
   view.innerHTML = `
     <div class="detail-head">
-      <button class="detail-back" onclick="backToMarkets()">← Markets</button>
-      <div class="detail-symbol">${symbol}</div>
-      <div class="detail-name">${holding?.name || ""}</div>
+      <button class="detail-back" data-act="back-markets">← Markets</button>
+      <div class="detail-symbol">${escAttr(symbol)}</div>
+      <div class="detail-name">${escAttr(holding?.name || "")}</div>
       <div class="detail-price">$${fmtUSD(cur)}</div>
       ${!isCash ? `<div class="detail-change ${dayPct >= 0 ? 'pos' : 'neg'}">${dayPct >= 0 ? '+' : ''}$${fmtUSD(Math.abs((cur - price.prev_close)))} · ${fmtPct(dayPct)} today</div>` : `<div class="detail-change flat">Cash · fixed value</div>`}
     </div>
@@ -1192,7 +1206,7 @@ async function renderAssetDetail(symbol) {
 
   if (!isCash) {
     setTimeout(() => {
-      renderChart(symbol, state.selectedRange);
+      try { renderChart(symbol, state.selectedRange); } catch (e) { console.warn("chart failed", e); }
       loadIndicators(symbol);
       loadSentiment(symbol);
     }, 50);
@@ -1209,25 +1223,25 @@ function renderAiCard(symbol, analysis) {
       <div class="empty-ai">
         <span class="display">Run analysis to get a structured read</span>
         <p>Combines technicals, news, and sentiment.</p>
-        <button class="btn btn-sm" onclick="runAnalysis('${symbol}')" style="margin-top:14px;" id="analyzeBtn">Analyze ${symbol}</button>
+        <button class="btn btn-sm" data-act="run-analysis" data-symbol="${escAttr(symbol)}" style="margin-top:14px;">Analyze ${escAttr(symbol)}</button>
       </div>
     </div>`;
   }
   const a = analysis;
-  const signalClass = (a.signal || "neutral").replace(/[^a-z-]/g, "");
+  const signalClass = (a.signal || "neutral").replace(/[^a-z]/g, "");
   const wl = a.watch_levels || {};
-  const risks = (a.key_risks || []).map(r => `<li>${r}</li>`).join("");
+  const risks = (a.key_risks || []).map(r => `<li>${escAttr(r)}</li>`).join("");
 
   return `<div class="ai-card">
     <div class="ai-head">
       <h3>Analysis</h3>
       <div>
-        <span class="signal-pill ${signalClass}">${(a.signal || "neutral").replace(/-/g, ' / ')}</span>
-        <span class="confidence-pill">${a.confidence || "—"} conf</span>
+        <span class="signal-pill ${signalClass}">${escAttr((a.signal || "neutral").replace(/-/g, ' / '))}</span>
+        <span class="confidence-pill">${escAttr(a.confidence || "—")} conf</span>
       </div>
     </div>
-    ${a.ta_summary ? `<div class="ai-section"><h4>Technical Read</h4><p>${a.ta_summary}</p></div>` : ""}
-    ${a.sentiment_summary ? `<div class="ai-section"><h4>Sentiment</h4><p>${a.sentiment_summary}</p></div>` : ""}
+    ${a.ta_summary ? `<div class="ai-section"><h4>Technical Read</h4><p>${escAttr(a.ta_summary)}</p></div>` : ""}
+    ${a.sentiment_summary ? `<div class="ai-section"><h4>Sentiment</h4><p>${escAttr(a.sentiment_summary)}</p></div>` : ""}
     ${(wl.support || wl.resistance || wl.stop_loss_idea) ? `
     <div class="ai-section">
       <h4>Watch Levels</h4>
@@ -1236,20 +1250,19 @@ function renderAiCard(symbol, analysis) {
         <div class="level-cell"><div class="lvl-lbl">Resistance</div><div class="lvl-val resistance">${wl.resistance ? '$' + fmtUSD(wl.resistance) : '—'}</div></div>
         <div class="level-cell"><div class="lvl-lbl">Stop Idea</div><div class="lvl-val stop">${wl.stop_loss_idea ? '$' + fmtUSD(wl.stop_loss_idea) : '—'}</div></div>
       </div>
-      ${wl.rationale ? `<p style="margin-top:8px;font-size:12px;color:var(--ink-soft);line-height:1.5;">${wl.rationale}</p>` : ""}
+      ${wl.rationale ? `<p style="margin-top:8px;font-size:12px;color:var(--ink-soft);line-height:1.5;">${escAttr(wl.rationale)}</p>` : ""}
     </div>` : ""}
     ${risks ? `<div class="ai-section risks"><h4>Key Risks</h4><ul>${risks}</ul></div>` : ""}
-    ${a.position_context ? `<div class="ai-section"><h4>For Your Position</h4><p>${a.position_context}</p></div>` : ""}
-    ${a.data_quality_notes ? `<div class="ai-section"><h4>Data Notes</h4><p style="font-size:12px;color:var(--ink-muted);">${a.data_quality_notes}</p></div>` : ""}
+    ${a.position_context ? `<div class="ai-section"><h4>For Your Position</h4><p>${escAttr(a.position_context)}</p></div>` : ""}
+    ${a.data_quality_notes ? `<div class="ai-section"><h4>Data Notes</h4><p style="font-size:12px;color:var(--ink-muted);">${escAttr(a.data_quality_notes)}</p></div>` : ""}
     <div class="ai-actions">
-      <button class="btn btn-sm" onclick="runAnalysis('${symbol}')" id="reanalyzeBtn">Re-analyze</button>
-      <button class="btn btn-secondary btn-sm" onclick="openLogTrade('${symbol}')">Log Trade</button>
+      <button class="btn btn-sm" data-act="run-analysis" data-symbol="${escAttr(symbol)}">Re-analyze</button>
+      <button class="btn btn-secondary btn-sm" data-act="log-trade" data-symbol="${escAttr(symbol)}">Log Trade</button>
     </div>
     <div class="ai-stamp">Generated ${fmtRel(a.generated_at)} · This is not financial advice.</div>
   </div>`;
 }
 
-// ----- Chart
 function getThemeColors() {
   const css = getComputedStyle(document.documentElement);
   return {
@@ -1268,7 +1281,7 @@ function renderChart(symbol, range) {
   if (!price || !price.ohlcv) return;
   const c = getThemeColors();
   const el = $("#chart");
-  if (!el) return;
+  if (!el || !window.LightweightCharts) return;
   el.innerHTML = "";
 
   const chart = LightweightCharts.createChart(el, {
@@ -1290,10 +1303,7 @@ function renderChart(symbol, range) {
   const now = Date.now();
   const rangeMs = { "1M": 30*864e5, "3M": 90*864e5, "6M": 180*864e5, "1Y": 365*864e5, "ALL": Infinity }[range];
   const filtered = price.ohlcv.filter(d => (now - d.t) <= rangeMs);
-  const data = filtered.map(d => ({
-    time: Math.floor(d.t / 1000),
-    open: d.o, high: d.h, low: d.l, close: d.c,
-  }));
+  const data = filtered.map(d => ({ time: Math.floor(d.t / 1000), open: d.o, high: d.h, low: d.l, close: d.c }));
   candle.setData(data);
 
   const closes = filtered.map(d => d.c);
@@ -1319,7 +1329,7 @@ function renderChart(symbol, range) {
 }
 function setRange(r, symbol) {
   state.selectedRange = r;
-  renderChart(symbol, r);
+  try { renderChart(symbol, r); } catch (e) { console.warn(e); }
   $$(".range-btn").forEach(b => b.classList.toggle("active", b.textContent === r));
 }
 
@@ -1332,7 +1342,6 @@ async function loadIndicators(symbol) {
     const rsiClass = ind.rsi14 > 70 ? "warn" : ind.rsi14 < 30 ? "warn" : "";
     const trendClass = ind.trend === "above_200ma" ? "pos" : "neg";
     const macdClass = macdCross.startsWith("bullish") ? "pos" : macdCross.startsWith("bearish") ? "neg" : "";
-
     const strip = $("#indStrip");
     if (!strip) return;
     strip.innerHTML = `
@@ -1355,12 +1364,11 @@ async function loadSentiment(symbol) {
     const news   = j.news?.headlines || [];
     let newsHtml = news.slice(0, 5).map(n => `
       <div class="news-item">
-        <a href="${n.link}" target="_blank" rel="noopener">${n.title}</a>
-        <div class="news-meta">${n.source || ''} ${n.published ? '· ' + new Date(n.published).toLocaleDateString() : ''}</div>
+        <a href="${escAttr(n.link)}" target="_blank" rel="noopener">${escAttr(n.title)}</a>
+        <div class="news-meta">${escAttr(n.source || '')} ${n.published ? '· ' + new Date(n.published).toLocaleDateString() : ''}</div>
       </div>
     `).join("");
     if (!newsHtml) newsHtml = `<div class="news-item" style="color:var(--ink-muted);font-size:13px;">No recent headlines.</div>`;
-
     block.innerHTML = `
       <div class="sent-card">
         <h3>Reddit · 24h</h3>
@@ -1379,7 +1387,7 @@ async function loadSentiment(symbol) {
 }
 
 async function runAnalysis(symbol) {
-  const btn = $("#analyzeBtn") || $("#reanalyzeBtn");
+  const btn = $(`[data-act="run-analysis"][data-symbol="${symbol}"]`);
   if (btn) {
     btn.innerHTML = '<span class="spinner"></span> Analyzing…';
     btn.disabled = true;
@@ -1391,8 +1399,7 @@ async function runAnalysis(symbol) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        uid: state.uid,
-        symbol,
+        uid: state.uid, symbol,
         holding: holding ? { quantity: holding.quantity, avg_cost: holding.avg_cost_unit } : null,
         idToken,
       }),
@@ -1410,21 +1417,15 @@ async function runAnalysis(symbol) {
       };
       toast("Analysis complete");
       renderAssetDetail(symbol);
-    } else {
-      throw new Error("No analysis returned");
-    }
+    } else throw new Error("No analysis returned");
   } catch (e) {
     toast("Analysis failed: " + (e.message || "unknown error").slice(0, 80), 3000, "error");
-    console.error(e);
-    if (btn) {
-      btn.innerHTML = "Try Again";
-      btn.disabled = false;
-    }
+    if (btn) { btn.innerHTML = "Try Again"; btn.disabled = false; }
   }
 }
 
 // ============================================================================
-// JOURNAL
+// JOURNAL / ALERTS / SETTINGS
 // ============================================================================
 async function loadJournal() {
   const snap = await db.collection("users").doc(state.uid).collection("journal")
@@ -1437,7 +1438,7 @@ async function renderJournal() {
   view.innerHTML = `
     <div class="section-head" style="padding: 20px 20px 0;">
       <h2>Journal</h2>
-      <button class="btn-ghost" onclick="openLogTrade()" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Log Trade</button>
+      <button class="btn-ghost" data-act="log-trade" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Log Trade</button>
     </div>
     <div id="journalList"><div class="empty-state"><span class="spinner"></span></div></div>
   `;
@@ -1445,7 +1446,7 @@ async function renderJournal() {
   if (entries.length === 0) {
     $("#journalList").innerHTML = `<div class="empty-state">
       <span class="display">No trades logged</span>
-      <p>Log every trade you make. After 3 months, you'll be able to audit whether the app is actually helping.</p>
+      <p>Log every trade you make. After 3 months you'll be able to audit whether the app is helping.</p>
     </div>`;
     return;
   }
@@ -1453,24 +1454,20 @@ async function renderJournal() {
     <div class="journal-entry">
       <div class="journal-head">
         <div>
-          <span class="journal-symbol">${e.symbol}</span>
-          <span class="journal-action ${e.action}">${e.action}</span>
+          <span class="journal-symbol">${escAttr(e.symbol)}</span>
+          <span class="journal-action ${e.action}">${escAttr(e.action)}</span>
         </div>
-        <div class="journal-meta">${e.date}</div>
+        <div class="journal-meta">${escAttr(e.date)}</div>
       </div>
       <div class="journal-meta">${fmtNum(e.quantity, 6)} @ $${fmtUSD(e.price)}</div>
-      ${e.reason ? `<div class="journal-reason">${e.reason}</div>` : ""}
-      ${e.signal_at_time ? `<div class="journal-snapshot">App signal at time: ${e.signal_at_time} · ${e.confidence_at_time || ""}</div>` : ""}
+      ${e.reason ? `<div class="journal-reason">${escAttr(e.reason)}</div>` : ""}
+      ${e.signal_at_time ? `<div class="journal-snapshot">App signal at time: ${escAttr(e.signal_at_time)} · ${escAttr(e.confidence_at_time || "")}</div>` : ""}
     </div>
   `).join("");
 }
 
-// ============================================================================
-// ALERTS
-// ============================================================================
 async function loadAlerts() {
-  const snap = await db.collection("users").doc(state.uid).collection("alerts")
-    .where("active", "==", true).get();
+  const snap = await db.collection("users").doc(state.uid).collection("alerts").where("active", "==", true).get();
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 async function renderAlerts() {
@@ -1479,7 +1476,7 @@ async function renderAlerts() {
   view.innerHTML = `
     <div class="section-head" style="padding: 20px 20px 0;">
       <h2>Alerts</h2>
-      <button class="btn-ghost" onclick="openAddAlert()" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
+      <button class="btn-ghost" data-act="add-alert" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
     </div>
     <div id="alertsList"><div class="empty-state"><span class="spinner"></span></div></div>
   `;
@@ -1494,11 +1491,11 @@ async function renderAlerts() {
   $("#alertsList").innerHTML = alerts.map(a => `
     <div class="alert-row">
       <div class="alert-info">
-        <div class="symbol">${a.symbol}</div>
+        <div class="symbol">${escAttr(a.symbol)}</div>
         <div class="cond">${a.type === 'price_above' ? 'Above' : 'Below'} $${fmtUSD(a.threshold)}</div>
       </div>
       <div class="alert-actions">
-        <button class="btn-ghost btn-sm" onclick="deleteAlert('${a.id}')">Remove</button>
+        <button class="btn-ghost btn-sm" data-act="delete-alert" data-id="${escAttr(a.id)}">Remove</button>
       </div>
     </div>
   `).join("");
@@ -1514,8 +1511,7 @@ async function checkAlerts() {
     const p = state.prices[a.symbol];
     if (!p) continue;
     const cur = p.current_price;
-    const trigger = (a.type === "price_above" && cur > a.threshold) ||
-                   (a.type === "price_below" && cur < a.threshold);
+    const trigger = (a.type === "price_above" && cur > a.threshold) || (a.type === "price_below" && cur < a.threshold);
     if (trigger) {
       toast(`${a.symbol} ${a.type === 'price_above' ? 'crossed above' : 'dropped below'} $${fmtUSD(a.threshold)}`);
       await db.collection("users").doc(state.uid).collection("alerts").doc(a.id).update({
@@ -1526,45 +1522,40 @@ async function checkAlerts() {
   }
 }
 
-// ============================================================================
-// SETTINGS
-// ============================================================================
 function renderSettings() {
   $("#topbarTitle").textContent = "Settings";
   const view = $("#view");
   view.innerHTML = `
-    <div class="section-head" style="padding: 20px 20px 0;">
-      <h2>Settings</h2>
-    </div>
+    <div class="section-head" style="padding: 20px 20px 0;"><h2>Settings</h2></div>
     <div class="settings-group">
       <div class="setting-row">
         <div><div class="lbl">Theme</div><div class="sub">Day or night</div></div>
-        <div class="toggle ${state.theme === 'night' ? 'on' : ''}" onclick="toggleTheme()"></div>
+        <div class="toggle ${state.theme === 'night' ? 'on' : ''}" data-act="toggle-theme"></div>
       </div>
       <div class="setting-row">
         <div><div class="lbl">Change PIN</div><div class="sub">Reset your local lock</div></div>
-        <button class="btn btn-secondary btn-sm" onclick="resetPin()">Change</button>
+        <button class="btn btn-secondary btn-sm" data-act="reset-pin">Change</button>
       </div>
     </div>
     <div class="settings-group">
       <div class="setting-row">
         <div><div class="lbl">Refresh All Prices</div><div class="sub">Pull latest from data sources</div></div>
-        <button class="btn btn-secondary btn-sm" onclick="manualRefresh()">Refresh</button>
+        <button class="btn btn-secondary btn-sm" data-act="manual-refresh">Refresh</button>
       </div>
       <div class="setting-row">
         <div><div class="lbl">Export Portfolio (JSON)</div><div class="sub">Holdings + journal + alerts</div></div>
-        <button class="btn btn-secondary btn-sm" onclick="exportData()">Export</button>
+        <button class="btn btn-secondary btn-sm" data-act="export-data">Export</button>
       </div>
     </div>
     <div class="settings-group">
       <div class="setting-row">
-        <div><div class="lbl">User ID</div><div class="sub mono" style="font-family:var(--mono);font-size:10.5px;">${state.uid || '—'}</div></div>
+        <div><div class="lbl">User ID</div><div class="sub" style="font-family:var(--mono);font-size:10.5px;">${escAttr(state.uid || '—')}</div></div>
       </div>
       <div class="setting-row">
-        <div><div class="lbl">Worker</div><div class="sub mono" style="font-family:var(--mono);font-size:10.5px;">portfolio-advisor.workers.dev</div></div>
+        <div><div class="lbl">Worker</div><div class="sub" style="font-family:var(--mono);font-size:10.5px;">portfolio-advisor.workers.dev</div></div>
       </div>
       <div class="setting-row">
-        <div><div class="lbl">Version</div><div class="sub">1.1.0</div></div>
+        <div><div class="lbl">Version</div><div class="sub">1.2.0</div></div>
       </div>
     </div>
     <div class="empty-state" style="padding: 30px 20px;">
@@ -1597,12 +1588,7 @@ async function manualRefresh() {
 async function exportData() {
   const journal = await loadJournal();
   const alerts  = await loadAlerts();
-  const data = {
-    exported_at: new Date().toISOString(),
-    holdings: state.holdings,
-    analyses: state.analyses,
-    journal, alerts,
-  };
+  const data = { exported_at: new Date().toISOString(), holdings: state.holdings, analyses: state.analyses, journal, alerts };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1624,24 +1610,22 @@ function closeModal() {
   $("#modalBg").classList.remove("show");
   $("#modal").classList.remove("show");
 }
-$("#modalBg").addEventListener("click", closeModal);
 
-// ----- ADD HOLDING (with proper cash + symbol search)
 function openAddHolding() {
   openModal(`
     <div class="modal-head"><h3>Add Holding</h3></div>
     <div class="field">
       <label>Asset Class</label>
-      <select id="ah_class" onchange="onAddClassChange()">
+      <select id="ah_class">
         ${ASSET_CLASSES.map(c => `<option value="${c.value}">${c.label}</option>`).join("")}
       </select>
     </div>
     <div id="ah_dynamic"></div>
-    <button class="btn btn-block" onclick="submitAddHolding()" style="margin-top:8px;">Add</button>
+    <button class="btn btn-block" data-act="submit-add" style="margin-top:8px;">Add</button>
   `);
+  $("#ah_class").addEventListener("change", onAddClassChange);
   onAddClassChange();
 }
-
 function onAddClassChange() {
   const cls = $("#ah_class").value;
   const dyn = $("#ah_dynamic");
@@ -1651,13 +1635,12 @@ function onAddClassChange() {
         <label>Amount (USD)</label>
         <input id="ah_cash" type="number" step="any" placeholder="0.00" />
         <div class="field-hint">For cash positions, enter the dollar amount you hold.</div>
-      </div>
-    `;
+      </div>`;
   } else {
     dyn.innerHTML = `
       <div class="field" style="position:relative;">
         <label>Symbol</label>
-        <input id="ah_symbol" placeholder="e.g. AAPL, BTC, SWRD" autocomplete="off" oninput="onSymbolInput()" />
+        <input id="ah_symbol" placeholder="e.g. AAPL, BTC, SWRD" autocomplete="off" />
         <div id="ah_search_results" class="search-results hidden"></div>
         <div class="field-hint">Type to search or enter ticker directly.</div>
       </div>
@@ -1665,14 +1648,12 @@ function onAddClassChange() {
         <div class="field"><label>Quantity</label><input id="ah_qty" type="number" step="any" placeholder="0" /></div>
         <div class="field"><label>Total Cost (USD)</label><input id="ah_cost" type="number" step="any" placeholder="0" /></div>
       </div>
-      <div class="field">
-        <label>Display Name (optional)</label>
-        <input id="ah_name" placeholder="e.g. Apple Inc." />
-      </div>
+      <div class="field"><label>Display Name (optional)</label><input id="ah_name" placeholder="e.g. Apple Inc." /></div>
     `;
+    const symInput = $("#ah_symbol");
+    symInput.addEventListener("input", debouncedSearch);
   }
 }
-
 const debouncedSearch = debounce(async () => {
   const q = $("#ah_symbol")?.value.trim();
   const results = $("#ah_search_results");
@@ -1683,47 +1664,33 @@ const debouncedSearch = debounce(async () => {
     const items = (j.results || []).slice(0, 6);
     if (items.length === 0) { results.classList.add("hidden"); return; }
     results.innerHTML = items.map(item => `
-      <div class="search-result" onclick="selectSearchResult('${item.symbol}', ${JSON.stringify(item.name).replace(/'/g, "\\'")})">
-        <span class="ex">${item.exchange || ''}</span>
-        <div class="sym">${item.symbol}</div>
-        <div class="nm">${item.name || ''}</div>
+      <div class="search-result" data-act="pick-symbol" data-symbol="${escAttr(item.symbol)}" data-name="${escAttr(item.name || '')}">
+        <span class="ex">${escAttr(item.exchange || '')}</span>
+        <div class="sym">${escAttr(item.symbol)}</div>
+        <div class="nm">${escAttr(item.name || '')}</div>
       </div>
     `).join("");
     results.classList.remove("hidden");
   } catch (e) { results.classList.add("hidden"); }
 }, 300);
 
-function onSymbolInput() { debouncedSearch(); }
-
-function selectSearchResult(symbol, name) {
-  $("#ah_symbol").value = symbol;
-  $("#ah_name").value = name || "";
-  $("#ah_search_results").classList.add("hidden");
-}
-
 async function submitAddHolding() {
   const cls = $("#ah_class").value;
   if (cls === "cash") {
     const amount = parseFloat($("#ah_cash").value);
     if (!amount || amount <= 0) { toast("Enter a valid amount", 2400, "error"); return; }
-    // Check if cash already exists
     const existing = state.holdings.find(h => h.symbol === "CASH");
     if (existing) {
-      // Add to existing cash
       const newQty = existing.quantity + amount;
       await db.collection("users").doc(state.uid).collection("holdings").doc("CASH").update({
-        quantity: newQty,
-        avg_cost_total: newQty,
+        quantity: newQty, avg_cost_total: newQty,
       });
       toast(`Cash updated to $${fmtUSD(newQty, 2)}`);
     } else {
       await db.collection("users").doc(state.uid).collection("holdings").doc("CASH").set({
         symbol: "CASH", asset_class: "cash",
-        quantity: amount,
-        avg_cost_total: amount,
-        avg_cost_unit: 1,
-        currency: "USD",
-        name: "Cash (USD)",
+        quantity: amount, avg_cost_total: amount, avg_cost_unit: 1,
+        currency: "USD", name: "Cash (USD)",
         added_at: firebase.firestore.FieldValue.serverTimestamp(),
       });
       toast("Cash added");
@@ -1734,30 +1701,15 @@ async function submitAddHolding() {
     renderCurrentView();
     return;
   }
-
   const symbol = $("#ah_symbol").value.trim().toUpperCase();
   const qty    = parseFloat($("#ah_qty").value);
   const cost   = parseFloat($("#ah_cost").value);
   const name   = $("#ah_name").value.trim() || symbol;
   if (!symbol || !qty || !cost) { toast("Fill all fields", 2400, "error"); return; }
-
-  // Verify the symbol fetches successfully
-  try {
-    const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(symbol)}`);
-    const j = await r.json();
-    if (!j.current_price && !r.ok) throw new Error("invalid");
-  } catch (e) {
-    toast(`Couldn't verify "${symbol}". Save anyway?`, 3000, "error");
-    // Save anyway — user might know better
-  }
-
   await db.collection("users").doc(state.uid).collection("holdings").doc(symbol).set({
     symbol, asset_class: cls,
-    quantity: qty,
-    avg_cost_total: cost,
-    avg_cost_unit: cost / qty,
-    currency: "USD",
-    name,
+    quantity: qty, avg_cost_total: cost, avg_cost_unit: cost / qty,
+    currency: "USD", name,
     added_at: firebase.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
   toast("Holding added");
@@ -1767,26 +1719,22 @@ async function submitAddHolding() {
   renderCurrentView();
 }
 
-// ----- EDIT HOLDING
 function openEditHolding(symbol) {
   const h = state.holdings.find(x => x.symbol === symbol);
   if (!h) return;
   const isCash = h.asset_class === "cash";
   openModal(`
-    <div class="modal-head"><h3>Edit ${symbol}</h3></div>
+    <div class="modal-head"><h3>Edit ${escAttr(symbol)}</h3></div>
     ${isCash ? `
-      <div class="field">
-        <label>Amount (USD)</label>
-        <input id="eh_cash" type="number" step="any" value="${h.quantity}" />
-      </div>
+      <div class="field"><label>Amount (USD)</label><input id="eh_cash" type="number" step="any" value="${h.quantity}" /></div>
     ` : `
       <div class="field-row">
         <div class="field"><label>Quantity</label><input id="eh_qty" type="number" step="any" value="${h.quantity}" /></div>
         <div class="field"><label>Total Cost (USD)</label><input id="eh_cost" type="number" step="any" value="${h.avg_cost_total}" /></div>
       </div>
-      <div class="field"><label>Display Name</label><input id="eh_name" value="${h.name || ''}" /></div>
+      <div class="field"><label>Display Name</label><input id="eh_name" value="${escAttr(h.name || '')}" /></div>
     `}
-    <button class="btn btn-block" onclick="submitEditHolding('${symbol}')">Save Changes</button>
+    <button class="btn btn-block" data-act="submit-edit" data-symbol="${escAttr(symbol)}">Save Changes</button>
   `);
 }
 async function submitEditHolding(symbol) {
@@ -1796,8 +1744,7 @@ async function submitEditHolding(symbol) {
     const amount = parseFloat($("#eh_cash").value);
     if (!amount || amount <= 0) { toast("Enter a valid amount", 2400, "error"); return; }
     await db.collection("users").doc(state.uid).collection("holdings").doc(symbol).update({
-      quantity: amount,
-      avg_cost_total: amount,
+      quantity: amount, avg_cost_total: amount,
     });
   } else {
     const qty = parseFloat($("#eh_qty").value);
@@ -1805,10 +1752,7 @@ async function submitEditHolding(symbol) {
     const name = $("#eh_name").value.trim();
     if (!qty || !cost) { toast("Fill all fields", 2400, "error"); return; }
     await db.collection("users").doc(state.uid).collection("holdings").doc(symbol).update({
-      quantity: qty,
-      avg_cost_total: cost,
-      avg_cost_unit: cost / qty,
-      name,
+      quantity: qty, avg_cost_total: cost, avg_cost_unit: cost / qty, name,
     });
   }
   toast("Updated");
@@ -1817,7 +1761,6 @@ async function submitEditHolding(symbol) {
   renderAssetDetail(symbol);
 }
 
-// ----- DELETE HOLDING
 function confirmDeleteHolding(symbol) {
   if (confirm(`Remove ${symbol} from your portfolio? This won't delete past analyses or journal entries.`)) {
     deleteHolding(symbol);
@@ -1831,13 +1774,12 @@ async function deleteHolding(symbol) {
   setView("portfolio");
 }
 
-// ----- LOG TRADE
 function openLogTrade(symbol) {
   const sigSnapshot = symbol && state.analyses[symbol] ? state.analyses[symbol] : null;
   openModal(`
     <div class="modal-head"><h3>Log Trade</h3></div>
     <div class="field-row">
-      <div class="field"><label>Symbol</label><input id="lt_symbol" value="${symbol || ''}" /></div>
+      <div class="field"><label>Symbol</label><input id="lt_symbol" value="${escAttr(symbol || '')}" /></div>
       <div class="field"><label>Action</label>
         <select id="lt_action">
           <option value="buy">Buy</option>
@@ -1853,8 +1795,8 @@ function openLogTrade(symbol) {
       <label>Reason / Thesis</label>
       <textarea id="lt_reason" rows="3" placeholder="Why did you make this trade?" style="font-family:var(--sans);"></textarea>
     </div>
-    ${sigSnapshot ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--ink-muted);margin-bottom:14px;padding:10px;background:var(--bg-elev);border-radius:6px;">Snapshot: signal "${sigSnapshot.signal}" · ${sigSnapshot.confidence} confidence</div>` : ""}
-    <button class="btn btn-block" onclick="submitTrade(${sigSnapshot ? `'${sigSnapshot.signal}','${sigSnapshot.confidence}'` : 'null,null'})">Save</button>
+    ${sigSnapshot ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--ink-muted);margin-bottom:14px;padding:10px;background:var(--bg-elev);border-radius:6px;">Snapshot: signal "${escAttr(sigSnapshot.signal)}" · ${escAttr(sigSnapshot.confidence)} confidence</div>` : ""}
+    <button class="btn btn-block" data-act="submit-trade" ${sigSnapshot ? `data-sig="${escAttr(sigSnapshot.signal)}" data-conf="${escAttr(sigSnapshot.confidence)}"` : ""}>Save</button>
   `);
 }
 async function submitTrade(sig, conf) {
@@ -1868,17 +1810,16 @@ async function submitTrade(sig, conf) {
     symbol, action, quantity: qty, price, reason,
     date: new Date().toISOString().slice(0, 10),
     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-    signal_at_time: sig === "null" ? null : sig,
-    confidence_at_time: conf === "null" ? null : conf,
+    signal_at_time: sig || null,
+    confidence_at_time: conf || null,
   });
   toast("Trade logged");
   closeModal();
   if (state.currentView === "journal") renderJournal();
 }
 
-// ----- ADD ALERT
 function openAddAlert() {
-  const opts = state.holdings.filter(h => h.asset_class !== "cash").map(h => `<option value="${h.symbol}">${h.symbol}</option>`).join("");
+  const opts = state.holdings.filter(h => h.asset_class !== "cash").map(h => `<option value="${escAttr(h.symbol)}">${escAttr(h.symbol)}</option>`).join("");
   openModal(`
     <div class="modal-head"><h3>New Alert</h3></div>
     <div class="field"><label>Symbol</label><select id="al_symbol">${opts}</select></div>
@@ -1889,7 +1830,7 @@ function openAddAlert() {
       </select>
     </div>
     <div class="field"><label>Threshold (USD)</label><input id="al_threshold" type="number" step="any" /></div>
-    <button class="btn btn-block" onclick="submitAlert()">Create Alert</button>
+    <button class="btn btn-block" data-act="submit-alert">Create Alert</button>
   `);
 }
 async function submitAlert() {
@@ -1898,8 +1839,7 @@ async function submitAlert() {
   const threshold = parseFloat($("#al_threshold").value);
   if (!symbol || !threshold) { toast("Fill all fields", 2400, "error"); return; }
   await db.collection("users").doc(state.uid).collection("alerts").add({
-    symbol, type, threshold,
-    active: true,
+    symbol, type, threshold, active: true,
     created_at: firebase.firestore.FieldValue.serverTimestamp(),
   });
   toast("Alert created");
@@ -1908,30 +1848,64 @@ async function submitAlert() {
 }
 
 // ============================================================================
-// EVENTS
+// EVENT DELEGATION — single global click handler dispatches all actions
 // ============================================================================
-$$(".tab").forEach(t => t.addEventListener("click", () => setView(t.dataset.view)));
+document.addEventListener("click", (e) => {
+  const target = e.target.closest("[data-act], [data-view]");
+  if (!target) return;
+
+  // Tab switching
+  if (target.dataset.view) {
+    setView(target.dataset.view);
+    return;
+  }
+
+  const act = target.dataset.act;
+  const symbol = target.dataset.symbol;
+
+  try {
+    switch (act) {
+      case "open-asset":         openAsset(symbol); break;
+      case "back-markets":       backToMarkets(); break;
+      case "set-range":          setRange(target.dataset.range, symbol); break;
+      case "run-analysis":       runAnalysis(symbol); break;
+      case "log-trade":          openLogTrade(symbol); break;
+      case "add-holding":        openAddHolding(); break;
+      case "submit-add":         submitAddHolding(); break;
+      case "edit-holding":       openEditHolding(symbol); break;
+      case "submit-edit":        submitEditHolding(symbol); break;
+      case "delete-holding":     confirmDeleteHolding(symbol); break;
+      case "submit-trade":       submitTrade(target.dataset.sig, target.dataset.conf); break;
+      case "add-alert":          openAddAlert(); break;
+      case "submit-alert":       submitAlert(); break;
+      case "delete-alert":       deleteAlert(target.dataset.id); break;
+      case "pick-symbol":
+        $("#ah_symbol").value = target.dataset.symbol;
+        $("#ah_name").value = target.dataset.name || "";
+        $("#ah_search_results").classList.add("hidden");
+        break;
+      case "toggle-theme":       toggleTheme(); break;
+      case "reset-pin":          resetPin(); break;
+      case "manual-refresh":     manualRefresh(); break;
+      case "export-data":        exportData(); break;
+    }
+  } catch (err) {
+    showError("Action failed: " + err.message);
+  }
+});
+
+// Topbar buttons
 $("#themeBtn").addEventListener("click", toggleTheme);
 $("#refreshBtn").addEventListener("click", manualRefresh);
+$("#modalBg").addEventListener("click", closeModal);
 
 window.addEventListener("load", () => {
-  setTimeout(() => showPinScreen(), 600);
+  setTimeout(showPinScreen, 600);
 });
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
-
-// Expose for inline handlers
-Object.assign(window, {
-  openAsset, backToMarkets,
-  openAddHolding, submitAddHolding, onAddClassChange, onSymbolInput, selectSearchResult,
-  openEditHolding, submitEditHolding, confirmDeleteHolding,
-  openLogTrade, submitTrade,
-  openAddAlert, submitAlert, deleteAlert,
-  runAnalysis, setRange,
-  toggleTheme, resetPin, manualRefresh, exportData,
-});
 </script>
 
 </body>
