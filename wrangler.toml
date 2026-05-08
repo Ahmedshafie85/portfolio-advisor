@@ -1,5 +1,5 @@
 name = "portfolio-advisor"
-main = "worker.js"
+main = "index.js"
 compatibility_date = "2025-01-15"
 
 # Daily cron: 1:00 AM Kuwait time = 22:00 UTC (previous day)
