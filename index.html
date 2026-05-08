@@ -13,7 +13,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
 <style>
 :root {
@@ -62,11 +62,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body {
   height: 100%;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--sans);
-  font-size: 15px;
-  line-height: 1.5;
+  background: var(--bg); color: var(--ink);
+  font-family: var(--sans); font-size: 15px; line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'ss01', 'cv11', 'tnum';
   overscroll-behavior-y: none;
@@ -127,7 +124,6 @@ body {
 .tab svg { width: 22px; height: 22px; stroke-width: 1.5; pointer-events: none; }
 .tab.active svg { stroke-width: 2; }
 
-.section { padding: 20px; }
 .section-head {
   display: flex; justify-content: space-between; align-items: baseline;
   margin-bottom: 14px;
@@ -208,12 +204,18 @@ body {
 .holding-pnl.pos { color: var(--green); }
 .holding-pnl.neg { color: var(--red); }
 .holding-pnl.flat { color: var(--ink-muted); }
-.holding-signal {
-  position: absolute; top: 18px; right: 14px;
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--accent); display: none;
+.holding-stance {
+  position: absolute; top: 16px; right: 14px;
+  font-family: var(--mono); font-size: 8.5px; font-weight: 600;
+  padding: 2px 6px; border-radius: 3px; letter-spacing: 0.1em;
+  display: none;
 }
-.holding-signal.show { display: block; }
+.holding-stance.show { display: inline-block; }
+.holding-stance.ACCUMULATE { background: rgba(74,122,74,0.15); color: var(--green); }
+.holding-stance.HOLD       { background: var(--bg-elev); color: var(--ink-soft); }
+.holding-stance.TRIM       { background: rgba(176,141,60,0.15); color: var(--gold); }
+.holding-stance.EXIT       { background: rgba(161,61,45,0.15); color: var(--red); }
+.holding-stance.AVOID      { background: rgba(161,61,45,0.10); color: var(--red-soft); }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -231,6 +233,24 @@ body {
 .btn-block { display: flex; width: 100%; }
 .btn-sm { padding: 8px 14px; font-size: 11.5px; }
 .btn-danger { background: transparent; color: var(--red); border-color: var(--red-soft); }
+
+.btn-portfolio-analyze {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 14px 20px;
+  padding: 14px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  cursor: pointer; transition: background .15s;
+  position: relative; overflow: hidden;
+}
+.btn-portfolio-analyze::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: var(--accent);
+}
+.btn-portfolio-analyze:hover { background: var(--bg-elev); }
+.btn-portfolio-analyze .lbl { font-family: var(--display); font-size: 16px; font-weight: 500; }
+.btn-portfolio-analyze .sub { font-size: 11px; color: var(--ink-muted); margin-top: 2px; }
+.btn-portfolio-analyze .arrow { color: var(--accent); font-size: 18px; }
 
 .pin-screen {
   position: fixed; inset: 0; background: var(--bg);
@@ -344,60 +364,185 @@ body {
   padding-top: 14px; border-top: 1px solid var(--rule-soft);
 }
 
+/* ============ NEW AI CARD STYLES ============ */
+
 .ai-card {
   margin: 14px 20px;
   border: 1px solid var(--rule); border-radius: var(--radius);
-  background: var(--bg-card); padding: 18px 20px;
+  background: var(--bg-card); padding: 0;
   position: relative; overflow: hidden;
 }
 .ai-card::before {
   content: ""; position: absolute; top: 0; left: 0;
   width: 4px; height: 100%; background: var(--accent);
 }
-.ai-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.ai-head h3 { font-family: var(--display); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
-.signal-pill {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 11px; border-radius: 999px;
-  font-family: var(--mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em;
-  text-transform: uppercase; border: 1px solid var(--rule);
-}
-.signal-pill.bullish          { background: rgba(74,122,74,0.12); color: var(--green); border-color: var(--green-soft); }
-.signal-pill.neutralbullish   { background: rgba(74,122,74,0.06); color: var(--green-soft); border-color: var(--rule); }
-.signal-pill.neutral          { color: var(--ink-soft); }
-.signal-pill.neutralbearish   { background: rgba(161,61,45,0.06); color: var(--red-soft); border-color: var(--rule); }
-.signal-pill.bearish          { background: rgba(161,61,45,0.12); color: var(--red); border-color: var(--red-soft); }
-.signal-pill.no-signal        { color: var(--ink-muted); border-style: dashed; }
 
-.confidence-pill {
-  display: inline-flex;
+/* Stance hero */
+.stance-hero {
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.stance-eyebrow {
+  font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--ink-muted); font-weight: 500; margin-bottom: 8px;
+}
+.stance-verb {
+  font-family: var(--display); font-weight: 700;
+  font-size: 38px; letter-spacing: -0.025em; line-height: 1;
+}
+.stance-verb.ACCUMULATE { color: var(--green); }
+.stance-verb.HOLD       { color: var(--ink); }
+.stance-verb.TRIM       { color: var(--gold); }
+.stance-verb.EXIT       { color: var(--red); }
+.stance-verb.AVOID      { color: var(--red-soft); }
+.stance-headline {
+  font-size: 14px; color: var(--ink-soft); margin-top: 8px;
+  line-height: 1.45;
+}
+.stance-pills {
+  display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;
+}
+.pill {
+  display: inline-flex; align-items: center;
   font-family: var(--mono); font-size: 9.5px; font-weight: 500;
-  padding: 3px 8px; background: var(--bg-elev); color: var(--ink-soft);
-  border-radius: 4px; letter-spacing: 0.1em; text-transform: uppercase; margin-left: 6px;
+  padding: 4px 9px; border-radius: 4px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+.pill-conf {
+  background: var(--bg-elev); color: var(--ink-soft);
+  border: 1px solid var(--rule);
+}
+.pill-conv {
+  background: transparent; color: var(--ink-muted);
+  border: 1px dashed var(--rule);
+}
+.pill-conv.high, .pill-conf.high { color: var(--ink); border-color: var(--ink-soft); }
+.pill-conv.medium, .pill-conf.medium { color: var(--ink-soft); }
+.pill-conv.low, .pill-conf.low { color: var(--ink-muted); opacity: 0.85; }
+
+/* Action block */
+.action-block {
+  padding: 16px 20px;
+  background: linear-gradient(180deg, transparent 0%, rgba(161,61,45,0.04) 100%);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.action-block h4 {
+  font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-muted); font-weight: 500; margin-bottom: 10px;
+}
+.action-what {
+  font-family: var(--display); font-size: 18px; font-weight: 500;
+  letter-spacing: -0.01em; color: var(--ink); line-height: 1.3;
+}
+.action-meta {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  margin-top: 12px;
+}
+.action-meta-cell {
+  background: var(--bg); border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sm); padding: 8px 10px;
+}
+.action-meta-cell .lbl {
+  font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-muted); font-weight: 500;
+}
+.action-meta-cell .val {
+  font-family: var(--mono); font-size: 12.5px; font-weight: 500;
+  color: var(--ink); margin-top: 3px;
+}
+.invalidation-row {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(161,61,45,0.06);
+  border: 1px solid var(--red-soft);
+  border-radius: var(--radius-sm);
+  font-size: 12px; color: var(--ink);
+  line-height: 1.45;
+}
+.invalidation-row strong {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--red); font-weight: 600;
+  display: block; margin-bottom: 3px;
 }
 
-.ai-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--rule-soft); }
-.ai-section:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+/* Horizon strip */
+.horizon-strip {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.horizon-cell {
+  padding: 12px 10px; text-align: center;
+  border-right: 1px solid var(--rule-soft);
+}
+.horizon-cell:last-child { border-right: none; }
+.horizon-cell .lbl {
+  font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-muted); font-weight: 500;
+}
+.horizon-cell .signal-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block; margin-top: 6px;
+}
+.signal-dot.bullish          { background: var(--green); }
+.signal-dot.neutralbullish   { background: var(--green-soft); opacity: 0.7; }
+.signal-dot.neutral          { background: var(--ink-muted); }
+.signal-dot.neutralbearish   { background: var(--red-soft); opacity: 0.7; }
+.signal-dot.bearish          { background: var(--red); }
+.horizon-cell .signal-text {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.04em;
+  color: var(--ink-soft); margin-top: 5px;
+}
+.horizon-cell .note {
+  font-size: 10.5px; color: var(--ink-soft); margin-top: 6px;
+  line-height: 1.35; min-height: 28px;
+}
+
+/* Body sections */
+.ai-body { padding: 16px 20px; }
+.ai-section { margin-bottom: 16px; }
+.ai-section:last-child { margin-bottom: 0; }
 .ai-section h4 {
   font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--ink-muted); font-weight: 500; margin-bottom: 6px;
 }
-.ai-section p { font-size: 14px; color: var(--ink); line-height: 1.55; }
+.ai-section p { font-size: 13.5px; color: var(--ink); line-height: 1.55; }
 
-.levels-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
-  background: var(--rule-soft);
-  border: 1px solid var(--rule-soft); border-radius: var(--radius-sm);
-  overflow: hidden; margin-top: 8px;
+.confluence-row {
+  display: flex; align-items: baseline; gap: 8px;
+  margin-bottom: 4px;
 }
-.level-cell { background: var(--bg-card); padding: 10px 8px; text-align: center; }
-.level-cell .lvl-lbl { font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted); }
-.level-cell .lvl-val { font-family: var(--mono); font-size: 14px; margin-top: 3px; font-weight: 500; }
-.lvl-val.support { color: var(--green); }
-.lvl-val.resistance { color: var(--red); }
-.lvl-val.stop { color: var(--accent); }
+.confluence-score {
+  font-family: var(--display); font-size: 22px; font-weight: 600;
+  color: var(--ink); letter-spacing: -0.01em;
+}
 
-.risks ul { list-style: none; margin-top: 6px; }
+.scenarios-grid {
+  display: grid; grid-template-columns: 1fr; gap: 8px;
+  margin-top: 6px;
+}
+.scenario {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule-soft);
+  background: var(--bg);
+}
+.scenario.bull { border-left: 3px solid var(--green); }
+.scenario.bear { border-left: 3px solid var(--red); }
+.scenario.base { border-left: 3px solid var(--ink-muted); }
+.scenario .scn-lbl {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; font-weight: 600; margin-bottom: 4px;
+}
+.scenario.bull .scn-lbl { color: var(--green); }
+.scenario.bear .scn-lbl { color: var(--red); }
+.scenario.base .scn-lbl { color: var(--ink-muted); }
+.scenario .scn-cond { font-size: 12.5px; color: var(--ink); line-height: 1.45; }
+.scenario .scn-impl {
+  font-size: 11.5px; color: var(--ink-soft); margin-top: 4px; line-height: 1.4;
+  font-style: italic;
+}
+
+.risks ul { list-style: none; margin-top: 4px; }
 .risks li {
   font-size: 13px; padding: 5px 0 5px 18px; position: relative;
   color: var(--ink); line-height: 1.45;
@@ -407,15 +552,122 @@ body {
   width: 4px; height: 1px; background: var(--accent);
 }
 
+.what-changed {
+  padding: 10px 12px;
+  background: var(--bg-elev);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px; color: var(--ink-soft);
+  line-height: 1.5;
+  font-family: var(--sans);
+}
+.what-changed::before {
+  content: "WHAT CHANGED";
+  display: block;
+  font-family: var(--mono); font-size: 9px; font-weight: 600;
+  letter-spacing: 0.14em; color: var(--ink-muted);
+  margin-bottom: 4px;
+}
+
+.counter-arg {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: rgba(176,141,60,0.06);
+  border: 1px dashed var(--gold);
+  border-radius: var(--radius-sm);
+}
+.counter-arg .ca-lbl {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--gold); font-weight: 600;
+  margin-bottom: 5px;
+}
+.counter-arg .ca-text {
+  font-size: 12.5px; color: var(--ink); line-height: 1.55;
+  font-style: italic;
+}
+
+.position-context-block {
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px; color: var(--ink);
+  line-height: 1.5;
+}
+
 .ai-actions {
   display: flex; gap: 8px;
-  margin-top: 16px; padding-top: 14px;
+  padding: 14px 20px;
   border-top: 1px solid var(--rule-soft);
 }
-.ai-stamp { font-family: var(--mono); font-size: 10px; color: var(--ink-muted); letter-spacing: 0.04em; margin-top: 12px; }
+.ai-stamp {
+  font-family: var(--mono); font-size: 9.5px; color: var(--ink-muted);
+  letter-spacing: 0.04em; padding: 0 20px 14px; line-height: 1.5;
+}
 
 .empty-ai { text-align: center; padding: 30px 20px; color: var(--ink-muted); font-size: 13px; }
 .empty-ai .display { font-size: 16px; color: var(--ink-soft); margin-bottom: 14px; display: block; }
+
+/* Portfolio analysis card */
+.port-analysis-card {
+  margin: 14px 20px;
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  background: var(--bg-card); padding: 0;
+  position: relative; overflow: hidden;
+}
+.port-analysis-card::before {
+  content: ""; position: absolute; top: 0; left: 0;
+  width: 4px; height: 100%; background: var(--gold);
+}
+.port-stance-hero { padding: 22px 20px 18px; border-bottom: 1px solid var(--rule-soft); }
+.port-stance-verb {
+  font-family: var(--display); font-weight: 700;
+  font-size: 32px; letter-spacing: -0.02em; line-height: 1;
+}
+.port-stance-verb.DEFENSIVE { color: var(--ink-soft); }
+.port-stance-verb.BALANCED  { color: var(--ink); }
+.port-stance-verb.AGGRESSIVE { color: var(--accent); }
+.port-stance-verb.MISALIGNED, .port-stance-verb.MIS-ALIGNED { color: var(--red); }
+
+.list-block {
+  background: var(--bg);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sm);
+  padding: 4px 0;
+  margin-top: 6px;
+}
+.list-block .li {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule-soft);
+  font-size: 12.5px; color: var(--ink); line-height: 1.5;
+}
+.list-block .li:last-child { border-bottom: none; }
+
+.rec-block {
+  background: var(--bg);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-top: 8px;
+}
+.rec-block.high { border-left: 3px solid var(--accent); }
+.rec-block.medium { border-left: 3px solid var(--gold); }
+.rec-block.low { border-left: 3px solid var(--ink-muted); }
+.rec-action {
+  font-family: var(--display); font-size: 14px; font-weight: 500;
+  color: var(--ink); line-height: 1.4;
+}
+.rec-rationale {
+  font-size: 12px; color: var(--ink-soft); line-height: 1.5; margin-top: 5px;
+}
+.rec-priority {
+  font-family: var(--mono); font-size: 9px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  margin-top: 6px; display: inline-block;
+  padding: 2px 6px; border-radius: 3px;
+}
+.rec-priority.high { background: rgba(161,61,45,0.12); color: var(--accent); }
+.rec-priority.medium { background: rgba(176,141,60,0.15); color: var(--gold); }
+.rec-priority.low { background: var(--bg-elev); color: var(--ink-muted); }
 
 .sent-card {
   margin: 14px 20px;
@@ -663,7 +915,6 @@ body {
 <script>
 "use strict";
 
-// Global error handler — surfaces any uncaught error so we don't fail silently
 window.addEventListener("error", (e) => {
   showError(e.message + (e.filename ? ` (${e.filename}:${e.lineno})` : ""));
 });
@@ -709,12 +960,8 @@ const SEED_HOLDINGS = [
   { symbol: "BTC",  asset_class: "crypto",   quantity: 0.10996493,  avg_cost_total: 8855,  name: "Bitcoin" },
 ];
 
-const ALLOC_COLORS = {
-  etf: "#4a4639", us_stock: "#a13d2d", crypto: "#b08d3c", metal: "#d4a85c", cash: "#8a8473",
-};
-const ALLOC_LABELS = {
-  etf: "ETFs", us_stock: "Stocks", crypto: "Crypto", metal: "Metals", cash: "Cash",
-};
+const ALLOC_COLORS = { etf: "#4a4639", us_stock: "#a13d2d", crypto: "#b08d3c", metal: "#d4a85c", cash: "#8a8473" };
+const ALLOC_LABELS = { etf: "ETFs", us_stock: "Stocks", crypto: "Crypto", metal: "Metals", cash: "Cash" };
 const ASSET_CLASSES = [
   { value: "us_stock", label: "US Stock" },
   { value: "etf",      label: "ETF" },
@@ -737,6 +984,7 @@ const state = {
   holdings: [],
   prices: {},
   analyses: {},
+  portfolioAnalysis: null,
   selectedSymbol: null,
   selectedRange: "3M",
   chart: null,
@@ -791,6 +1039,8 @@ function toast(msg, ms = 2400, type = "default") {
 function escAttr(s) {
   return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
+function signalToClass(s) { return String(s || "neutral").replace(/[^a-z]/g, ""); }
+function stanceToClass(s) { return String(s || "HOLD").replace(/[^A-Z]/g, ""); }
 
 // ============================================================================
 // PIN GATE
@@ -887,7 +1137,7 @@ function showPinScreen() {
 // ============================================================================
 async function ensureAuth() {
   return new Promise((resolve, reject) => {
-    const unsub = auth.onAuthStateChanged(async user => {
+    auth.onAuthStateChanged(async user => {
       if (user) { state.uid = user.uid; resolve(user); }
       else {
         try { await auth.signInAnonymously(); }
@@ -902,6 +1152,7 @@ async function loadInitialData() {
   await loadHoldingsFromFirestore();
   if (state.holdings.length === 0) await seedHoldings();
   await loadAnalysesFromFirestore();
+  await loadPortfolioAnalysis();
   await refreshAllPrices();
   renderCurrentView();
 }
@@ -919,8 +1170,7 @@ async function seedHoldings() {
         quantity: h.quantity,
         avg_cost_total: h.avg_cost_total,
         avg_cost_unit: h.avg_cost_total / h.quantity,
-        currency: "USD",
-        name: h.name,
+        currency: "USD", name: h.name,
         added_at: firebase.firestore.FieldValue.serverTimestamp(),
       });
     } catch (e) { console.warn("seed failed for", h.symbol, e); }
@@ -939,6 +1189,14 @@ async function loadAnalysesFromFirestore() {
     });
     state.analyses = latest;
   } catch (e) { console.warn("analyses load failed", e); state.analyses = {}; }
+}
+
+async function loadPortfolioAnalysis() {
+  try {
+    const snap = await db.collection("users").doc(state.uid).collection("portfolio_analyses")
+      .orderBy("generated_at", "desc").limit(1).get();
+    state.portfolioAnalysis = snap.docs[0]?.data() || null;
+  } catch (e) { state.portfolioAnalysis = null; }
 }
 
 async function refreshAllPrices() {
@@ -1020,6 +1278,8 @@ function renderPortfolio() {
     </div>`;
   }
 
+  const portAnalysisCard = renderPortAnalysisInlineCard();
+
   let holdingsHtml = "";
   if (state.holdings.length === 0) {
     holdingsHtml = `<div class="empty-state">
@@ -1031,10 +1291,14 @@ function renderPortfolio() {
     state.holdings.sort((a, b) => (holdingMetrics(b).value || 0) - (holdingMetrics(a).value || 0));
     holdingsHtml = state.holdings.map(h => {
       const hm = holdingMetrics(h);
-      const hasSig = !!state.analyses[h.symbol];
+      const a = state.analyses[h.symbol];
+      const stance = a?.stance;
       const isCash = h.asset_class === "cash";
       const pnlClass = isCash ? "flat" : (hm.pnlPct >= 0 ? "pos" : "neg");
       const pnlText = isCash ? "Cash" : fmtPct(hm.pnlPct);
+      const stanceBadge = (stance && !isCash)
+        ? `<span class="holding-stance show ${escAttr(stance)}">${escAttr(stance)}</span>`
+        : "";
       return `<div class="holding" data-act="open-asset" data-symbol="${escAttr(h.symbol)}">
         <div class="holding-icon" data-class="${h.asset_class}">${escAttr(h.symbol.slice(0,2))}</div>
         <div class="holding-main">
@@ -1045,7 +1309,7 @@ function renderPortfolio() {
           <div class="holding-value">${hm.value != null ? '$' + fmtUSD(hm.value, 0) : '—'}</div>
           <div class="holding-pnl ${pnlClass}">${pnlText}</div>
         </div>
-        <div class="holding-signal ${hasSig && !isCash ? 'show' : ''}"></div>
+        ${stanceBadge}
       </div>`;
     }).join("");
   }
@@ -1068,6 +1332,8 @@ function renderPortfolio() {
       <div class="alloc-legend">${allocLegend}</div>
     </div>
 
+    ${portAnalysisCard}
+
     <div class="section-head" style="padding: 0 20px; margin-top: 20px;">
       <h2>Holdings</h2>
       <button class="btn-ghost" data-act="add-holding" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
@@ -1075,6 +1341,91 @@ function renderPortfolio() {
     <div class="holdings">${holdingsHtml}</div>
   `;
   $("#topbarTitle").textContent = "Portfolio";
+}
+
+function renderPortAnalysisInlineCard() {
+  const a = state.portfolioAnalysis;
+  if (!a) {
+    return `
+      <div class="btn-portfolio-analyze" data-act="run-portfolio-analysis">
+        <div>
+          <div class="lbl">Run Portfolio Analysis</div>
+          <div class="sub">Whole-portfolio AI read · concentration, drift, correlation</div>
+        </div>
+        <div class="arrow">›</div>
+      </div>
+    `;
+  }
+  // Compact display when analysis exists, expandable to full
+  return `
+    <div class="port-analysis-card">
+      <div class="port-stance-hero">
+        <div class="stance-eyebrow">Portfolio Stance · ${fmtRel(a.generated_at)}</div>
+        <div class="port-stance-verb ${stanceToClass(a.portfolio_stance)}">${escAttr(a.portfolio_stance || "—")}</div>
+        <div class="stance-headline">${escAttr(a.headline || "")}</div>
+        <div class="stance-pills">
+          <span class="pill pill-conf ${escAttr(a.confidence || '')}">conf: ${escAttr(a.confidence || "—")}</span>
+        </div>
+      </div>
+      <div class="ai-body">
+        ${a.implicit_bets?.length ? `
+          <div class="ai-section">
+            <h4>Implicit Bets</h4>
+            <div class="list-block">
+              ${a.implicit_bets.map(b => `<div class="li">${escAttr(b)}</div>`).join("")}
+            </div>
+          </div>` : ""}
+
+        ${a.concentration_risks?.length ? `
+          <div class="ai-section">
+            <h4>Concentration Risks</h4>
+            <div class="list-block">
+              ${a.concentration_risks.map(r => `<div class="li">${escAttr(r)}</div>`).join("")}
+            </div>
+          </div>` : ""}
+
+        ${a.correlation_notes ? `
+          <div class="ai-section">
+            <h4>Correlation Notes</h4>
+            <p>${escAttr(a.correlation_notes)}</p>
+          </div>` : ""}
+
+        ${a.drift_observations ? `
+          <div class="ai-section">
+            <h4>Drift</h4>
+            <p>${escAttr(a.drift_observations)}</p>
+          </div>` : ""}
+
+        ${a.top_recommendations?.length ? `
+          <div class="ai-section">
+            <h4>Top Recommendations</h4>
+            ${a.top_recommendations.map(r => `
+              <div class="rec-block ${escAttr(r.priority || 'medium')}">
+                <div class="rec-action">${escAttr(r.action)}</div>
+                <div class="rec-rationale">${escAttr(r.rationale || "")}</div>
+                <span class="rec-priority ${escAttr(r.priority || 'medium')}">${escAttr(r.priority || 'medium')}</span>
+              </div>
+            `).join("")}
+          </div>` : ""}
+
+        ${a.macro_context ? `
+          <div class="ai-section">
+            <h4>Macro Context</h4>
+            <p>${escAttr(a.macro_context)}</p>
+          </div>` : ""}
+
+        ${a.counter_argument ? `
+          <div class="counter-arg">
+            <div class="ca-lbl">Counter-Argument</div>
+            <div class="ca-text">${escAttr(a.counter_argument)}</div>
+          </div>` : ""}
+      </div>
+      <div class="ai-actions">
+        <button class="btn btn-sm" data-act="run-portfolio-analysis">Re-analyze Portfolio</button>
+      </div>
+      <div class="ai-stamp">Generated ${fmtRel(a.generated_at)} · This is not financial advice.</div>
+    </div>
+  `;
 }
 
 // ----- Markets
@@ -1153,15 +1504,17 @@ async function renderAssetDetail(symbol) {
   let posCard = "";
   if (holding) {
     const hm = holdingMetrics(holding);
-    const isCashRow = isCash;
+    const m = portfolioMetrics();
+    const pctOfPort = m.totalValue > 0 && hm.value ? (hm.value / m.totalValue) * 100 : null;
     posCard = `
       <div class="pos-card">
         <h3>Your Position</h3>
-        <div class="pos-row"><span class="lbl">${isCashRow ? 'Amount' : 'Quantity'}</span><span class="val">${isCashRow ? '$' + fmtUSD(holding.quantity, 2) : fmtNum(holding.quantity, 6)}</span></div>
-        ${!isCashRow ? `<div class="pos-row"><span class="lbl">Avg Cost</span><span class="val">$${fmtUSD(holding.avg_cost_unit)}</span></div>` : ''}
-        <div class="pos-row"><span class="lbl">${isCashRow ? 'Value' : 'Cost Basis'}</span><span class="val">$${fmtUSD(holding.avg_cost_total, 0)}</span></div>
-        ${!isCashRow ? `<div class="pos-row"><span class="lbl">Current Value</span><span class="val">$${fmtUSD(hm.value, 0)}</span></div>
-        <div class="pos-row"><span class="lbl">Unrealized P&L</span><span class="val ${hm.pnlAbs >= 0 ? 'pos' : 'neg'}">${hm.pnlAbs >= 0 ? '+' : ''}$${fmtUSD(Math.abs(hm.pnlAbs), 0)} · ${fmtPct(hm.pnlPct)}</span></div>` : ''}
+        <div class="pos-row"><span class="lbl">${isCash ? 'Amount' : 'Quantity'}</span><span class="val">${isCash ? '$' + fmtUSD(holding.quantity, 2) : fmtNum(holding.quantity, 6)}</span></div>
+        ${!isCash ? `<div class="pos-row"><span class="lbl">Avg Cost</span><span class="val">$${fmtUSD(holding.avg_cost_unit)}</span></div>` : ''}
+        <div class="pos-row"><span class="lbl">${isCash ? 'Value' : 'Cost Basis'}</span><span class="val">$${fmtUSD(holding.avg_cost_total, 0)}</span></div>
+        ${!isCash ? `<div class="pos-row"><span class="lbl">Current Value</span><span class="val">$${fmtUSD(hm.value, 0)}</span></div>
+        <div class="pos-row"><span class="lbl">Unrealized P&L</span><span class="val ${hm.pnlAbs >= 0 ? 'pos' : 'neg'}">${hm.pnlAbs >= 0 ? '+' : ''}$${fmtUSD(Math.abs(hm.pnlAbs), 0)} · ${fmtPct(hm.pnlPct)}</span></div>
+        <div class="pos-row"><span class="lbl">% of Portfolio</span><span class="val">${pctOfPort != null ? pctOfPort.toFixed(1) + '%' : '—'}</span></div>` : ''}
         <div class="pos-actions">
           <button class="btn btn-secondary btn-sm" data-act="edit-holding" data-symbol="${escAttr(symbol)}">Edit</button>
           <button class="btn btn-danger btn-sm" data-act="delete-holding" data-symbol="${escAttr(symbol)}">Remove</button>
@@ -1213,56 +1566,184 @@ async function renderAssetDetail(symbol) {
   }
 }
 
-function renderAiCard(symbol, analysis) {
-  if (!analysis) {
+// ============================================================================
+// NEW AI CARD — full schema render
+// ============================================================================
+function renderAiCard(symbol, a) {
+  if (!a) {
     return `<div class="ai-card">
-      <div class="ai-head">
-        <h3>Analysis</h3>
-        <span class="signal-pill no-signal">No analysis yet</span>
-      </div>
       <div class="empty-ai">
-        <span class="display">Run analysis to get a structured read</span>
-        <p>Combines technicals, news, and sentiment.</p>
+        <span class="display">No analysis yet</span>
+        <p>Get a structured read with stance, action, and counter-argument.</p>
         <button class="btn btn-sm" data-act="run-analysis" data-symbol="${escAttr(symbol)}" style="margin-top:14px;">Analyze ${escAttr(symbol)}</button>
       </div>
     </div>`;
   }
-  const a = analysis;
-  const signalClass = (a.signal || "neutral").replace(/[^a-z]/g, "");
-  const wl = a.watch_levels || {};
-  const risks = (a.key_risks || []).map(r => `<li>${escAttr(r)}</li>`).join("");
+
+  // Backwards-compat: schema v1 had "signal" not "stance"
+  if (!a.stance && a.signal) {
+    return renderLegacyAiCard(symbol, a);
+  }
+
+  const stance = a.stance || "HOLD";
+  const horizon = a.horizon_signals || {};
+  const action = a.action || {};
+  const scenarios = a.scenarios || {};
+
+  const horizonCell = (label, key) => {
+    const h = horizon[key] || {};
+    const sigClass = signalToClass(h.signal);
+    return `
+      <div class="horizon-cell">
+        <div class="lbl">${label}</div>
+        <div><span class="signal-dot ${sigClass}"></span></div>
+        <div class="signal-text">${escAttr((h.signal || "—").replace(/-/g, ' / '))}</div>
+        <div class="note">${escAttr(h.note || "")}</div>
+      </div>
+    `;
+  };
 
   return `<div class="ai-card">
-    <div class="ai-head">
-      <h3>Analysis</h3>
-      <div>
-        <span class="signal-pill ${signalClass}">${escAttr((a.signal || "neutral").replace(/-/g, ' / '))}</span>
-        <span class="confidence-pill">${escAttr(a.confidence || "—")} conf</span>
+    <div class="stance-hero">
+      <div class="stance-eyebrow">Recommendation</div>
+      <div class="stance-verb ${stanceToClass(stance)}">${escAttr(stance)}</div>
+      ${a.headline ? `<div class="stance-headline">${escAttr(a.headline)}</div>` : ""}
+      <div class="stance-pills">
+        <span class="pill pill-conf ${escAttr(a.confidence || '')}">confidence: ${escAttr(a.confidence || "—")}</span>
+        <span class="pill pill-conv ${escAttr(a.conviction || '')}">conviction: ${escAttr(a.conviction || "—")}</span>
       </div>
     </div>
-    ${a.ta_summary ? `<div class="ai-section"><h4>Technical Read</h4><p>${escAttr(a.ta_summary)}</p></div>` : ""}
-    ${a.sentiment_summary ? `<div class="ai-section"><h4>Sentiment</h4><p>${escAttr(a.sentiment_summary)}</p></div>` : ""}
-    ${(wl.support || wl.resistance || wl.stop_loss_idea) ? `
-    <div class="ai-section">
-      <h4>Watch Levels</h4>
-      <div class="levels-grid">
-        <div class="level-cell"><div class="lvl-lbl">Support</div><div class="lvl-val support">${wl.support ? '$' + fmtUSD(wl.support) : '—'}</div></div>
-        <div class="level-cell"><div class="lvl-lbl">Resistance</div><div class="lvl-val resistance">${wl.resistance ? '$' + fmtUSD(wl.resistance) : '—'}</div></div>
-        <div class="level-cell"><div class="lvl-lbl">Stop Idea</div><div class="lvl-val stop">${wl.stop_loss_idea ? '$' + fmtUSD(wl.stop_loss_idea) : '—'}</div></div>
+
+    ${(action.what || action.price_zone) ? `
+    <div class="action-block">
+      <h4>Action</h4>
+      <div class="action-what">${escAttr(action.what || "—")}</div>
+      <div class="action-meta">
+        <div class="action-meta-cell">
+          <div class="lbl">Price Zone</div>
+          <div class="val">${escAttr(action.price_zone || "—")}</div>
+        </div>
+        <div class="action-meta-cell">
+          <div class="lbl">Timeframe</div>
+          <div class="val">${escAttr(action.timeframe || "—")}</div>
+        </div>
       </div>
-      ${wl.rationale ? `<p style="margin-top:8px;font-size:12px;color:var(--ink-soft);line-height:1.5;">${escAttr(wl.rationale)}</p>` : ""}
+      ${action.invalidation ? `
+        <div class="invalidation-row">
+          <strong>Invalidation</strong>
+          ${escAttr(action.invalidation)}
+        </div>` : ""}
     </div>` : ""}
-    ${risks ? `<div class="ai-section risks"><h4>Key Risks</h4><ul>${risks}</ul></div>` : ""}
-    ${a.position_context ? `<div class="ai-section"><h4>For Your Position</h4><p>${escAttr(a.position_context)}</p></div>` : ""}
-    ${a.data_quality_notes ? `<div class="ai-section"><h4>Data Notes</h4><p style="font-size:12px;color:var(--ink-muted);">${escAttr(a.data_quality_notes)}</p></div>` : ""}
+
+    <div class="horizon-strip">
+      ${horizonCell("Short", "short_term")}
+      ${horizonCell("Medium", "medium_term")}
+      ${horizonCell("Long", "long_term")}
+    </div>
+
+    <div class="ai-body">
+      ${a.what_changed ? `<div class="what-changed">${escAttr(a.what_changed)}</div>` : ""}
+
+      ${a.confluence ? `
+        <div class="ai-section" style="margin-top:14px;">
+          <h4>Confluence</h4>
+          <div class="confluence-row">
+            <span class="confluence-score">${escAttr(a.confluence.score || "—")}</span>
+          </div>
+          <p>${escAttr(a.confluence.summary || "")}</p>
+        </div>` : ""}
+
+      ${(scenarios.bull_trigger || scenarios.bear_trigger || scenarios.base_case) ? `
+        <div class="ai-section">
+          <h4>Scenarios</h4>
+          <div class="scenarios-grid">
+            ${scenarios.bull_trigger ? `
+              <div class="scenario bull">
+                <div class="scn-lbl">Bull Trigger</div>
+                <div class="scn-cond">${escAttr(scenarios.bull_trigger.condition || "")}</div>
+                ${scenarios.bull_trigger.implication ? `<div class="scn-impl">→ ${escAttr(scenarios.bull_trigger.implication)}</div>` : ""}
+              </div>` : ""}
+            ${scenarios.bear_trigger ? `
+              <div class="scenario bear">
+                <div class="scn-lbl">Bear Trigger</div>
+                <div class="scn-cond">${escAttr(scenarios.bear_trigger.condition || "")}</div>
+                ${scenarios.bear_trigger.implication ? `<div class="scn-impl">→ ${escAttr(scenarios.bear_trigger.implication)}</div>` : ""}
+              </div>` : ""}
+            ${scenarios.base_case ? `
+              <div class="scenario base">
+                <div class="scn-lbl">Base Case</div>
+                <div class="scn-cond">${escAttr(scenarios.base_case)}</div>
+              </div>` : ""}
+          </div>
+        </div>` : ""}
+
+      ${a.ta_summary ? `
+        <div class="ai-section">
+          <h4>Technical Read</h4>
+          <p>${escAttr(a.ta_summary)}</p>
+        </div>` : ""}
+
+      ${a.sentiment_summary ? `
+        <div class="ai-section">
+          <h4>Sentiment</h4>
+          <p>${escAttr(a.sentiment_summary)}</p>
+        </div>` : ""}
+
+      ${a.key_risks?.length ? `
+        <div class="ai-section risks">
+          <h4>Key Risks</h4>
+          <ul>${a.key_risks.map(r => `<li>${escAttr(r)}</li>`).join("")}</ul>
+        </div>` : ""}
+
+      ${a.position_context ? `
+        <div class="ai-section">
+          <h4>For Your Position</h4>
+          <div class="position-context-block">${escAttr(a.position_context)}</div>
+        </div>` : ""}
+
+      ${a.counter_argument ? `
+        <div class="counter-arg">
+          <div class="ca-lbl">Counter-Argument</div>
+          <div class="ca-text">${escAttr(a.counter_argument)}</div>
+        </div>` : ""}
+
+      ${a.data_quality_notes ? `
+        <div class="ai-section">
+          <h4>Data Notes</h4>
+          <p style="font-size:12px;color:var(--ink-muted);">${escAttr(a.data_quality_notes)}</p>
+        </div>` : ""}
+    </div>
+
     <div class="ai-actions">
       <button class="btn btn-sm" data-act="run-analysis" data-symbol="${escAttr(symbol)}">Re-analyze</button>
       <button class="btn btn-secondary btn-sm" data-act="log-trade" data-symbol="${escAttr(symbol)}">Log Trade</button>
     </div>
-    <div class="ai-stamp">Generated ${fmtRel(a.generated_at)} · This is not financial advice.</div>
+    <div class="ai-stamp">Generated ${fmtRel(a.generated_at)} · This is a tool, not advice. You decide.</div>
   </div>`;
 }
 
+// Legacy renderer for old-schema analyses
+function renderLegacyAiCard(symbol, a) {
+  return `<div class="ai-card">
+    <div class="stance-hero">
+      <div class="stance-eyebrow">Legacy Analysis</div>
+      <div class="stance-verb HOLD">${escAttr((a.signal || "neutral").replace(/-/g, ' / ').toUpperCase())}</div>
+      <div class="stance-headline">Old format — re-analyze to upgrade</div>
+    </div>
+    <div class="ai-body">
+      ${a.ta_summary ? `<div class="ai-section"><h4>Technical Read</h4><p>${escAttr(a.ta_summary)}</p></div>` : ""}
+      ${a.sentiment_summary ? `<div class="ai-section"><h4>Sentiment</h4><p>${escAttr(a.sentiment_summary)}</p></div>` : ""}
+    </div>
+    <div class="ai-actions">
+      <button class="btn btn-sm" data-act="run-analysis" data-symbol="${escAttr(symbol)}">Re-analyze (Upgrade)</button>
+    </div>
+    <div class="ai-stamp">Old format · Click re-analyze to get the new structured output.</div>
+  </div>`;
+}
+
+// ============================================================================
+// CHART
+// ============================================================================
 function getThemeColors() {
   const css = getComputedStyle(document.documentElement);
   return {
@@ -1283,29 +1764,24 @@ function renderChart(symbol, range) {
   const el = $("#chart");
   if (!el || !window.LightweightCharts) return;
   el.innerHTML = "";
-
   const chart = LightweightCharts.createChart(el, {
     layout: { background: { color: c.bg }, textColor: c.muted, fontFamily: "'IBM Plex Mono', monospace" },
     grid: { vertLines: { color: c.rule, style: 1 }, horzLines: { color: c.rule, style: 1 } },
     crosshair: { mode: 1, vertLine: { color: c.muted, width: 1, style: 2 }, horzLine: { color: c.muted, width: 1, style: 2 } },
     rightPriceScale: { borderColor: c.rule },
     timeScale: { borderColor: c.rule, timeVisible: false, secondsVisible: false },
-    handleScroll: true, handleScale: true,
-    height: 280,
+    handleScroll: true, handleScale: true, height: 280,
   });
-
   const candle = chart.addCandlestickSeries({
     upColor: c.green, downColor: c.red,
     borderUpColor: c.green, borderDownColor: c.red,
     wickUpColor: c.green, wickDownColor: c.red,
   });
-
   const now = Date.now();
   const rangeMs = { "1M": 30*864e5, "3M": 90*864e5, "6M": 180*864e5, "1Y": 365*864e5, "ALL": Infinity }[range];
   const filtered = price.ohlcv.filter(d => (now - d.t) <= rangeMs);
   const data = filtered.map(d => ({ time: Math.floor(d.t / 1000), open: d.o, high: d.h, low: d.l, close: d.c }));
   candle.setData(data);
-
   const closes = filtered.map(d => d.c);
   const times  = filtered.map(d => Math.floor(d.t / 1000));
   function maSeries(period, color) {
@@ -1323,7 +1799,6 @@ function renderChart(symbol, range) {
   maSeries(20, c.gold);
   maSeries(50, c.accent);
   maSeries(200, c.muted);
-
   chart.timeScale().fitContent();
   state.chart = chart;
 }
@@ -1388,19 +1863,24 @@ async function loadSentiment(symbol) {
 
 async function runAnalysis(symbol) {
   const btn = $(`[data-act="run-analysis"][data-symbol="${symbol}"]`);
-  if (btn) {
-    btn.innerHTML = '<span class="spinner"></span> Analyzing…';
-    btn.disabled = true;
-  }
+  if (btn) { btn.innerHTML = '<span class="spinner"></span> Analyzing…'; btn.disabled = true; }
   try {
     const holding = state.holdings.find(h => h.symbol === symbol);
     const idToken = await auth.currentUser.getIdToken();
+    const m = portfolioMetrics();
+    const portfolioContext = {
+      total_value: m.totalValue,
+      total_cost: m.totalCost,
+      total_pnl_pct: m.totalPnLPct,
+      allocation_by_class: m.alloc,
+    };
     const r = await fetch(`${WORKER_URL}/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         uid: state.uid, symbol,
         holding: holding ? { quantity: holding.quantity, avg_cost: holding.avg_cost_unit } : null,
+        portfolio_context: portfolioContext,
         idToken,
       }),
     });
@@ -1421,6 +1901,47 @@ async function runAnalysis(symbol) {
   } catch (e) {
     toast("Analysis failed: " + (e.message || "unknown error").slice(0, 80), 3000, "error");
     if (btn) { btn.innerHTML = "Try Again"; btn.disabled = false; }
+  }
+}
+
+async function runPortfolioAnalysis() {
+  const btn = $('[data-act="run-portfolio-analysis"]');
+  if (btn) {
+    btn.style.opacity = "0.6";
+    btn.style.pointerEvents = "none";
+    const lbl = btn.querySelector(".lbl");
+    if (lbl) lbl.innerHTML = '<span class="spinner"></span> Analyzing portfolio…';
+  }
+  try {
+    const idToken = await auth.currentUser.getIdToken();
+    const m = portfolioMetrics();
+    const r = await fetch(`${WORKER_URL}/analyze-portfolio`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        uid: state.uid,
+        idToken,
+        holdings: state.holdings,
+        portfolio_metrics: m,
+      }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const j = await r.json();
+    if (j.analysis) {
+      state.portfolioAnalysis = {
+        ...j.analysis,
+        generated_at: new Date().toISOString(),
+      };
+      toast("Portfolio analysis complete");
+      renderPortfolio();
+    } else throw new Error("No analysis returned");
+  } catch (e) {
+    toast("Portfolio analysis failed: " + (e.message || "unknown").slice(0, 80), 3000, "error");
+    if (btn) {
+      btn.style.opacity = "1"; btn.style.pointerEvents = "all";
+      const lbl = btn.querySelector(".lbl");
+      if (lbl) lbl.textContent = "Run Portfolio Analysis";
+    }
   }
 }
 
@@ -1461,7 +1982,7 @@ async function renderJournal() {
       </div>
       <div class="journal-meta">${fmtNum(e.quantity, 6)} @ $${fmtUSD(e.price)}</div>
       ${e.reason ? `<div class="journal-reason">${escAttr(e.reason)}</div>` : ""}
-      ${e.signal_at_time ? `<div class="journal-snapshot">App signal at time: ${escAttr(e.signal_at_time)} · ${escAttr(e.confidence_at_time || "")}</div>` : ""}
+      ${e.signal_at_time ? `<div class="journal-snapshot">App stance at time: ${escAttr(e.signal_at_time)} · ${escAttr(e.confidence_at_time || "")}</div>` : ""}
     </div>
   `).join("");
 }
@@ -1588,7 +2109,13 @@ async function manualRefresh() {
 async function exportData() {
   const journal = await loadJournal();
   const alerts  = await loadAlerts();
-  const data = { exported_at: new Date().toISOString(), holdings: state.holdings, analyses: state.analyses, journal, alerts };
+  const data = {
+    exported_at: new Date().toISOString(),
+    holdings: state.holdings,
+    analyses: state.analyses,
+    portfolio_analysis: state.portfolioAnalysis,
+    journal, alerts,
+  };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1682,9 +2209,7 @@ async function submitAddHolding() {
     const existing = state.holdings.find(h => h.symbol === "CASH");
     if (existing) {
       const newQty = existing.quantity + amount;
-      await db.collection("users").doc(state.uid).collection("holdings").doc("CASH").update({
-        quantity: newQty, avg_cost_total: newQty,
-      });
+      await db.collection("users").doc(state.uid).collection("holdings").doc("CASH").update({ quantity: newQty, avg_cost_total: newQty });
       toast(`Cash updated to $${fmtUSD(newQty, 2)}`);
     } else {
       await db.collection("users").doc(state.uid).collection("holdings").doc("CASH").set({
@@ -1743,9 +2268,7 @@ async function submitEditHolding(symbol) {
   if (h.asset_class === "cash") {
     const amount = parseFloat($("#eh_cash").value);
     if (!amount || amount <= 0) { toast("Enter a valid amount", 2400, "error"); return; }
-    await db.collection("users").doc(state.uid).collection("holdings").doc(symbol).update({
-      quantity: amount, avg_cost_total: amount,
-    });
+    await db.collection("users").doc(state.uid).collection("holdings").doc(symbol).update({ quantity: amount, avg_cost_total: amount });
   } else {
     const qty = parseFloat($("#eh_qty").value);
     const cost = parseFloat($("#eh_cost").value);
@@ -1776,6 +2299,7 @@ async function deleteHolding(symbol) {
 
 function openLogTrade(symbol) {
   const sigSnapshot = symbol && state.analyses[symbol] ? state.analyses[symbol] : null;
+  const stanceLabel = sigSnapshot?.stance || sigSnapshot?.signal || null;
   openModal(`
     <div class="modal-head"><h3>Log Trade</h3></div>
     <div class="field-row">
@@ -1795,8 +2319,8 @@ function openLogTrade(symbol) {
       <label>Reason / Thesis</label>
       <textarea id="lt_reason" rows="3" placeholder="Why did you make this trade?" style="font-family:var(--sans);"></textarea>
     </div>
-    ${sigSnapshot ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--ink-muted);margin-bottom:14px;padding:10px;background:var(--bg-elev);border-radius:6px;">Snapshot: signal "${escAttr(sigSnapshot.signal)}" · ${escAttr(sigSnapshot.confidence)} confidence</div>` : ""}
-    <button class="btn btn-block" data-act="submit-trade" ${sigSnapshot ? `data-sig="${escAttr(sigSnapshot.signal)}" data-conf="${escAttr(sigSnapshot.confidence)}"` : ""}>Save</button>
+    ${stanceLabel ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--ink-muted);margin-bottom:14px;padding:10px;background:var(--bg-elev);border-radius:6px;">App stance: ${escAttr(stanceLabel)} · ${escAttr(sigSnapshot.confidence || "")} confidence</div>` : ""}
+    <button class="btn btn-block" data-act="submit-trade" ${stanceLabel ? `data-sig="${escAttr(stanceLabel)}" data-conf="${escAttr(sigSnapshot.confidence || '')}"` : ""}>Save</button>
   `);
 }
 async function submitTrade(sig, conf) {
@@ -1848,13 +2372,12 @@ async function submitAlert() {
 }
 
 // ============================================================================
-// EVENT DELEGATION — single global click handler dispatches all actions
+// EVENT DELEGATION
 // ============================================================================
 document.addEventListener("click", (e) => {
   const target = e.target.closest("[data-act], [data-view]");
   if (!target) return;
 
-  // Tab switching
   if (target.dataset.view) {
     setView(target.dataset.view);
     return;
@@ -1865,43 +2388,41 @@ document.addEventListener("click", (e) => {
 
   try {
     switch (act) {
-      case "open-asset":         openAsset(symbol); break;
-      case "back-markets":       backToMarkets(); break;
-      case "set-range":          setRange(target.dataset.range, symbol); break;
-      case "run-analysis":       runAnalysis(symbol); break;
-      case "log-trade":          openLogTrade(symbol); break;
-      case "add-holding":        openAddHolding(); break;
-      case "submit-add":         submitAddHolding(); break;
-      case "edit-holding":       openEditHolding(symbol); break;
-      case "submit-edit":        submitEditHolding(symbol); break;
-      case "delete-holding":     confirmDeleteHolding(symbol); break;
-      case "submit-trade":       submitTrade(target.dataset.sig, target.dataset.conf); break;
-      case "add-alert":          openAddAlert(); break;
-      case "submit-alert":       submitAlert(); break;
-      case "delete-alert":       deleteAlert(target.dataset.id); break;
+      case "open-asset":             openAsset(symbol); break;
+      case "back-markets":           backToMarkets(); break;
+      case "set-range":              setRange(target.dataset.range, symbol); break;
+      case "run-analysis":           runAnalysis(symbol); break;
+      case "run-portfolio-analysis": runPortfolioAnalysis(); break;
+      case "log-trade":              openLogTrade(symbol); break;
+      case "add-holding":            openAddHolding(); break;
+      case "submit-add":             submitAddHolding(); break;
+      case "edit-holding":           openEditHolding(symbol); break;
+      case "submit-edit":            submitEditHolding(symbol); break;
+      case "delete-holding":         confirmDeleteHolding(symbol); break;
+      case "submit-trade":           submitTrade(target.dataset.sig, target.dataset.conf); break;
+      case "add-alert":              openAddAlert(); break;
+      case "submit-alert":           submitAlert(); break;
+      case "delete-alert":           deleteAlert(target.dataset.id); break;
       case "pick-symbol":
         $("#ah_symbol").value = target.dataset.symbol;
         $("#ah_name").value = target.dataset.name || "";
         $("#ah_search_results").classList.add("hidden");
         break;
-      case "toggle-theme":       toggleTheme(); break;
-      case "reset-pin":          resetPin(); break;
-      case "manual-refresh":     manualRefresh(); break;
-      case "export-data":        exportData(); break;
+      case "toggle-theme":           toggleTheme(); break;
+      case "reset-pin":              resetPin(); break;
+      case "manual-refresh":         manualRefresh(); break;
+      case "export-data":            exportData(); break;
     }
   } catch (err) {
     showError("Action failed: " + err.message);
   }
 });
 
-// Topbar buttons
 $("#themeBtn").addEventListener("click", toggleTheme);
 $("#refreshBtn").addEventListener("click", manualRefresh);
 $("#modalBg").addEventListener("click", closeModal);
 
-window.addEventListener("load", () => {
-  setTimeout(showPinScreen, 600);
-});
+window.addEventListener("load", () => { setTimeout(showPinScreen, 600); });
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(()=>{});
