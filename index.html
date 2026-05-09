@@ -252,6 +252,126 @@ body {
 .btn-portfolio-analyze .sub { font-size: 11px; color: var(--ink-muted); margin-top: 2px; }
 .btn-portfolio-analyze .arrow { color: var(--accent); font-size: 18px; }
 
+/* Opportunity card on Portfolio tab */
+.opp-card {
+  margin: 14px 20px;
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  background: var(--bg-card); overflow: hidden;
+  position: relative;
+}
+.opp-card::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: var(--gold);
+}
+.opp-card-head {
+  padding: 14px 18px 10px;
+  display: flex; justify-content: space-between; align-items: baseline;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.opp-card-head .lbl {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--gold); font-weight: 600;
+}
+.opp-card-head .meta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted); }
+.opp-row {
+  padding: 12px 18px;
+  display: flex; align-items: center;
+  border-bottom: 1px solid var(--rule-soft);
+  cursor: pointer; transition: background .15s;
+}
+.opp-row:last-child { border-bottom: none; }
+.opp-row:hover { background: var(--bg-elev); }
+.opp-row * { pointer-events: none; }
+.opp-row .opp-icon {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--bg); border: 1px solid var(--rule);
+  display: grid; place-items: center;
+  font-family: var(--display); font-weight: 600; font-size: 13px;
+  color: var(--ink-soft);
+  margin-right: 12px; flex-shrink: 0;
+}
+.opp-row .opp-main { flex: 1; min-width: 0; }
+.opp-row .opp-symbol { font-family: var(--display); font-size: 15px; font-weight: 600; }
+.opp-row .opp-cond {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--gold); margin-top: 2px; letter-spacing: 0.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 220px;
+}
+.opp-row .opp-right { text-align: right; font-family: var(--mono); flex-shrink: 0; }
+.opp-row .opp-price { font-size: 13px; font-weight: 500; }
+.opp-row .opp-rsi { font-size: 10.5px; color: var(--ink-muted); margin-top: 2px; }
+
+/* Watchlist tab */
+.watch-row {
+  display: flex; align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--rule-soft);
+  cursor: pointer; transition: background .15s; position: relative;
+}
+.watch-row:hover { background: var(--bg-elev); }
+.watch-row * { pointer-events: none; }
+.watch-row .w-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg); border: 1px solid var(--rule);
+  display: grid; place-items: center;
+  font-family: var(--display); font-weight: 600; font-size: 13px;
+  color: var(--ink-soft);
+  margin-right: 12px; flex-shrink: 0;
+}
+.watch-row .w-icon[data-class="crypto"] { border-color: var(--gold); color: var(--gold); }
+.watch-row .w-icon[data-class="metal"]  { border-color: var(--gold); color: var(--gold); }
+.watch-row .w-main { flex: 1; min-width: 0; }
+.watch-row .w-symbol { font-family: var(--display); font-size: 16px; font-weight: 600; }
+.watch-row .w-name {
+  font-size: 11px; color: var(--ink-muted); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;
+}
+.watch-row .w-right { text-align: right; font-family: var(--mono); flex-shrink: 0; min-width: 80px; }
+.watch-row .w-price { font-size: 13px; font-weight: 500; }
+.watch-row .w-day { font-size: 11px; margin-top: 1px; }
+.watch-row .w-day.pos { color: var(--green); }
+.watch-row .w-day.neg { color: var(--red); }
+.watch-row .w-meta {
+  display: flex; gap: 12px;
+  font-family: var(--mono); font-size: 10px; color: var(--ink-muted);
+  margin-top: 4px; letter-spacing: 0.02em;
+}
+.watch-row .w-meta .chip { padding: 1px 5px; border-radius: 3px; background: var(--bg); border: 1px solid var(--rule-soft); }
+.watch-row .w-meta .chip.warn { color: var(--gold); border-color: var(--gold); }
+.watch-row .w-meta .chip.pos { color: var(--green); border-color: var(--green); }
+.watch-row .w-meta .chip.neg { color: var(--red); border-color: var(--red); }
+.watch-trigger-badge {
+  position: absolute; top: 10px; right: 14px;
+  font-family: var(--mono); font-size: 8.5px; font-weight: 600;
+  padding: 2px 6px; border-radius: 3px; letter-spacing: 0.1em;
+  background: rgba(176,141,60,0.18); color: var(--gold);
+}
+
+.watch-empty-cta {
+  padding: 30px 20px; text-align: center;
+}
+.watch-empty-cta .display { font-size: 18px; color: var(--ink-soft); margin-bottom: 8px; display: block; }
+.watch-empty-cta p { font-size: 13px; color: var(--ink-muted); margin-bottom: 18px; line-height: 1.5; }
+
+.scan-button-row {
+  display: flex; gap: 8px; padding: 0 20px; margin-top: 4px; margin-bottom: 8px;
+}
+
+.condition-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px;
+  background: var(--bg); border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-family: var(--mono); font-size: 10px;
+  color: var(--ink-soft);
+  margin: 2px 4px 2px 0;
+}
+.condition-chip .x {
+  color: var(--ink-muted); font-size: 12px; cursor: pointer;
+  margin-left: 2px;
+}
+
 .pin-screen {
   position: fixed; inset: 0; background: var(--bg);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -364,8 +484,7 @@ body {
   padding-top: 14px; border-top: 1px solid var(--rule-soft);
 }
 
-/* ============ NEW AI CARD STYLES ============ */
-
+/* AI CARD STYLES */
 .ai-card {
   margin: 14px 20px;
   border: 1px solid var(--rule); border-radius: var(--radius);
@@ -376,8 +495,6 @@ body {
   content: ""; position: absolute; top: 0; left: 0;
   width: 4px; height: 100%; background: var(--accent);
 }
-
-/* Stance hero */
 .stance-hero {
   padding: 22px 20px 18px;
   border-bottom: 1px solid var(--rule-soft);
@@ -408,19 +525,12 @@ body {
   padding: 4px 9px; border-radius: 4px;
   letter-spacing: 0.1em; text-transform: uppercase;
 }
-.pill-conf {
-  background: var(--bg-elev); color: var(--ink-soft);
-  border: 1px solid var(--rule);
-}
-.pill-conv {
-  background: transparent; color: var(--ink-muted);
-  border: 1px dashed var(--rule);
-}
+.pill-conf { background: var(--bg-elev); color: var(--ink-soft); border: 1px solid var(--rule); }
+.pill-conv { background: transparent; color: var(--ink-muted); border: 1px dashed var(--rule); }
 .pill-conv.high, .pill-conf.high { color: var(--ink); border-color: var(--ink-soft); }
 .pill-conv.medium, .pill-conf.medium { color: var(--ink-soft); }
 .pill-conv.low, .pill-conf.low { color: var(--ink-muted); opacity: 0.85; }
 
-/* Action block */
 .action-block {
   padding: 16px 20px;
   background: linear-gradient(180deg, transparent 0%, rgba(161,61,45,0.04) 100%);
@@ -465,7 +575,6 @@ body {
   display: block; margin-bottom: 3px;
 }
 
-/* Horizon strip */
 .horizon-strip {
   display: grid; grid-template-columns: repeat(3, 1fr);
   border-bottom: 1px solid var(--rule-soft);
@@ -497,7 +606,6 @@ body {
   line-height: 1.35; min-height: 28px;
 }
 
-/* Body sections */
 .ai-body { padding: 16px 20px; }
 .ai-section { margin-bottom: 16px; }
 .ai-section:last-child { margin-bottom: 0; }
@@ -507,24 +615,16 @@ body {
 }
 .ai-section p { font-size: 13.5px; color: var(--ink); line-height: 1.55; }
 
-.confluence-row {
-  display: flex; align-items: baseline; gap: 8px;
-  margin-bottom: 4px;
-}
+.confluence-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
 .confluence-score {
   font-family: var(--display); font-size: 22px; font-weight: 600;
   color: var(--ink); letter-spacing: -0.01em;
 }
 
-.scenarios-grid {
-  display: grid; grid-template-columns: 1fr; gap: 8px;
-  margin-top: 6px;
-}
+.scenarios-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 6px; }
 .scenario {
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--rule-soft);
-  background: var(--bg);
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--rule-soft); background: var(--bg);
 }
 .scenario.bull { border-left: 3px solid var(--green); }
 .scenario.bear { border-left: 3px solid var(--red); }
@@ -607,7 +707,6 @@ body {
 .empty-ai { text-align: center; padding: 30px 20px; color: var(--ink-muted); font-size: 13px; }
 .empty-ai .display { font-size: 16px; color: var(--ink-soft); margin-bottom: 14px; display: block; }
 
-/* Portfolio analysis card */
 .port-analysis-card {
   margin: 14px 20px;
   border: 1px solid var(--rule); border-radius: var(--radius);
@@ -879,6 +978,11 @@ body {
         <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
       </svg>Portfolio
     </button>
+    <button class="tab" data-view="watchlist">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
+      </svg>Watchlist
+    </button>
     <button class="tab" data-view="markets">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/>
@@ -888,11 +992,6 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 4h13a3 3 0 0 1 3 3v13a3 3 0 0 1-3 3H4z"/><path d="M8 8h8M8 12h8M8 16h5"/>
       </svg>Journal
-    </button>
-    <button class="tab" data-view="alerts">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>
-      </svg>Alerts
     </button>
     <button class="tab" data-view="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
@@ -960,6 +1059,32 @@ const SEED_HOLDINGS = [
   { symbol: "BTC",  asset_class: "crypto",   quantity: 0.10996493,  avg_cost_total: 8855,  name: "Bitcoin" },
 ];
 
+// Seed watchlist with sensible defaults — user can edit
+const SEED_WATCHLIST = [
+  { symbol: "VOO",  asset_class: "etf",      name: "Vanguard S&P 500 ETF",
+    conditions: [{ id: "rsi30", type: "rsi_below", threshold: 30 }, { id: "ma200", type: "ma_touch", period: 200, tolerance_pct: 2 }] },
+  { symbol: "QQQ",  asset_class: "etf",      name: "Invesco QQQ Trust",
+    conditions: [{ id: "rsi30", type: "rsi_below", threshold: 30 }, { id: "drop10", type: "drop_from_peak", threshold_pct: 10 }] },
+  { symbol: "GLD",  asset_class: "metal",    name: "SPDR Gold Shares",
+    conditions: [{ id: "rsi30", type: "rsi_below", threshold: 30 }] },
+  { symbol: "TLT",  asset_class: "etf",      name: "iShares 20+ Year Treasury",
+    conditions: [{ id: "near_low", type: "near_52w_low", threshold_pct: 5 }] },
+  { symbol: "NVDA", asset_class: "us_stock", name: "NVIDIA Corporation",
+    conditions: [{ id: "drop15", type: "drop_from_peak", threshold_pct: 15 }, { id: "rsi30", type: "rsi_below", threshold: 30 }] },
+  { symbol: "AAPL", asset_class: "us_stock", name: "Apple Inc.",
+    conditions: [{ id: "rsi30", type: "rsi_below", threshold: 30 }] },
+  { symbol: "GOOG", asset_class: "us_stock", name: "Alphabet Inc.",
+    conditions: [{ id: "rsi35", type: "rsi_below", threshold: 35 }] },
+  { symbol: "META", asset_class: "us_stock", name: "Meta Platforms Inc.",
+    conditions: [{ id: "drop15", type: "drop_from_peak", threshold_pct: 15 }] },
+  { symbol: "TSLA", asset_class: "us_stock", name: "Tesla Inc.",
+    conditions: [{ id: "drop20", type: "drop_from_peak", threshold_pct: 20 }] },
+  { symbol: "SOL",  asset_class: "crypto",   name: "Solana",
+    conditions: [{ id: "rsi30", type: "rsi_below", threshold: 30 }, { id: "drop25", type: "drop_from_peak", threshold_pct: 25 }] },
+  { symbol: "LINK", asset_class: "crypto",   name: "Chainlink",
+    conditions: [{ id: "rsi30", type: "rsi_below", threshold: 30 }] },
+];
+
 const ALLOC_COLORS = { etf: "#4a4639", us_stock: "#a13d2d", crypto: "#b08d3c", metal: "#d4a85c", cash: "#8a8473" };
 const ALLOC_LABELS = { etf: "ETFs", us_stock: "Stocks", crypto: "Crypto", metal: "Metals", cash: "Cash" };
 const ASSET_CLASSES = [
@@ -968,6 +1093,19 @@ const ASSET_CLASSES = [
   { value: "crypto",   label: "Crypto" },
   { value: "metal",    label: "Metal / Commodity" },
   { value: "cash",     label: "Cash" },
+];
+
+const CONDITION_TYPES = [
+  { value: "rsi_below",        label: "RSI below threshold (oversold)",   defaults: { threshold: 30 },                  describe: c => `RSI < ${c.threshold}` },
+  { value: "rsi_above",        label: "RSI above threshold (overbought)", defaults: { threshold: 70 },                  describe: c => `RSI > ${c.threshold}` },
+  { value: "ma_touch",         label: "Price touches moving average",     defaults: { period: 200, tolerance_pct: 2 }, describe: c => `Within ${c.tolerance_pct}% of MA${c.period}` },
+  { value: "near_52w_high",    label: "Near 52-week high",                defaults: { threshold_pct: 3 },              describe: c => `Within ${c.threshold_pct}% of 52w high` },
+  { value: "near_52w_low",     label: "Near 52-week low",                 defaults: { threshold_pct: 5 },              describe: c => `Within ${c.threshold_pct}% of 52w low` },
+  { value: "macd_bullish_cross", label: "MACD bullish cross",             defaults: { within_days: 3 },                 describe: c => `MACD bull cross (${c.within_days}d)` },
+  { value: "macd_bearish_cross", label: "MACD bearish cross",             defaults: { within_days: 3 },                 describe: c => `MACD bear cross (${c.within_days}d)` },
+  { value: "drop_from_peak",   label: "Drop from 90-day peak",            defaults: { threshold_pct: 10 },             describe: c => `Down ${c.threshold_pct}%+ from 90d peak` },
+  { value: "price_above",      label: "Price above (USD)",                defaults: { threshold: 100 },                describe: c => `Price > $${c.threshold}` },
+  { value: "price_below",      label: "Price below (USD)",                defaults: { threshold: 100 },                describe: c => `Price < $${c.threshold}` },
 ];
 
 // ============================================================================
@@ -985,6 +1123,9 @@ const state = {
   prices: {},
   analyses: {},
   portfolioAnalysis: null,
+  watchlist: [],
+  watchlistSnapshot: {},   // symbol -> snapshot from /scan-snapshot
+  triggers: [],
   selectedSymbol: null,
   selectedRange: "3M",
   chart: null,
@@ -1041,6 +1182,10 @@ function escAttr(s) {
 }
 function signalToClass(s) { return String(s || "neutral").replace(/[^a-z]/g, ""); }
 function stanceToClass(s) { return String(s || "HOLD").replace(/[^A-Z]/g, ""); }
+function describeCondition(c) {
+  const ct = CONDITION_TYPES.find(t => t.value === c.type);
+  return ct ? ct.describe(c) : c.type;
+}
 
 // ============================================================================
 // PIN GATE
@@ -1151,10 +1296,15 @@ async function loadInitialData() {
   await ensureAuth();
   await loadHoldingsFromFirestore();
   if (state.holdings.length === 0) await seedHoldings();
+  await loadWatchlistFromFirestore();
+  if (state.watchlist.length === 0) await seedWatchlist();
   await loadAnalysesFromFirestore();
   await loadPortfolioAnalysis();
+  await loadTriggers();
   await refreshAllPrices();
   renderCurrentView();
+  // Trigger a background scan after load (non-blocking)
+  runScan().catch(()=>{});
 }
 
 async function loadHoldingsFromFirestore() {
@@ -1178,6 +1328,24 @@ async function seedHoldings() {
   await loadHoldingsFromFirestore();
 }
 
+async function loadWatchlistFromFirestore() {
+  const snap = await db.collection("users").doc(state.uid).collection("watchlist").get();
+  state.watchlist = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function seedWatchlist() {
+  for (const w of SEED_WATCHLIST) {
+    try {
+      await db.collection("users").doc(state.uid).collection("watchlist").doc(w.symbol).set({
+        symbol: w.symbol, asset_class: w.asset_class, name: w.name,
+        conditions: w.conditions,
+        added_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (e) { console.warn("seed watchlist failed for", w.symbol, e); }
+  }
+  await loadWatchlistFromFirestore();
+}
+
 async function loadAnalysesFromFirestore() {
   try {
     const snap = await db.collection("users").doc(state.uid).collection("analyses")
@@ -1199,6 +1367,17 @@ async function loadPortfolioAnalysis() {
   } catch (e) { state.portfolioAnalysis = null; }
 }
 
+async function loadTriggers() {
+  try {
+    const today = new Date();
+    const cutoff = new Date(today.getTime() - 7 * 86400000).toISOString().slice(0, 10);
+    const snap = await db.collection("users").doc(state.uid).collection("triggers")
+      .where("date", ">=", cutoff).get();
+    state.triggers = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.triggered_at || "").localeCompare(a.triggered_at || ""));
+  } catch (e) { state.triggers = []; }
+}
+
 async function refreshAllPrices() {
   const promises = state.holdings.map(h =>
     fetch(`${WORKER_URL}/price/${encodeURIComponent(h.symbol)}`)
@@ -1207,6 +1386,53 @@ async function refreshAllPrices() {
       .catch(e => console.warn("price fetch failed:", h.symbol, e))
   );
   await Promise.all(promises);
+}
+
+// ============================================================================
+// SCAN — calls /scan endpoint, refreshes triggers + watchlist snapshot
+// ============================================================================
+async function runScan() {
+  if (state.watchlist.length === 0) return;
+  try {
+    const idToken = await auth.currentUser.getIdToken();
+    const r = await fetch(`${WORKER_URL}/scan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: state.uid, idToken }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const j = await r.json();
+    // Cache snapshot per symbol
+    for (const item of (j.results || [])) {
+      state.watchlistSnapshot[item.symbol] = item;
+    }
+    // Refresh triggers from Firestore (worker just wrote them)
+    await loadTriggers();
+    return j;
+  } catch (e) {
+    console.warn("scan failed:", e);
+    throw e;
+  }
+}
+
+// Snapshot-only fetch (no Firestore writes) for the Watchlist tab — faster
+async function fetchWatchlistSnapshot() {
+  if (state.watchlist.length === 0) return;
+  try {
+    const symbols = state.watchlist.map(w => w.symbol);
+    const conditions_by_symbol = {};
+    for (const w of state.watchlist) conditions_by_symbol[w.symbol] = w.conditions || [];
+    const r = await fetch(`${WORKER_URL}/scan-snapshot`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbols, conditions_by_symbol }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const j = await r.json();
+    for (const item of (j.results || [])) {
+      state.watchlistSnapshot[item.symbol] = item;
+    }
+  } catch (e) { console.warn("snapshot failed:", e); }
 }
 
 // ============================================================================
@@ -1250,9 +1476,9 @@ function portfolioMetrics() {
 function renderCurrentView() {
   const v = state.currentView;
   if (v === "portfolio") renderPortfolio();
+  else if (v === "watchlist") renderWatchlist();
   else if (v === "markets") renderMarkets();
   else if (v === "journal") renderJournal();
-  else if (v === "alerts") renderAlerts();
   else if (v === "settings") renderSettings();
 }
 function setView(v) {
@@ -1262,7 +1488,9 @@ function setView(v) {
   renderCurrentView();
 }
 
-// ----- Portfolio
+// ============================================================================
+// PORTFOLIO TAB (with opportunity card)
+// ============================================================================
 function renderPortfolio() {
   const m = portfolioMetrics();
   const view = $("#view");
@@ -1278,6 +1506,7 @@ function renderPortfolio() {
     </div>`;
   }
 
+  const oppCard = renderOpportunityCard();
   const portAnalysisCard = renderPortAnalysisInlineCard();
 
   let holdingsHtml = "";
@@ -1332,6 +1561,7 @@ function renderPortfolio() {
       <div class="alloc-legend">${allocLegend}</div>
     </div>
 
+    ${oppCard}
     ${portAnalysisCard}
 
     <div class="section-head" style="padding: 0 20px; margin-top: 20px;">
@@ -1341,6 +1571,40 @@ function renderPortfolio() {
     <div class="holdings">${holdingsHtml}</div>
   `;
   $("#topbarTitle").textContent = "Portfolio";
+}
+
+function renderOpportunityCard() {
+  // Show all triggers from last 7 days, dedupe by symbol+type
+  const seen = new Set();
+  const triggers = (state.triggers || []).filter(t => {
+    const k = t.symbol + ":" + t.type;
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  }).slice(0, 6);
+
+  if (triggers.length === 0) return "";
+
+  return `
+    <div class="opp-card">
+      <div class="opp-card-head">
+        <div class="lbl">Opportunities · ${triggers.length} ${triggers.length === 1 ? 'setup' : 'setups'}</div>
+        <div class="meta">${triggers.length > 0 ? fmtRel(triggers[0].triggered_at) : ''}</div>
+      </div>
+      ${triggers.map(t => `
+        <div class="opp-row" data-act="open-asset" data-symbol="${escAttr(t.symbol)}">
+          <div class="opp-icon">${escAttr(t.symbol.slice(0,2))}</div>
+          <div class="opp-main">
+            <div class="opp-symbol">${escAttr(t.symbol)}</div>
+            <div class="opp-cond">${escAttr(t.label || t.type)}</div>
+          </div>
+          <div class="opp-right">
+            <div class="opp-price">$${fmtUSD(t.current_price)}</div>
+            <div class="opp-rsi">RSI ${t.rsi14 != null ? t.rsi14 : '—'}</div>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 function renderPortAnalysisInlineCard() {
@@ -1356,7 +1620,6 @@ function renderPortAnalysisInlineCard() {
       </div>
     `;
   }
-  // Compact display when analysis exists, expandable to full
   return `
     <div class="port-analysis-card">
       <div class="port-stance-hero">
@@ -1371,31 +1634,15 @@ function renderPortAnalysisInlineCard() {
         ${a.implicit_bets?.length ? `
           <div class="ai-section">
             <h4>Implicit Bets</h4>
-            <div class="list-block">
-              ${a.implicit_bets.map(b => `<div class="li">${escAttr(b)}</div>`).join("")}
-            </div>
+            <div class="list-block">${a.implicit_bets.map(b => `<div class="li">${escAttr(b)}</div>`).join("")}</div>
           </div>` : ""}
-
         ${a.concentration_risks?.length ? `
           <div class="ai-section">
             <h4>Concentration Risks</h4>
-            <div class="list-block">
-              ${a.concentration_risks.map(r => `<div class="li">${escAttr(r)}</div>`).join("")}
-            </div>
+            <div class="list-block">${a.concentration_risks.map(r => `<div class="li">${escAttr(r)}</div>`).join("")}</div>
           </div>` : ""}
-
-        ${a.correlation_notes ? `
-          <div class="ai-section">
-            <h4>Correlation Notes</h4>
-            <p>${escAttr(a.correlation_notes)}</p>
-          </div>` : ""}
-
-        ${a.drift_observations ? `
-          <div class="ai-section">
-            <h4>Drift</h4>
-            <p>${escAttr(a.drift_observations)}</p>
-          </div>` : ""}
-
+        ${a.correlation_notes ? `<div class="ai-section"><h4>Correlation Notes</h4><p>${escAttr(a.correlation_notes)}</p></div>` : ""}
+        ${a.drift_observations ? `<div class="ai-section"><h4>Drift</h4><p>${escAttr(a.drift_observations)}</p></div>` : ""}
         ${a.top_recommendations?.length ? `
           <div class="ai-section">
             <h4>Top Recommendations</h4>
@@ -1407,18 +1654,8 @@ function renderPortAnalysisInlineCard() {
               </div>
             `).join("")}
           </div>` : ""}
-
-        ${a.macro_context ? `
-          <div class="ai-section">
-            <h4>Macro Context</h4>
-            <p>${escAttr(a.macro_context)}</p>
-          </div>` : ""}
-
-        ${a.counter_argument ? `
-          <div class="counter-arg">
-            <div class="ca-lbl">Counter-Argument</div>
-            <div class="ca-text">${escAttr(a.counter_argument)}</div>
-          </div>` : ""}
+        ${a.macro_context ? `<div class="ai-section"><h4>Macro Context</h4><p>${escAttr(a.macro_context)}</p></div>` : ""}
+        ${a.counter_argument ? `<div class="counter-arg"><div class="ca-lbl">Counter-Argument</div><div class="ca-text">${escAttr(a.counter_argument)}</div></div>` : ""}
       </div>
       <div class="ai-actions">
         <button class="btn btn-sm" data-act="run-portfolio-analysis">Re-analyze Portfolio</button>
@@ -1428,7 +1665,122 @@ function renderPortAnalysisInlineCard() {
   `;
 }
 
-// ----- Markets
+// ============================================================================
+// WATCHLIST TAB
+// ============================================================================
+async function renderWatchlist() {
+  $("#topbarTitle").textContent = "Watchlist";
+  const view = $("#view");
+
+  if (state.watchlist.length === 0) {
+    view.innerHTML = `
+      <div class="section-head" style="padding: 20px 20px 0;"><h2>Watchlist</h2></div>
+      <div class="watch-empty-cta">
+        <span class="display">Build your watchlist</span>
+        <p>Track tickers you'd consider buying. The app watches them and surfaces opportunities when conditions you set are met (RSI oversold, MA touch, etc.).</p>
+        <button class="btn" data-act="add-watch">Add First Ticker</button>
+      </div>
+    `;
+    return;
+  }
+
+  // Sort by setup_score desc (most interesting at top)
+  const sorted = [...state.watchlist].sort((a, b) => {
+    const sa = state.watchlistSnapshot[a.symbol]?.setup_score || 0;
+    const sb = state.watchlistSnapshot[b.symbol]?.setup_score || 0;
+    return sb - sa;
+  });
+
+  let rows = sorted.map(w => {
+    const snap = state.watchlistSnapshot[w.symbol];
+    const condCount = (w.conditions || []).length;
+    const hasTriggers = snap && snap.triggers && snap.triggers.length > 0;
+
+    let priceHtml = "—";
+    let dayHtml = "";
+    let metaHtml = "";
+
+    if (snap && !snap.error) {
+      priceHtml = `$${fmtUSD(snap.current_price)}`;
+      const dayClass = (snap.day_change_pct || 0) >= 0 ? "pos" : "neg";
+      dayHtml = `<div class="w-day ${dayClass}">${fmtPct(snap.day_change_pct)}</div>`;
+
+      const metaParts = [];
+      if (snap.rsi14 != null) {
+        const rsiCls = snap.rsi14 < 30 ? "warn" : snap.rsi14 > 70 ? "warn" : "";
+        metaParts.push(`<span class="chip ${rsiCls}">RSI ${snap.rsi14}</span>`);
+      }
+      if (snap.trend) {
+        const tCls = snap.trend === "above_200ma" ? "pos" : "neg";
+        metaParts.push(`<span class="chip ${tCls}">${snap.trend === "above_200ma" ? "Above 200" : "Below 200"}</span>`);
+      }
+      if (snap.pct_from_52w_high != null) {
+        metaParts.push(`<span class="chip">${snap.pct_from_52w_high.toFixed(1)}% off 52wH</span>`);
+      }
+      metaHtml = `<div class="w-meta">${metaParts.join("")}</div>`;
+    } else if (condCount > 0) {
+      metaHtml = `<div class="w-meta"><span class="chip">${condCount} ${condCount === 1 ? 'condition' : 'conditions'}</span></div>`;
+    }
+
+    return `
+      <div class="watch-row" data-act="open-watch" data-symbol="${escAttr(w.symbol)}">
+        <div class="w-icon" data-class="${w.asset_class}">${escAttr(w.symbol.slice(0,2))}</div>
+        <div class="w-main">
+          <div class="w-symbol">${escAttr(w.symbol)}</div>
+          <div class="w-name">${escAttr(w.name || '')}</div>
+          ${metaHtml}
+        </div>
+        <div class="w-right">
+          <div class="w-price">${priceHtml}</div>
+          ${dayHtml}
+        </div>
+        ${hasTriggers ? `<span class="watch-trigger-badge">${snap.triggers.length} ${snap.triggers.length === 1 ? 'TRIG' : 'TRIGS'}</span>` : ""}
+      </div>
+    `;
+  }).join("");
+
+  view.innerHTML = `
+    <div class="section-head" style="padding: 20px 20px 0;">
+      <h2>Watchlist</h2>
+      <button class="btn-ghost" data-act="add-watch" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
+    </div>
+    <div class="scan-button-row">
+      <button class="btn btn-secondary btn-sm" data-act="rescan" style="flex:1;">Rescan Now</button>
+    </div>
+    <div class="holdings">${rows}</div>
+  `;
+
+  // If no snapshot yet, fetch lazily in background
+  if (!Object.keys(state.watchlistSnapshot).length) {
+    fetchWatchlistSnapshot().then(() => renderWatchlist());
+  }
+}
+
+async function rescan() {
+  toast("Scanning watchlist…");
+  const btn = $('[data-act="rescan"]');
+  if (btn) { btn.innerHTML = '<span class="spinner"></span> Scanning…'; btn.disabled = true; }
+  try {
+    await runScan();
+    toast(state.triggers.length > 0 ? `Scan complete · ${state.triggers.length} triggers` : "Scan complete · no triggers");
+    renderWatchlist();
+  } catch (e) {
+    toast("Scan failed: " + (e.message || "").slice(0, 80), 3000, "error");
+    if (btn) { btn.innerHTML = "Try Again"; btn.disabled = false; }
+  }
+}
+
+function openWatchDetail(symbol) {
+  // Watchlist items use the same asset-detail page as Markets, just pre-route
+  state.selectedSymbol = symbol;
+  state.currentView = "markets";
+  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === "markets"));
+  renderAssetDetail(symbol);
+}
+
+// ============================================================================
+// MARKETS TAB
+// ============================================================================
 function renderMarkets() {
   if (state.selectedSymbol) renderAssetDetail(state.selectedSymbol);
   else renderMarketsList();
@@ -1475,6 +1827,7 @@ function backToMarkets() {
 async function renderAssetDetail(symbol) {
   $("#topbarTitle").textContent = symbol;
   const holding = state.holdings.find(h => h.symbol === symbol);
+  const watchEntry = state.watchlist.find(w => w.symbol === symbol);
   const view = $("#view");
   const isCash = holding?.asset_class === "cash";
   const price = state.prices[symbol];
@@ -1483,7 +1836,7 @@ async function renderAssetDetail(symbol) {
   if (!price) {
     view.innerHTML = `
       <div class="detail-head">
-        <button class="detail-back" data-act="back-markets">← Markets</button>
+        <button class="detail-back" data-act="back-markets">← Back</button>
         <div class="detail-symbol">${escAttr(symbol)}</div>
       </div>
       <div class="empty-state"><span class="spinner"></span><p style="margin-top:14px;">Loading data…</p></div>
@@ -1521,6 +1874,22 @@ async function renderAssetDetail(symbol) {
         </div>
       </div>
     `;
+  } else if (watchEntry) {
+    // Watchlist-only item — show conditions + add-to-portfolio CTA
+    const condChips = (watchEntry.conditions || []).map(c =>
+      `<span class="condition-chip">${escAttr(describeCondition(c))}<span class="x" data-act="rm-cond" data-symbol="${escAttr(symbol)}" data-cid="${escAttr(c.id)}">×</span></span>`
+    ).join("");
+    posCard = `
+      <div class="pos-card">
+        <h3>On Watchlist</h3>
+        <div style="margin-bottom:10px;">${condChips || '<span style="font-size:12px;color:var(--ink-muted);">No conditions set.</span>'}</div>
+        <div class="pos-actions">
+          <button class="btn btn-secondary btn-sm" data-act="add-cond" data-symbol="${escAttr(symbol)}">Add Condition</button>
+          <button class="btn btn-secondary btn-sm" data-act="add-from-watch" data-symbol="${escAttr(symbol)}">Add to Portfolio</button>
+          <button class="btn btn-danger btn-sm" data-act="rm-watch" data-symbol="${escAttr(symbol)}">Remove</button>
+        </div>
+      </div>
+    `;
   }
 
   let aiCard = "";
@@ -1545,9 +1914,9 @@ async function renderAssetDetail(symbol) {
 
   view.innerHTML = `
     <div class="detail-head">
-      <button class="detail-back" data-act="back-markets">← Markets</button>
+      <button class="detail-back" data-act="back-markets">← Back</button>
       <div class="detail-symbol">${escAttr(symbol)}</div>
-      <div class="detail-name">${escAttr(holding?.name || "")}</div>
+      <div class="detail-name">${escAttr(holding?.name || watchEntry?.name || "")}</div>
       <div class="detail-price">$${fmtUSD(cur)}</div>
       ${!isCash ? `<div class="detail-change ${dayPct >= 0 ? 'pos' : 'neg'}">${dayPct >= 0 ? '+' : ''}$${fmtUSD(Math.abs((cur - price.prev_close)))} · ${fmtPct(dayPct)} today</div>` : `<div class="detail-change flat">Cash · fixed value</div>`}
     </div>
@@ -1567,7 +1936,7 @@ async function renderAssetDetail(symbol) {
 }
 
 // ============================================================================
-// NEW AI CARD — full schema render
+// AI CARD
 // ============================================================================
 function renderAiCard(symbol, a) {
   if (!a) {
@@ -1580,7 +1949,6 @@ function renderAiCard(symbol, a) {
     </div>`;
   }
 
-  // Backwards-compat: schema v1 had "signal" not "stance"
   if (!a.stance && a.signal) {
     return renderLegacyAiCard(symbol, a);
   }
@@ -1619,20 +1987,10 @@ function renderAiCard(symbol, a) {
       <h4>Action</h4>
       <div class="action-what">${escAttr(action.what || "—")}</div>
       <div class="action-meta">
-        <div class="action-meta-cell">
-          <div class="lbl">Price Zone</div>
-          <div class="val">${escAttr(action.price_zone || "—")}</div>
-        </div>
-        <div class="action-meta-cell">
-          <div class="lbl">Timeframe</div>
-          <div class="val">${escAttr(action.timeframe || "—")}</div>
-        </div>
+        <div class="action-meta-cell"><div class="lbl">Price Zone</div><div class="val">${escAttr(action.price_zone || "—")}</div></div>
+        <div class="action-meta-cell"><div class="lbl">Timeframe</div><div class="val">${escAttr(action.timeframe || "—")}</div></div>
       </div>
-      ${action.invalidation ? `
-        <div class="invalidation-row">
-          <strong>Invalidation</strong>
-          ${escAttr(action.invalidation)}
-        </div>` : ""}
+      ${action.invalidation ? `<div class="invalidation-row"><strong>Invalidation</strong>${escAttr(action.invalidation)}</div>` : ""}
     </div>` : ""}
 
     <div class="horizon-strip">
@@ -1643,77 +2001,28 @@ function renderAiCard(symbol, a) {
 
     <div class="ai-body">
       ${a.what_changed ? `<div class="what-changed">${escAttr(a.what_changed)}</div>` : ""}
-
       ${a.confluence ? `
         <div class="ai-section" style="margin-top:14px;">
           <h4>Confluence</h4>
-          <div class="confluence-row">
-            <span class="confluence-score">${escAttr(a.confluence.score || "—")}</span>
-          </div>
+          <div class="confluence-row"><span class="confluence-score">${escAttr(a.confluence.score || "—")}</span></div>
           <p>${escAttr(a.confluence.summary || "")}</p>
         </div>` : ""}
-
       ${(scenarios.bull_trigger || scenarios.bear_trigger || scenarios.base_case) ? `
         <div class="ai-section">
           <h4>Scenarios</h4>
           <div class="scenarios-grid">
-            ${scenarios.bull_trigger ? `
-              <div class="scenario bull">
-                <div class="scn-lbl">Bull Trigger</div>
-                <div class="scn-cond">${escAttr(scenarios.bull_trigger.condition || "")}</div>
-                ${scenarios.bull_trigger.implication ? `<div class="scn-impl">→ ${escAttr(scenarios.bull_trigger.implication)}</div>` : ""}
-              </div>` : ""}
-            ${scenarios.bear_trigger ? `
-              <div class="scenario bear">
-                <div class="scn-lbl">Bear Trigger</div>
-                <div class="scn-cond">${escAttr(scenarios.bear_trigger.condition || "")}</div>
-                ${scenarios.bear_trigger.implication ? `<div class="scn-impl">→ ${escAttr(scenarios.bear_trigger.implication)}</div>` : ""}
-              </div>` : ""}
-            ${scenarios.base_case ? `
-              <div class="scenario base">
-                <div class="scn-lbl">Base Case</div>
-                <div class="scn-cond">${escAttr(scenarios.base_case)}</div>
-              </div>` : ""}
+            ${scenarios.bull_trigger ? `<div class="scenario bull"><div class="scn-lbl">Bull Trigger</div><div class="scn-cond">${escAttr(scenarios.bull_trigger.condition || "")}</div>${scenarios.bull_trigger.implication ? `<div class="scn-impl">→ ${escAttr(scenarios.bull_trigger.implication)}</div>` : ""}</div>` : ""}
+            ${scenarios.bear_trigger ? `<div class="scenario bear"><div class="scn-lbl">Bear Trigger</div><div class="scn-cond">${escAttr(scenarios.bear_trigger.condition || "")}</div>${scenarios.bear_trigger.implication ? `<div class="scn-impl">→ ${escAttr(scenarios.bear_trigger.implication)}</div>` : ""}</div>` : ""}
+            ${scenarios.base_case ? `<div class="scenario base"><div class="scn-lbl">Base Case</div><div class="scn-cond">${escAttr(scenarios.base_case)}</div></div>` : ""}
           </div>
         </div>` : ""}
-
-      ${a.ta_summary ? `
-        <div class="ai-section">
-          <h4>Technical Read</h4>
-          <p>${escAttr(a.ta_summary)}</p>
-        </div>` : ""}
-
-      ${a.sentiment_summary ? `
-        <div class="ai-section">
-          <h4>Sentiment</h4>
-          <p>${escAttr(a.sentiment_summary)}</p>
-        </div>` : ""}
-
-      ${a.key_risks?.length ? `
-        <div class="ai-section risks">
-          <h4>Key Risks</h4>
-          <ul>${a.key_risks.map(r => `<li>${escAttr(r)}</li>`).join("")}</ul>
-        </div>` : ""}
-
-      ${a.position_context ? `
-        <div class="ai-section">
-          <h4>For Your Position</h4>
-          <div class="position-context-block">${escAttr(a.position_context)}</div>
-        </div>` : ""}
-
-      ${a.counter_argument ? `
-        <div class="counter-arg">
-          <div class="ca-lbl">Counter-Argument</div>
-          <div class="ca-text">${escAttr(a.counter_argument)}</div>
-        </div>` : ""}
-
-      ${a.data_quality_notes ? `
-        <div class="ai-section">
-          <h4>Data Notes</h4>
-          <p style="font-size:12px;color:var(--ink-muted);">${escAttr(a.data_quality_notes)}</p>
-        </div>` : ""}
+      ${a.ta_summary ? `<div class="ai-section"><h4>Technical Read</h4><p>${escAttr(a.ta_summary)}</p></div>` : ""}
+      ${a.sentiment_summary ? `<div class="ai-section"><h4>Sentiment</h4><p>${escAttr(a.sentiment_summary)}</p></div>` : ""}
+      ${a.key_risks?.length ? `<div class="ai-section risks"><h4>Key Risks</h4><ul>${a.key_risks.map(r => `<li>${escAttr(r)}</li>`).join("")}</ul></div>` : ""}
+      ${a.position_context ? `<div class="ai-section"><h4>For Your Position</h4><div class="position-context-block">${escAttr(a.position_context)}</div></div>` : ""}
+      ${a.counter_argument ? `<div class="counter-arg"><div class="ca-lbl">Counter-Argument</div><div class="ca-text">${escAttr(a.counter_argument)}</div></div>` : ""}
+      ${a.data_quality_notes ? `<div class="ai-section"><h4>Data Notes</h4><p style="font-size:12px;color:var(--ink-muted);">${escAttr(a.data_quality_notes)}</p></div>` : ""}
     </div>
-
     <div class="ai-actions">
       <button class="btn btn-sm" data-act="run-analysis" data-symbol="${escAttr(symbol)}">Re-analyze</button>
       <button class="btn btn-secondary btn-sm" data-act="log-trade" data-symbol="${escAttr(symbol)}">Log Trade</button>
@@ -1722,7 +2031,6 @@ function renderAiCard(symbol, a) {
   </div>`;
 }
 
-// Legacy renderer for old-schema analyses
 function renderLegacyAiCard(symbol, a) {
   return `<div class="ai-card">
     <div class="stance-hero">
@@ -1884,10 +2192,7 @@ async function runAnalysis(symbol) {
         idToken,
       }),
     });
-    if (!r.ok) {
-      const text = await r.text();
-      throw new Error(text);
-    }
+    if (!r.ok) throw new Error(await r.text());
     const j = await r.json();
     if (j.analysis) {
       state.analyses[symbol] = {
@@ -1919,8 +2224,7 @@ async function runPortfolioAnalysis() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        uid: state.uid,
-        idToken,
+        uid: state.uid, idToken,
         holdings: state.holdings,
         portfolio_metrics: m,
       }),
@@ -1928,10 +2232,7 @@ async function runPortfolioAnalysis() {
     if (!r.ok) throw new Error(await r.text());
     const j = await r.json();
     if (j.analysis) {
-      state.portfolioAnalysis = {
-        ...j.analysis,
-        generated_at: new Date().toISOString(),
-      };
+      state.portfolioAnalysis = { ...j.analysis, generated_at: new Date().toISOString() };
       toast("Portfolio analysis complete");
       renderPortfolio();
     } else throw new Error("No analysis returned");
@@ -1946,7 +2247,7 @@ async function runPortfolioAnalysis() {
 }
 
 // ============================================================================
-// JOURNAL / ALERTS / SETTINGS
+// JOURNAL / SETTINGS
 // ============================================================================
 async function loadJournal() {
   const snap = await db.collection("users").doc(state.uid).collection("journal")
@@ -1987,62 +2288,6 @@ async function renderJournal() {
   `).join("");
 }
 
-async function loadAlerts() {
-  const snap = await db.collection("users").doc(state.uid).collection("alerts").where("active", "==", true).get();
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-}
-async function renderAlerts() {
-  $("#topbarTitle").textContent = "Alerts";
-  const view = $("#view");
-  view.innerHTML = `
-    <div class="section-head" style="padding: 20px 20px 0;">
-      <h2>Alerts</h2>
-      <button class="btn-ghost" data-act="add-alert" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
-    </div>
-    <div id="alertsList"><div class="empty-state"><span class="spinner"></span></div></div>
-  `;
-  const alerts = await loadAlerts();
-  if (alerts.length === 0) {
-    $("#alertsList").innerHTML = `<div class="empty-state">
-      <span class="display">No active alerts</span>
-      <p>Alerts trigger when prices cross your set thresholds. Checked when you open the app or refresh.</p>
-    </div>`;
-    return;
-  }
-  $("#alertsList").innerHTML = alerts.map(a => `
-    <div class="alert-row">
-      <div class="alert-info">
-        <div class="symbol">${escAttr(a.symbol)}</div>
-        <div class="cond">${a.type === 'price_above' ? 'Above' : 'Below'} $${fmtUSD(a.threshold)}</div>
-      </div>
-      <div class="alert-actions">
-        <button class="btn-ghost btn-sm" data-act="delete-alert" data-id="${escAttr(a.id)}">Remove</button>
-      </div>
-    </div>
-  `).join("");
-}
-async function deleteAlert(id) {
-  await db.collection("users").doc(state.uid).collection("alerts").doc(id).delete();
-  toast("Alert removed");
-  renderAlerts();
-}
-async function checkAlerts() {
-  const alerts = await loadAlerts();
-  for (const a of alerts) {
-    const p = state.prices[a.symbol];
-    if (!p) continue;
-    const cur = p.current_price;
-    const trigger = (a.type === "price_above" && cur > a.threshold) || (a.type === "price_below" && cur < a.threshold);
-    if (trigger) {
-      toast(`${a.symbol} ${a.type === 'price_above' ? 'crossed above' : 'dropped below'} $${fmtUSD(a.threshold)}`);
-      await db.collection("users").doc(state.uid).collection("alerts").doc(a.id).update({
-        active: false,
-        triggered_at: firebase.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-  }
-}
-
 function renderSettings() {
   $("#topbarTitle").textContent = "Settings";
   const view = $("#view");
@@ -2064,7 +2309,11 @@ function renderSettings() {
         <button class="btn btn-secondary btn-sm" data-act="manual-refresh">Refresh</button>
       </div>
       <div class="setting-row">
-        <div><div class="lbl">Export Portfolio (JSON)</div><div class="sub">Holdings + journal + alerts</div></div>
+        <div><div class="lbl">Rescan Watchlist</div><div class="sub">Run all conditions now</div></div>
+        <button class="btn btn-secondary btn-sm" data-act="rescan">Rescan</button>
+      </div>
+      <div class="setting-row">
+        <div><div class="lbl">Export Portfolio (JSON)</div><div class="sub">Holdings + journal + watchlist</div></div>
         <button class="btn btn-secondary btn-sm" data-act="export-data">Export</button>
       </div>
     </div>
@@ -2076,7 +2325,7 @@ function renderSettings() {
         <div><div class="lbl">Worker</div><div class="sub" style="font-family:var(--mono);font-size:10.5px;">portfolio-advisor.workers.dev</div></div>
       </div>
       <div class="setting-row">
-        <div><div class="lbl">Version</div><div class="sub">1.2.0</div></div>
+        <div><div class="lbl">Version</div><div class="sub">1.3.0</div></div>
       </div>
     </div>
     <div class="empty-state" style="padding: 30px 20px;">
@@ -2102,19 +2351,19 @@ function resetPin() {
 async function manualRefresh() {
   toast("Refreshing prices…");
   await refreshAllPrices();
-  await checkAlerts();
   toast("Refreshed");
   renderCurrentView();
 }
 async function exportData() {
   const journal = await loadJournal();
-  const alerts  = await loadAlerts();
   const data = {
     exported_at: new Date().toISOString(),
     holdings: state.holdings,
+    watchlist: state.watchlist,
+    triggers: state.triggers,
     analyses: state.analyses,
     portfolio_analysis: state.portfolioAnalysis,
-    journal, alerts,
+    journal,
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -2297,6 +2546,158 @@ async function deleteHolding(symbol) {
   setView("portfolio");
 }
 
+// ============================================================================
+// WATCHLIST MUTATIONS + ADD-WATCH MODAL
+// ============================================================================
+function openAddWatch() {
+  openModal(`
+    <div class="modal-head"><h3>Add to Watchlist</h3></div>
+    <div class="field" style="position:relative;">
+      <label>Symbol</label>
+      <input id="aw_symbol" placeholder="e.g. NVDA, SOL, GLD" autocomplete="off" />
+      <div id="aw_search_results" class="search-results hidden"></div>
+    </div>
+    <div class="field"><label>Display Name (optional)</label><input id="aw_name" /></div>
+    <div class="field">
+      <label>Asset Class</label>
+      <select id="aw_class">
+        ${ASSET_CLASSES.filter(c => c.value !== "cash").map(c => `<option value="${c.value}">${c.label}</option>`).join("")}
+      </select>
+    </div>
+    <button class="btn btn-block" data-act="submit-add-watch">Add to Watchlist</button>
+  `);
+  $("#aw_symbol").addEventListener("input", debouncedAwSearch);
+}
+const debouncedAwSearch = debounce(async () => {
+  const q = $("#aw_symbol")?.value.trim();
+  const results = $("#aw_search_results");
+  if (!q || q.length < 1) { results.classList.add("hidden"); return; }
+  try {
+    const r = await fetch(`${WORKER_URL}/search?q=${encodeURIComponent(q)}`);
+    const j = await r.json();
+    const items = (j.results || []).slice(0, 6);
+    if (items.length === 0) { results.classList.add("hidden"); return; }
+    results.innerHTML = items.map(item => `
+      <div class="search-result" data-act="pick-aw-symbol" data-symbol="${escAttr(item.symbol)}" data-name="${escAttr(item.name || '')}">
+        <span class="ex">${escAttr(item.exchange || '')}</span>
+        <div class="sym">${escAttr(item.symbol)}</div>
+        <div class="nm">${escAttr(item.name || '')}</div>
+      </div>
+    `).join("");
+    results.classList.remove("hidden");
+  } catch (e) { results.classList.add("hidden"); }
+}, 300);
+
+async function submitAddWatch() {
+  const symbol = $("#aw_symbol").value.trim().toUpperCase();
+  const name = $("#aw_name").value.trim() || symbol;
+  const cls = $("#aw_class").value;
+  if (!symbol) { toast("Enter a symbol", 2400, "error"); return; }
+  await db.collection("users").doc(state.uid).collection("watchlist").doc(symbol).set({
+    symbol, asset_class: cls, name,
+    conditions: [{ id: "rsi30", type: "rsi_below", threshold: 30 }],
+    added_at: firebase.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  toast(`${symbol} added — RSI<30 condition set`);
+  closeModal();
+  await loadWatchlistFromFirestore();
+  fetchWatchlistSnapshot().then(() => renderWatchlist());
+  renderWatchlist();
+}
+
+async function removeFromWatch(symbol) {
+  if (!confirm(`Remove ${symbol} from watchlist?`)) return;
+  await db.collection("users").doc(state.uid).collection("watchlist").doc(symbol).delete();
+  toast("Removed from watchlist");
+  await loadWatchlistFromFirestore();
+  state.selectedSymbol = null;
+  setView("watchlist");
+}
+
+function openAddCondition(symbol) {
+  openModal(`
+    <div class="modal-head"><h3>Add Condition · ${escAttr(symbol)}</h3></div>
+    <div class="field">
+      <label>Condition Type</label>
+      <select id="cd_type">
+        ${CONDITION_TYPES.map(t => `<option value="${t.value}">${t.label}</option>`).join("")}
+      </select>
+    </div>
+    <div id="cd_dynamic"></div>
+    <button class="btn btn-block" data-act="submit-cond" data-symbol="${escAttr(symbol)}">Add Condition</button>
+  `);
+  $("#cd_type").addEventListener("change", onConditionTypeChange);
+  onConditionTypeChange();
+}
+function onConditionTypeChange() {
+  const type = $("#cd_type").value;
+  const ct = CONDITION_TYPES.find(t => t.value === type);
+  const dyn = $("#cd_dynamic");
+  if (!ct) { dyn.innerHTML = ""; return; }
+  let html = "";
+  if ("threshold" in ct.defaults) {
+    const lbl = type.startsWith("rsi") ? "RSI Threshold" : type.startsWith("price") ? "Price (USD)" : "Threshold";
+    html += `<div class="field"><label>${lbl}</label><input id="cd_threshold" type="number" step="any" value="${ct.defaults.threshold}" /></div>`;
+  }
+  if ("threshold_pct" in ct.defaults) {
+    html += `<div class="field"><label>Threshold %</label><input id="cd_threshold_pct" type="number" step="any" value="${ct.defaults.threshold_pct}" /></div>`;
+  }
+  if ("period" in ct.defaults) {
+    html += `<div class="field"><label>MA Period</label><select id="cd_period"><option value="20">MA 20</option><option value="50">MA 50</option><option value="200" selected>MA 200</option></select></div>`;
+  }
+  if ("tolerance_pct" in ct.defaults) {
+    html += `<div class="field"><label>Tolerance %</label><input id="cd_tolerance_pct" type="number" step="any" value="${ct.defaults.tolerance_pct}" /></div>`;
+  }
+  if ("within_days" in ct.defaults) {
+    html += `<div class="field"><label>Within Days</label><input id="cd_within_days" type="number" step="1" value="${ct.defaults.within_days}" /></div>`;
+  }
+  dyn.innerHTML = html;
+}
+async function submitCondition(symbol) {
+  const type = $("#cd_type").value;
+  const ct = CONDITION_TYPES.find(t => t.value === type);
+  const cond = { id: `${type}_${Date.now()}`, type };
+  if ($("#cd_threshold")) cond.threshold = parseFloat($("#cd_threshold").value);
+  if ($("#cd_threshold_pct")) cond.threshold_pct = parseFloat($("#cd_threshold_pct").value);
+  if ($("#cd_period")) cond.period = parseInt($("#cd_period").value, 10);
+  if ($("#cd_tolerance_pct")) cond.tolerance_pct = parseFloat($("#cd_tolerance_pct").value);
+  if ($("#cd_within_days")) cond.within_days = parseInt($("#cd_within_days").value, 10);
+
+  const w = state.watchlist.find(x => x.symbol === symbol);
+  const newConditions = [...(w?.conditions || []), cond];
+  await db.collection("users").doc(state.uid).collection("watchlist").doc(symbol).update({ conditions: newConditions });
+  toast("Condition added");
+  closeModal();
+  await loadWatchlistFromFirestore();
+  renderAssetDetail(symbol);
+}
+async function removeCondition(symbol, condId) {
+  const w = state.watchlist.find(x => x.symbol === symbol);
+  if (!w) return;
+  const newConditions = (w.conditions || []).filter(c => c.id !== condId);
+  await db.collection("users").doc(state.uid).collection("watchlist").doc(symbol).update({ conditions: newConditions });
+  toast("Condition removed");
+  await loadWatchlistFromFirestore();
+  renderAssetDetail(symbol);
+}
+
+// "Add to Portfolio" from a watchlist item (opens add holding modal pre-filled)
+function addFromWatch(symbol) {
+  const w = state.watchlist.find(x => x.symbol === symbol);
+  if (!w) return;
+  openModal(`
+    <div class="modal-head"><h3>Add ${escAttr(symbol)} to Portfolio</h3></div>
+    <input id="ah_class" type="hidden" value="${escAttr(w.asset_class || 'us_stock')}" />
+    <input id="ah_symbol" type="hidden" value="${escAttr(symbol)}" />
+    <input id="ah_name" type="hidden" value="${escAttr(w.name || '')}" />
+    <div class="field-row">
+      <div class="field"><label>Quantity</label><input id="ah_qty" type="number" step="any" placeholder="0" /></div>
+      <div class="field"><label>Total Cost (USD)</label><input id="ah_cost" type="number" step="any" placeholder="0" /></div>
+    </div>
+    <button class="btn btn-block" data-act="submit-add">Add to Portfolio</button>
+  `);
+}
+
 function openLogTrade(symbol) {
   const sigSnapshot = symbol && state.analyses[symbol] ? state.analyses[symbol] : null;
   const stanceLabel = sigSnapshot?.stance || sigSnapshot?.signal || null;
@@ -2305,10 +2706,7 @@ function openLogTrade(symbol) {
     <div class="field-row">
       <div class="field"><label>Symbol</label><input id="lt_symbol" value="${escAttr(symbol || '')}" /></div>
       <div class="field"><label>Action</label>
-        <select id="lt_action">
-          <option value="buy">Buy</option>
-          <option value="sell">Sell</option>
-        </select>
+        <select id="lt_action"><option value="buy">Buy</option><option value="sell">Sell</option></select>
       </div>
     </div>
     <div class="field-row">
@@ -2342,35 +2740,6 @@ async function submitTrade(sig, conf) {
   if (state.currentView === "journal") renderJournal();
 }
 
-function openAddAlert() {
-  const opts = state.holdings.filter(h => h.asset_class !== "cash").map(h => `<option value="${escAttr(h.symbol)}">${escAttr(h.symbol)}</option>`).join("");
-  openModal(`
-    <div class="modal-head"><h3>New Alert</h3></div>
-    <div class="field"><label>Symbol</label><select id="al_symbol">${opts}</select></div>
-    <div class="field"><label>Trigger</label>
-      <select id="al_type">
-        <option value="price_above">Price above</option>
-        <option value="price_below">Price below</option>
-      </select>
-    </div>
-    <div class="field"><label>Threshold (USD)</label><input id="al_threshold" type="number" step="any" /></div>
-    <button class="btn btn-block" data-act="submit-alert">Create Alert</button>
-  `);
-}
-async function submitAlert() {
-  const symbol = $("#al_symbol").value;
-  const type   = $("#al_type").value;
-  const threshold = parseFloat($("#al_threshold").value);
-  if (!symbol || !threshold) { toast("Fill all fields", 2400, "error"); return; }
-  await db.collection("users").doc(state.uid).collection("alerts").add({
-    symbol, type, threshold, active: true,
-    created_at: firebase.firestore.FieldValue.serverTimestamp(),
-  });
-  toast("Alert created");
-  closeModal();
-  if (state.currentView === "alerts") renderAlerts();
-}
-
 // ============================================================================
 // EVENT DELEGATION
 // ============================================================================
@@ -2389,10 +2758,12 @@ document.addEventListener("click", (e) => {
   try {
     switch (act) {
       case "open-asset":             openAsset(symbol); break;
+      case "open-watch":             openWatchDetail(symbol); break;
       case "back-markets":           backToMarkets(); break;
       case "set-range":              setRange(target.dataset.range, symbol); break;
       case "run-analysis":           runAnalysis(symbol); break;
       case "run-portfolio-analysis": runPortfolioAnalysis(); break;
+      case "rescan":                 rescan(); break;
       case "log-trade":              openLogTrade(symbol); break;
       case "add-holding":            openAddHolding(); break;
       case "submit-add":             submitAddHolding(); break;
@@ -2400,16 +2771,25 @@ document.addEventListener("click", (e) => {
       case "submit-edit":            submitEditHolding(symbol); break;
       case "delete-holding":         confirmDeleteHolding(symbol); break;
       case "submit-trade":           submitTrade(target.dataset.sig, target.dataset.conf); break;
-      case "add-alert":              openAddAlert(); break;
-      case "submit-alert":           submitAlert(); break;
-      case "delete-alert":           deleteAlert(target.dataset.id); break;
+      case "add-watch":              openAddWatch(); break;
+      case "submit-add-watch":       submitAddWatch(); break;
+      case "rm-watch":               removeFromWatch(symbol); break;
+      case "add-cond":               openAddCondition(symbol); break;
+      case "submit-cond":            submitCondition(symbol); break;
+      case "rm-cond":                removeCondition(symbol, target.dataset.cid); break;
+      case "add-from-watch":         addFromWatch(symbol); break;
       case "pick-symbol":
         $("#ah_symbol").value = target.dataset.symbol;
         $("#ah_name").value = target.dataset.name || "";
         $("#ah_search_results").classList.add("hidden");
         break;
+      case "pick-aw-symbol":
+        $("#aw_symbol").value = target.dataset.symbol;
+        $("#aw_name").value = target.dataset.name || "";
+        $("#aw_search_results").classList.add("hidden");
+        break;
       case "toggle-theme":           toggleTheme(); break;
-      case "reset-pin":              resetPin(); break;
+      case "reset-pin":               resetPin(); break;
       case "manual-refresh":         manualRefresh(); break;
       case "export-data":            exportData(); break;
     }
