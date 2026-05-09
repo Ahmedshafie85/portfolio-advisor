@@ -928,6 +928,7 @@ body {
 .hidden { display: none !important; }
 ::-webkit-scrollbar { width: 0; }
 </style>
+<base target="_blank">
 </head>
 <body>
 
@@ -1130,6 +1131,7 @@ const state = {
   selectedRange: "3M",
   chart: null,
   theme: localStorage.getItem("theme") || "day",
+  _watchlistSnapshotFetching: false,
 };
 document.documentElement.setAttribute("data-theme", state.theme);
 
@@ -1427,12 +1429,18 @@ async function fetchWatchlistSnapshot() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbols, conditions_by_symbol }),
     });
-    if (!r.ok) throw new Error(await r.text());
+    if (!r.ok) {
+      const text = await r.text();
+      throw new Error(text);
+    }
     const j = await r.json();
     for (const item of (j.results || [])) {
       state.watchlistSnapshot[item.symbol] = item;
     }
-  } catch (e) { console.warn("snapshot failed:", e); }
+  } catch (e) {
+    console.warn("snapshot failed:", e);
+    // Don't throw — let the caller handle it gracefully
+  }
 }
 
 // ============================================================================
@@ -1669,6 +1677,9 @@ function renderPortAnalysisInlineCard() {
 // WATCHLIST TAB
 // ============================================================================
 async function renderWatchlist() {
+  // GUARD: Only render if user is still on watchlist view
+  if (state.currentView !== "watchlist") return;
+
   $("#topbarTitle").textContent = "Watchlist";
   const view = $("#view");
 
@@ -1750,9 +1761,16 @@ async function renderWatchlist() {
     <div class="holdings">${rows}</div>
   `;
 
-  // If no snapshot yet, fetch lazily in background
-  if (!Object.keys(state.watchlistSnapshot).length) {
-    fetchWatchlistSnapshot().then(() => renderWatchlist());
+  // If no snapshot yet, fetch lazily in background — with guard + one-shot flag
+  if (!state._watchlistSnapshotFetching && !Object.keys(state.watchlistSnapshot).length) {
+    state._watchlistSnapshotFetching = true;
+    fetchWatchlistSnapshot()
+      .catch(() => {})
+      .finally(() => {
+        state._watchlistSnapshotFetching = false;
+        // Only re-render if still on watchlist
+        if (state.currentView === "watchlist") renderWatchlist();
+      });
   }
 }
 
