@@ -106,7 +106,7 @@ body {
 
 .tabs {
   position: fixed; bottom: 0; left: 0; right: 0;
-  display: grid; grid-template-columns: repeat(6, 1fr);
+  display: grid; grid-template-columns: repeat(7, 1fr);
   background: var(--bg);
   border-top: 1px solid var(--rule);
   padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
@@ -868,6 +868,161 @@ body {
 
 .hidden { display: none !important; }
 ::-webkit-scrollbar { width: 0; }
+
+/* ===== BOT SIMULATOR ===== */
+.bot-hero {
+  background: var(--bg-card);
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  padding: 22px 20px;
+  margin: 16px 20px 12px;
+  position: relative; overflow: hidden;
+}
+.bot-hero::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--green) 0%, var(--gold) 50%, var(--accent) 100%);
+}
+.bot-hero h3 { font-family: var(--display); font-size: 18px; font-weight: 500; margin-bottom: 4px; }
+.bot-hero .sub { font-size: 12px; color: var(--ink-muted); margin-bottom: 16px; }
+.bot-stats {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 12px 18px;
+}
+.bot-stat-block {
+  padding: 12px 14px;
+  background: var(--bg-elev);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule-soft);
+}
+.bot-stat-block .label { display: block; margin-bottom: 4px; }
+.bot-stat-block .val { font-family: var(--mono); font-size: 16px; font-weight: 500; }
+.bot-stat-block .val.pos { color: var(--green); }
+.bot-stat-block .val.neg { color: var(--red); }
+.bot-stat-block .sub { font-size: 10.5px; color: var(--ink-muted); margin-top: 2px; font-family: var(--mono); }
+
+.strategy-card {
+  margin: 12px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.strategy-card .strat-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 14px;
+}
+.strategy-card .strat-name {
+  font-family: var(--display); font-size: 17px; font-weight: 500;
+}
+.strategy-card .strat-tag {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 3px 8px; border-radius: 4px;
+}
+.strat-tag.app { background: rgba(176,141,60,0.15); color: var(--gold); border: 1px solid var(--gold); }
+.strat-tag.classic { background: rgba(74,122,74,0.12); color: var(--green); border: 1px solid var(--green); }
+
+.strat-metrics {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.strat-metric {
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--bg-elev);
+  border-radius: 6px;
+}
+.strat-metric .label { font-size: 9.5px; }
+.strat-metric .val { font-family: var(--mono); font-size: 14px; font-weight: 500; margin-top: 2px; }
+.strat-metric .val.pos { color: var(--green); }
+.strat-metric .val.neg { color: var(--red); }
+
+.bot-trade-list { margin: 0; padding: 0; }
+.bot-trade {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule-soft);
+  font-size: 13px;
+}
+.bot-trade:last-child { border-bottom: none; }
+.bot-trade-l { display: flex; flex-direction: column; gap: 2px; }
+.bot-trade-sym { font-family: var(--display); font-weight: 600; font-size: 14px; }
+.bot-trade-meta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted); }
+.bot-trade-r { text-align: right; }
+.bot-trade-pnl { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+.bot-trade-pnl.pos { color: var(--green); }
+.bot-trade-pnl.neg { color: var(--red); }
+.bot-trade-pnl.open { color: var(--ink-muted); }
+.bot-trade-act {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 2px 6px; border-radius: 3px;
+  display: inline-block; margin-right: 6px;
+}
+.bot-trade-act.buy { background: rgba(74,122,74,0.15); color: var(--green); }
+.bot-trade-act.sell { background: rgba(161,61,45,0.15); color: var(--red); }
+.bot-trade-act.open-pos { background: var(--bg-elev); color: var(--ink-muted); }
+
+.bot-bar {
+  display: flex; gap: 8px;
+  padding: 12px 20px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--rule);
+  font-size: 11px; color: var(--ink-muted);
+  font-family: var(--mono);
+  align-items: center;
+}
+.bot-bar button {
+  background: var(--ink); color: var(--bg); border: none;
+  padding: 6px 12px; border-radius: 6px;
+  font-family: var(--sans); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.04em; cursor: pointer;
+}
+.bot-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+.bot-bar .grow { flex: 1; }
+
+.equity-chart {
+  margin: 12px 20px; padding: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.equity-chart h4 {
+  font-family: var(--display); font-size: 14px; font-weight: 500;
+  margin-bottom: 10px;
+}
+.equity-chart svg { width: 100%; height: 160px; display: block; }
+
+.head-to-head {
+  margin: 12px 20px; padding: 16px 18px;
+  background: var(--bg-card); border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.head-to-head h4 { font-family: var(--display); font-size: 15px; margin-bottom: 12px; font-weight: 500; }
+.h2h-row {
+  display: grid; grid-template-columns: 1fr 60px 1fr;
+  align-items: center; gap: 8px;
+  padding: 8px 0; border-bottom: 1px solid var(--rule-soft);
+}
+.h2h-row:last-child { border-bottom: none; }
+.h2h-side { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+.h2h-side.app { text-align: right; color: var(--gold); }
+.h2h-side.classic { text-align: left; color: var(--green); }
+.h2h-side.winner { font-weight: 700; }
+.h2h-side.winner::after { content: " ★"; }
+.h2h-label {
+  text-align: center; font-size: 9.5px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-muted);
+}
+
+.bot-empty {
+  margin: 24px 20px; padding: 32px 22px;
+  background: var(--bg-card); border: 1px dashed var(--rule);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.bot-empty .display { font-family: var(--display); font-size: 22px; display: block; margin-bottom: 8px; }
+.bot-empty p { color: var(--ink-muted); font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
+
 </style>
 </head>
 <body>
@@ -939,6 +1094,12 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
         <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>
       </svg>Alerts
+    </button>
+    <button class="tab" data-view="bot">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="7" width="16" height="12" rx="2"/>
+        <path d="M9 3v4M15 3v4M9 13v.01M15 13v.01M9 17h6"/>
+      </svg>Bot
     </button>
     <button class="tab" data-view="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
@@ -1085,6 +1246,10 @@ const state = {
   chart: null,
   theme: localStorage.getItem("theme") || "day",
   lastScanAt: null,
+  // bot simulator
+  bot: { app: null, classic: null }, // { trades:[], equity:[], cash, positions:{} }
+  botRunning: false,
+  ohlcvCache: {}, // symbol -> { ohlcv, fetched_at }
 };
 document.documentElement.setAttribute("data-theme", state.theme);
 
@@ -1267,6 +1432,7 @@ async function loadInitialData() {
   await loadWatchlist();
   if (state.watchlist.length === 0) await seedWatchlist();
   await loadTriggers();
+  await loadBotState();
   await refreshAllPrices();
   renderCurrentView();
   // Background scan after first render
@@ -1320,9 +1486,14 @@ async function loadTriggers() {
   try {
     const snap = await db.collection("users").doc(state.uid).collection("triggers")
       .where("seen", "==", false).limit(20).get();
-    state.triggers = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const remoteTriggers = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.triggered_at || "").localeCompare(a.triggered_at || ""));
-  } catch (e) { state.triggers = []; }
+    // Merge with any local-only triggers (don't overwrite if remote returns nothing)
+    if (remoteTriggers.length > 0) state.triggers = remoteTriggers;
+  } catch (e) {
+    console.warn("loadTriggers failed (probably no index):", e.message || e);
+    // Keep whatever we already have in state.triggers
+  }
 }
 
 async function loadAnalysesFromFirestore() {
@@ -1358,6 +1529,7 @@ async function refreshAllPrices() {
 
 async function runScan() {
   if (state.watchlist.length === 0) return;
+  // Try worker /scan first, fall back to client-side computation
   try {
     const idToken = await auth.currentUser.getIdToken();
     const r = await fetch(`${WORKER_URL}/scan`, {
@@ -1365,23 +1537,50 @@ async function runScan() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ uid: state.uid, idToken }),
     });
-    if (!r.ok) throw new Error(await r.text());
-    const j = await r.json();
-    for (const item of (j.results || [])) {
-      state.watchlistSnapshot[item.symbol] = item;
+    if (r.ok) {
+      const j = await r.json();
+      if (j.results && j.results.length) {
+        for (const item of j.results) state.watchlistSnapshot[item.symbol] = item;
+        state.lastScanAt = new Date().toISOString();
+        await loadTriggers();
+        if (state.currentView === "portfolio" || state.currentView === "watchlist") renderCurrentView();
+        return j;
+      }
     }
-    state.lastScanAt = new Date().toISOString();
-    await loadTriggers();
-    if (state.currentView === "portfolio" || state.currentView === "watchlist") renderCurrentView();
-    return j;
+    throw new Error("scan endpoint failed or returned no results");
   } catch (e) {
-    console.warn("scan failed:", e);
-    throw e;
+    console.warn("worker scan failed, using client-side scan:", e.message || e);
   }
+
+  // Client-side scan
+  await fetchWatchlistSnapshot();
+  state.lastScanAt = new Date().toISOString();
+  // collect triggers from snapshots into local state.triggers
+  state.triggers = [];
+  for (const w of state.watchlist) {
+    const snap = state.watchlistSnapshot[w.symbol];
+    if (snap?.triggers?.length) {
+      for (const t of snap.triggers) {
+        state.triggers.push({
+          id: `${w.symbol}_${t.condition_id}_${Date.now()}`,
+          symbol: w.symbol,
+          condition_id: t.condition_id,
+          condition_type: t.type,
+          detail: t.detail,
+          triggered_at: new Date().toISOString(),
+          seen: false,
+        });
+      }
+    }
+  }
+  if (state.currentView === "portfolio" || state.currentView === "watchlist") renderCurrentView();
+  return { results: Object.values(state.watchlistSnapshot) };
 }
 
 async function fetchWatchlistSnapshot() {
   if (state.watchlist.length === 0) return;
+
+  // Try worker endpoint first; if it fails, compute client-side.
   try {
     const symbols = state.watchlist.map(w => w.symbol);
     const conditions_by_symbol = {};
@@ -1391,22 +1590,247 @@ async function fetchWatchlistSnapshot() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbols, conditions_by_symbol }),
     });
-    if (!r.ok) throw new Error(await r.text());
-    const j = await r.json();
-    for (const item of (j.results || [])) {
-      state.watchlistSnapshot[item.symbol] = item;
+    if (r.ok) {
+      const j = await r.json();
+      if (j.results && j.results.length) {
+        for (const item of j.results) state.watchlistSnapshot[item.symbol] = item;
+        return;
+      }
     }
+    throw new Error("scan-snapshot empty or failed");
   } catch (e) {
-    console.warn("snapshot failed:", e);
+    console.warn("scan-snapshot failed; falling back to client-side TA:", e.message || e);
+  }
+
+  // ---- Client-side fallback: fetch prices, compute indicators locally ----
+  for (const w of state.watchlist) {
+    try {
+      const snap = await computeClientSnapshot(w.symbol, w.conditions || []);
+      if (snap) state.watchlistSnapshot[w.symbol] = snap;
+    } catch (e) {
+      console.warn("client snapshot failed for", w.symbol, e.message || e);
+    }
   }
 }
 
+async function getOhlcv(symbol) {
+  // cache for 5 min
+  const cached = state.ohlcvCache[symbol];
+  if (cached && (Date.now() - cached.fetched_at < 5 * 60 * 1000)) return cached.data;
+  let data = null;
+  if (state.prices[symbol] && state.prices[symbol].ohlcv) {
+    data = state.prices[symbol];
+  } else {
+    const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(symbol)}`);
+    if (!r.ok) throw new Error(`price fetch ${r.status}`);
+    data = await r.json();
+    state.prices[symbol] = data;
+  }
+  state.ohlcvCache[symbol] = { data, fetched_at: Date.now() };
+  return data;
+}
+
+async function computeClientSnapshot(symbol, conditions) {
+  const data = await getOhlcv(symbol);
+  if (!data || !data.ohlcv || data.ohlcv.length < 30) {
+    return {
+      symbol,
+      current_price: data?.current_price || null,
+      day_change_pct: null,
+      rsi14: null, trend: null,
+      pct_from_52w_high: null,
+      drop_from_peak_90d: null,
+      triggers: [],
+      setup_score: 0,
+    };
+  }
+  const ohlcv = data.ohlcv;
+  const closes = ohlcv.map(d => d.c);
+  const highs  = ohlcv.map(d => d.h);
+  const lows   = ohlcv.map(d => d.l);
+  const cur    = data.current_price ?? closes[closes.length - 1];
+  const prev   = data.prev_close ?? closes[closes.length - 2];
+  const dayChangePct = prev ? ((cur - prev) / prev) * 100 : null;
+
+  const rsi14 = computeRSI(closes, 14);
+  const ma50  = computeMA(closes, 50);
+  const ma200 = computeMA(closes, 200);
+  const trend = ma200 != null && cur > ma200 ? "above_200ma" : "below_200ma";
+
+  // 52-week range (last 252 sessions ≈ 1 year)
+  const yearSlice = closes.slice(-252);
+  const yearHighs = highs.slice(-252);
+  const yearLows  = lows.slice(-252);
+  const high52w = Math.max(...yearHighs);
+  const low52w  = Math.min(...yearLows);
+  const pctFrom52wHigh = high52w > 0 ? ((cur - high52w) / high52w) * 100 : null;
+  const pctFrom52wLow  = low52w > 0  ? ((cur - low52w)  / low52w)  * 100 : null;
+
+  // 90-day peak (drop_from_peak)
+  const slice90 = highs.slice(-90);
+  const peak90 = slice90.length ? Math.max(...slice90) : null;
+  const dropFromPeak90 = peak90 ? ((cur - peak90) / peak90) * 100 : null;
+
+  // MACD
+  const macd = computeMACD(closes);
+
+  // Evaluate conditions
+  const triggers = [];
+  for (const c of (conditions || [])) {
+    let fired = false;
+    let detail = "";
+    switch (c.type) {
+      case "rsi_below":
+        if (rsi14 != null && rsi14 < c.threshold) { fired = true; detail = `RSI ${rsi14.toFixed(1)} < ${c.threshold}`; }
+        break;
+      case "rsi_above":
+        if (rsi14 != null && rsi14 > c.threshold) { fired = true; detail = `RSI ${rsi14.toFixed(1)} > ${c.threshold}`; }
+        break;
+      case "ma_touch": {
+        const period = c.period || 200;
+        const tol = c.tolerance_pct || 1.5;
+        const ma = computeMA(closes, period);
+        if (ma != null) {
+          const diffPct = Math.abs((cur - ma) / ma) * 100;
+          if (diffPct <= tol) { fired = true; detail = `${diffPct.toFixed(2)}% from MA${period}`; }
+        }
+        break;
+      }
+      case "near_52w_high":
+        if (pctFrom52wHigh != null && Math.abs(pctFrom52wHigh) <= (c.threshold_pct || 3)) {
+          fired = true; detail = `${Math.abs(pctFrom52wHigh).toFixed(2)}% from 52w high`;
+        }
+        break;
+      case "near_52w_low":
+        if (pctFrom52wLow != null && pctFrom52wLow <= (c.threshold_pct || 5)) {
+          fired = true; detail = `${pctFrom52wLow.toFixed(2)}% above 52w low`;
+        }
+        break;
+      case "drop_from_peak":
+        if (dropFromPeak90 != null && dropFromPeak90 <= -(c.threshold_pct || 10)) {
+          fired = true; detail = `${dropFromPeak90.toFixed(2)}% off 90d peak`;
+        }
+        break;
+      case "macd_bullish_cross":
+        if (macd && macd.lastCrossover === "bullish" && macd.daysSinceCross <= (c.within_days || 3)) {
+          fired = true; detail = `bullish cross ${macd.daysSinceCross}d ago`;
+        }
+        break;
+      case "macd_bearish_cross":
+        if (macd && macd.lastCrossover === "bearish" && macd.daysSinceCross <= (c.within_days || 3)) {
+          fired = true; detail = `bearish cross ${macd.daysSinceCross}d ago`;
+        }
+        break;
+      case "price_above":
+        if (cur > c.threshold) { fired = true; detail = `$${cur.toFixed(2)} > $${c.threshold}`; }
+        break;
+      case "price_below":
+        if (cur < c.threshold) { fired = true; detail = `$${cur.toFixed(2)} < $${c.threshold}`; }
+        break;
+    }
+    if (fired) triggers.push({ condition_id: c.id, type: c.type, detail });
+  }
+
+  // setup score: simple heuristic (more triggers + RSI extremes + drop = higher)
+  let score = triggers.length * 25;
+  if (rsi14 != null) {
+    if (rsi14 < 30) score += 20;
+    else if (rsi14 < 40) score += 10;
+    else if (rsi14 > 70) score -= 10;
+  }
+  if (dropFromPeak90 != null && dropFromPeak90 < -10) score += 15;
+
+  return {
+    symbol, current_price: cur, day_change_pct: dayChangePct,
+    rsi14: rsi14 != null ? Math.round(rsi14 * 10) / 10 : null,
+    trend, pct_from_52w_high: pctFrom52wHigh,
+    pct_from_52w_low: pctFrom52wLow,
+    drop_from_peak_90d: dropFromPeak90,
+    macd_crossover: macd?.lastCrossover || "none",
+    triggers, setup_score: score,
+  };
+}
+
+// ============================================================================
+// TECHNICAL INDICATORS (client-side, used by watchlist + bot)
+// ============================================================================
+function computeRSI(closes, period = 14) {
+  if (!closes || closes.length < period + 1) return null;
+  let gains = 0, losses = 0;
+  for (let i = closes.length - period; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff >= 0) gains += diff; else losses -= diff;
+  }
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
+}
+
+function computeMA(closes, period) {
+  if (!closes || closes.length < period) return null;
+  const slice = closes.slice(-period);
+  return slice.reduce((a, b) => a + b, 0) / period;
+}
+
+function computeEMA(closes, period) {
+  if (!closes || closes.length < period) return [];
+  const k = 2 / (period + 1);
+  const out = [];
+  let ema = closes.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  out[period - 1] = ema;
+  for (let i = period; i < closes.length; i++) {
+    ema = closes[i] * k + ema * (1 - k);
+    out[i] = ema;
+  }
+  return out;
+}
+
+function computeMACD(closes, fast = 12, slow = 26, signal = 9) {
+  if (!closes || closes.length < slow + signal) return null;
+  const emaFast = computeEMA(closes, fast);
+  const emaSlow = computeEMA(closes, slow);
+  const macdLine = closes.map((_, i) =>
+    (emaFast[i] != null && emaSlow[i] != null) ? emaFast[i] - emaSlow[i] : null
+  );
+  const macdValues = macdLine.filter(v => v != null);
+  const signalLine = computeEMA(macdValues, signal);
+  // align signal to original index
+  const offset = macdLine.indexOf(macdValues[0]);
+  // detect last crossover
+  let lastCrossover = "none", daysSinceCross = Infinity;
+  for (let i = closes.length - 1; i > offset + signal; i--) {
+    const sigIdx = i - offset;
+    const sigPrev = signalLine[sigIdx - 1];
+    const sigCur  = signalLine[sigIdx];
+    const macdPrev = macdLine[i - 1];
+    const macdCur  = macdLine[i];
+    if (sigPrev == null || sigCur == null || macdPrev == null || macdCur == null) continue;
+    const diffPrev = macdPrev - sigPrev;
+    const diffCur  = macdCur - sigCur;
+    if (diffPrev <= 0 && diffCur > 0) {
+      lastCrossover = "bullish";
+      daysSinceCross = closes.length - 1 - i;
+      break;
+    }
+    if (diffPrev >= 0 && diffCur < 0) {
+      lastCrossover = "bearish";
+      daysSinceCross = closes.length - 1 - i;
+      break;
+    }
+  }
+  return { lastCrossover, daysSinceCross };
+}
+
 async function markTriggerSeen(triggerId) {
+  // Always update local state
+  state.triggers = state.triggers.filter(t => t.id !== triggerId);
+  // Try Firestore update (may fail for local-only triggers, that's OK)
   try {
     await db.collection("users").doc(state.uid).collection("triggers").doc(triggerId)
       .update({ seen: true });
-    state.triggers = state.triggers.filter(t => t.id !== triggerId);
-  } catch (e) { console.warn("trigger update failed", e); }
+  } catch (e) { /* local-only trigger, no Firestore doc */ }
 }
 
 // ============================================================================
@@ -1454,6 +1878,7 @@ function renderCurrentView() {
   else if (v === "watchlist") renderWatchlist();
   else if (v === "journal") renderJournal();
   else if (v === "alerts") renderAlerts();
+  else if (v === "bot") renderBot();
   else if (v === "settings") renderSettings();
 }
 function setView(v) {
@@ -2382,6 +2807,624 @@ async function checkAlerts() {
   }
 }
 
+// ============================================================================
+// TRADING BOT SIMULATOR
+// ============================================================================
+// One active strategy + one benchmark, both running on the same universe
+// (watchlist + non-cash holdings):
+//
+//   1) "app"  — App's signals: enter on RSI<35 AND drop_from_peak < -7%
+//                              exit on RSI>65 OR price >= 1.15× entry OR <= 0.92× entry
+//   2) "bh"   — Buy & Hold benchmark: equal-weight buy on day 1, never sell.
+//
+// Why B&H instead of another active strategy: it's the honest baseline.
+// If the app's clever entries can't beat just sitting on the same basket,
+// the signals are noise. Each starts with $10,000.
+
+const BOT_STARTING_CAPITAL = 10000;
+const BOT_POSITION_PCT     = 0.10;
+const BOT_MAX_POSITIONS    = 5;
+const BOT_STOP_LOSS_PCT    = 0.92;  // -8%
+const BOT_TAKE_PROFIT_PCT  = 1.15;  // +15%
+
+function emptyBotState(label) {
+  return {
+    label,
+    cash: BOT_STARTING_CAPITAL,
+    positions: {}, // symbol -> { entryDate, entryPrice, qty, entryReason }
+    trades: [],    // closed trades [{ symbol, entryDate, exitDate, entryPrice, exitPrice, qty, pnl, pnlPct, reason }]
+    equity: [],    // [{ date, value }]
+    started_at: new Date().toISOString(),
+    last_run_at: null,
+  };
+}
+
+async function loadBotState() {
+  try {
+    const doc = await db.collection("users").doc(state.uid).collection("bot").doc("state").get();
+    if (doc.exists) {
+      const data = doc.data();
+      state.bot = {
+        app: data.app || null,
+        classic: data.classic || null,
+      };
+    }
+  } catch (e) { console.warn("bot load failed", e); }
+}
+
+async function saveBotState() {
+  try {
+    await db.collection("users").doc(state.uid).collection("bot").doc("state").set({
+      app: state.bot.app,
+      classic: state.bot.classic,
+      saved_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (e) { console.warn("bot save failed", e); }
+}
+
+// Build the trading universe = watchlist symbols + non-cash holdings
+function botUniverse() {
+  const set = new Set();
+  for (const w of state.watchlist) set.add(w.symbol);
+  for (const h of state.holdings) if (h.asset_class !== "cash") set.add(h.symbol);
+  return Array.from(set);
+}
+
+// Strategies expressed as (priceSeriesUpToDay i) → "buy" | "sell" | null
+function appSignal(closes, highs, idx, hasPosition, entryPrice) {
+  // Slice to just the data up to idx
+  const upToIdx = closes.slice(0, idx + 1);
+  const rsi = computeRSI(upToIdx, 14);
+  if (rsi == null) return null;
+  const slice90 = highs.slice(Math.max(0, idx - 89), idx + 1);
+  const peak = Math.max(...slice90);
+  const cur  = closes[idx];
+  const dropFromPeak = peak > 0 ? ((cur - peak) / peak) * 100 : 0;
+
+  if (hasPosition) {
+    if (rsi > 65) return { side: "sell", reason: `RSI ${rsi.toFixed(1)} overbought` };
+    if (cur >= entryPrice * BOT_TAKE_PROFIT_PCT) return { side: "sell", reason: `+${((cur/entryPrice - 1)*100).toFixed(1)}% take-profit` };
+    if (cur <= entryPrice * BOT_STOP_LOSS_PCT)   return { side: "sell", reason: `${((cur/entryPrice - 1)*100).toFixed(1)}% stop-loss` };
+    return null;
+  }
+  if (rsi < 35 && dropFromPeak <= -7) {
+    return { side: "buy", reason: `RSI ${rsi.toFixed(1)} + ${dropFromPeak.toFixed(1)}% off peak` };
+  }
+  return null;
+}
+
+// Buy & Hold benchmark: on the first day we see a symbol with no position,
+// buy equal-weight (capped to BOT_POSITION_PCT * 2 to avoid over-concentration).
+// Never sells. The honest baseline: "what if I just bought the basket?"
+function bhSignal(closes, highs, idx, hasPosition, entryPrice) {
+  if (hasPosition) return null;
+  // Wait until we have at least 30 bars so positions enter at a reasonable starting point
+  if (idx < 30) return null;
+  return { side: "buy", reason: "Buy & hold (day 1)" };
+}
+
+// Backtest a single strategy over the provided per-symbol OHLCV.
+// `mode` controls position sizing: "active" (10% per trade, max 5 concurrent)
+// or "bh" (equal-weight across universe, no max).
+function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital = BOT_STARTING_CAPITAL, lookbackDays = 730) {
+  const sim = emptyBotState("backtest");
+  sim.cash = startCapital;
+
+  const universeSymbols = Object.keys(symbolOhlcv);
+  // For B&H: deploy cash equally across all symbols
+  const bhSliceUSD = mode === "bh" ? startCapital / Math.max(1, universeSymbols.length) : null;
+
+  // Build a unified date timeline (union of all symbols' dates), trimmed to lookbackDays
+  const allDates = new Set();
+  for (const sym of universeSymbols) {
+    const ohlcv = symbolOhlcv[sym];
+    for (const bar of ohlcv) allDates.add(bar.t);
+  }
+  const sorted = Array.from(allDates).sort((a, b) => a - b);
+  const cutoff = Date.now() - lookbackDays * 86400000;
+  const dates  = sorted.filter(t => t >= cutoff);
+
+  // Pre-index per-symbol by timestamp for fast lookup
+  const indexed = {};
+  for (const sym of universeSymbols) {
+    indexed[sym] = { byT: {}, closes: [], highs: [], times: [] };
+    const ohlcv = symbolOhlcv[sym];
+    for (let i = 0; i < ohlcv.length; i++) {
+      indexed[sym].byT[ohlcv[i].t] = i;
+      indexed[sym].closes.push(ohlcv[i].c);
+      indexed[sym].highs.push(ohlcv[i].h);
+      indexed[sym].times.push(ohlcv[i].t);
+    }
+  }
+
+  for (const t of dates) {
+    let positionsValue = 0;
+
+    for (const sym of universeSymbols) {
+      const idx = indexed[sym].byT[t];
+      if (idx == null) continue;
+      const closes = indexed[sym].closes;
+      const highs  = indexed[sym].highs;
+      const cur    = closes[idx];
+      const hasPos = !!sim.positions[sym];
+      const entryPrice = hasPos ? sim.positions[sym].entryPrice : null;
+      const sig = strategyFn(closes, highs, idx, hasPos, entryPrice);
+
+      if (sig?.side === "sell" && hasPos) {
+        const pos = sim.positions[sym];
+        const proceeds = pos.qty * cur;
+        const pnl = proceeds - (pos.qty * pos.entryPrice);
+        const pnlPct = ((cur / pos.entryPrice) - 1) * 100;
+        sim.cash += proceeds;
+        sim.trades.push({
+          symbol: sym,
+          entryDate: pos.entryDate, exitDate: new Date(t).toISOString().slice(0,10),
+          entryPrice: pos.entryPrice, exitPrice: cur,
+          qty: pos.qty, pnl, pnlPct,
+          entryReason: pos.entryReason, exitReason: sig.reason,
+        });
+        delete sim.positions[sym];
+      } else if (sig?.side === "buy" && !hasPos) {
+        let sizeUSD;
+        if (mode === "bh") {
+          sizeUSD = bhSliceUSD;
+        } else {
+          if (Object.keys(sim.positions).length >= BOT_MAX_POSITIONS) continue;
+          const equity = sim.cash + positionsValue;
+          sizeUSD = equity * BOT_POSITION_PCT;
+        }
+        if (sim.cash < sizeUSD || sizeUSD < 100) continue;
+        const qty = sizeUSD / cur;
+        sim.positions[sym] = {
+          entryDate: new Date(t).toISOString().slice(0,10),
+          entryPrice: cur, qty, entryReason: sig.reason,
+        };
+        sim.cash -= qty * cur;
+      }
+
+      if (sim.positions[sym]) positionsValue += sim.positions[sym].qty * cur;
+    }
+
+    // Equity curve
+    let v = 0;
+    for (const sym of Object.keys(sim.positions)) {
+      const idx = indexed[sym].byT[t];
+      const last = idx != null ? indexed[sym].closes[idx] : sim.positions[sym].entryPrice;
+      v += sim.positions[sym].qty * last;
+    }
+    sim.equity.push({ date: new Date(t).toISOString().slice(0,10), value: sim.cash + v });
+  }
+
+  return sim;
+}
+
+async function runBacktest() {
+  const universe = botUniverse();
+  if (universe.length === 0) {
+    toast("No symbols to test (add holdings or watchlist items)", 3000, "error");
+    return;
+  }
+  state.botRunning = true;
+  toast(`Backtesting ${universe.length} symbols (2-year history)…`, 3000);
+  renderBot();
+
+  // Fetch OHLCV for all symbols
+  const symbolOhlcv = {};
+  for (const sym of universe) {
+    try {
+      const data = await getOhlcv(sym);
+      if (data?.ohlcv?.length) symbolOhlcv[sym] = data.ohlcv;
+    } catch (e) { console.warn("bot ohlcv fetch failed for", sym, e.message || e); }
+  }
+  if (Object.keys(symbolOhlcv).length === 0) {
+    state.botRunning = false;
+    toast("Could not fetch any OHLCV data", 3000, "error");
+    renderBot();
+    return;
+  }
+
+  // Run app strategy + B&H benchmark
+  const appResult = backtestStrategy(appSignal, symbolOhlcv, "active");
+  const bhResult  = backtestStrategy(bhSignal,  symbolOhlcv, "bh");
+  appResult.label = "App Signals";
+  bhResult.label  = "Buy & Hold";
+  appResult.last_run_at = new Date().toISOString();
+  bhResult.last_run_at  = new Date().toISOString();
+
+  state.bot.app     = appResult;
+  state.bot.classic = bhResult;  // keeping the field name "classic" so existing Firestore docs migrate cleanly
+  await saveBotState();
+
+  state.botRunning = false;
+  toast(`Backtest complete · ${appResult.trades.length} app trades vs $${fmtUSD(botMetrics(bhResult).equity, 0)} B&H`);
+  renderBot();
+}
+
+async function runForwardStep() {
+  // Single live step: evaluate each universe symbol against the freshest data
+  if (!state.bot.app)     { state.bot.app     = emptyBotState("App Signals"); }
+  if (!state.bot.classic) { state.bot.classic = emptyBotState("Buy & Hold"); }
+  // If reusing a doc from a previous "Classic TA" run, relabel it
+  if (state.bot.classic.label === "Classic TA") state.bot.classic.label = "Buy & Hold";
+
+  const universe = botUniverse();
+  if (universe.length === 0) { toast("Empty universe", 2400, "error"); return; }
+
+  state.botRunning = true;
+  renderBot();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const tradesAdded = { app: 0, bh: 0 };
+
+  // For B&H, slice the *initial* capital across the *current* universe size.
+  // If new symbols got added later, we still use the same per-symbol slice so
+  // additions deploy fresh cash if available.
+  const bhSliceUSD = BOT_STARTING_CAPITAL / universe.length;
+
+  for (const sym of universe) {
+    let data;
+    try { data = await getOhlcv(sym); } catch (e) { continue; }
+    if (!data?.ohlcv?.length) continue;
+    const closes = data.ohlcv.map(d => d.c);
+    const highs  = data.ohlcv.map(d => d.h);
+    const idx    = closes.length - 1;
+    const cur    = data.current_price ?? closes[idx];
+
+    // ----- App strategy -----
+    {
+      const sim = state.bot.app;
+      const hasPos = !!sim.positions[sym];
+      const entryPrice = hasPos ? sim.positions[sym].entryPrice : null;
+      const sig = appSignal(closes, highs, idx, hasPos, entryPrice);
+      if (sig?.side === "sell" && hasPos) {
+        const pos = sim.positions[sym];
+        const proceeds = pos.qty * cur;
+        const pnl = proceeds - (pos.qty * pos.entryPrice);
+        const pnlPct = ((cur / pos.entryPrice) - 1) * 100;
+        sim.cash += proceeds;
+        sim.trades.push({
+          symbol: sym, entryDate: pos.entryDate, exitDate: today,
+          entryPrice: pos.entryPrice, exitPrice: cur,
+          qty: pos.qty, pnl, pnlPct,
+          entryReason: pos.entryReason, exitReason: sig.reason,
+        });
+        delete sim.positions[sym];
+        tradesAdded.app++;
+      } else if (sig?.side === "buy" && !hasPos) {
+        if (Object.keys(sim.positions).length < BOT_MAX_POSITIONS) {
+          let positionsValue = 0;
+          for (const s of Object.keys(sim.positions)) {
+            const p2 = state.prices[s]?.current_price || sim.positions[s].entryPrice;
+            positionsValue += sim.positions[s].qty * p2;
+          }
+          const equity = sim.cash + positionsValue;
+          const sizeUSD = equity * BOT_POSITION_PCT;
+          if (sim.cash >= sizeUSD && sizeUSD >= 100) {
+            const qty = sizeUSD / cur;
+            sim.positions[sym] = { entryDate: today, entryPrice: cur, qty, entryReason: sig.reason };
+            sim.cash -= qty * cur;
+            tradesAdded.app++;
+          }
+        }
+      }
+    }
+
+    // ----- Buy & Hold -----
+    // Just buy each symbol once if we haven't bought it yet and have cash
+    {
+      const sim = state.bot.classic;
+      const hasPos = !!sim.positions[sym];
+      if (!hasPos && sim.cash >= bhSliceUSD && bhSliceUSD >= 100) {
+        const qty = bhSliceUSD / cur;
+        sim.positions[sym] = {
+          entryDate: today, entryPrice: cur, qty,
+          entryReason: "Buy & hold (initial buy)",
+        };
+        sim.cash -= qty * cur;
+        tradesAdded.bh++;
+      }
+    }
+  }
+
+  // Append equity snapshots
+  for (const stratKey of ["app", "classic"]) {
+    const sim = state.bot[stratKey];
+    let positionsValue = 0;
+    for (const s of Object.keys(sim.positions)) {
+      const p2 = state.prices[s]?.current_price || sim.positions[s].entryPrice;
+      positionsValue += sim.positions[s].qty * p2;
+    }
+    sim.equity.push({ date: today, value: sim.cash + positionsValue });
+    sim.last_run_at = new Date().toISOString();
+  }
+
+  await saveBotState();
+  state.botRunning = false;
+  const total = tradesAdded.app + tradesAdded.bh;
+  toast(total > 0
+    ? `Step complete · ${tradesAdded.app} app + ${tradesAdded.bh} B&H actions`
+    : "Step complete · no actions today");
+  renderBot();
+}
+
+function resetBot() {
+  if (!confirm("Reset both bot strategies? This wipes all bot trades and equity history.")) return;
+  state.bot.app = null;
+  state.bot.classic = null;
+  saveBotState();
+  toast("Bot reset");
+  renderBot();
+}
+
+function botMetrics(sim) {
+  if (!sim) return null;
+  const trades = sim.trades || [];
+  const wins   = trades.filter(t => t.pnl > 0).length;
+  const losses = trades.filter(t => t.pnl <= 0).length;
+  const winRate = trades.length > 0 ? (wins / trades.length) * 100 : 0;
+
+  // Current equity (mark-to-market open positions with latest price)
+  let posValue = 0;
+  let openCount = 0;
+  for (const sym of Object.keys(sim.positions || {})) {
+    openCount++;
+    const cur = state.prices[sym]?.current_price || sim.positions[sym].entryPrice;
+    posValue += sim.positions[sym].qty * cur;
+  }
+  const equity = sim.cash + posValue;
+  const totalReturn = ((equity / BOT_STARTING_CAPITAL) - 1) * 100;
+  const realizedPnL = trades.reduce((sum, t) => sum + t.pnl, 0);
+  const avgWin   = wins   > 0 ? trades.filter(t => t.pnl > 0).reduce((s, t) => s + t.pnlPct, 0) / wins : 0;
+  const avgLoss  = losses > 0 ? trades.filter(t => t.pnl <= 0).reduce((s, t) => s + t.pnlPct, 0) / losses : 0;
+  return {
+    equity, cashLeft: sim.cash, positionsValue: posValue,
+    openCount, tradeCount: trades.length, wins, losses, winRate,
+    totalReturn, realizedPnL, avgWin, avgLoss,
+  };
+}
+
+function renderEquityChart(simApp, simBh) {
+  const series = [];
+  if (simApp?.equity?.length) series.push({ data: simApp.equity, color: "var(--gold)", label: "App" });
+  if (simBh?.equity?.length)  series.push({ data: simBh.equity,  color: "var(--green)", label: "B&H" });
+  if (series.length === 0) return "";
+
+  // Compute bounds
+  let minV = Infinity, maxV = -Infinity, minT = Infinity, maxT = -Infinity;
+  for (const s of series) {
+    for (const p of s.data) {
+      if (p.value < minV) minV = p.value;
+      if (p.value > maxV) maxV = p.value;
+      const t = new Date(p.date).getTime();
+      if (t < minT) minT = t;
+      if (t > maxT) maxT = t;
+    }
+  }
+  const w = 320, h = 160, pad = 28;
+  const xRange = maxT - minT || 1;
+  const yRange = (maxV - minV) || 1;
+  function xFor(t) { return pad + ((t - minT) / xRange) * (w - pad - 8); }
+  function yFor(v) { return h - pad - ((v - minV) / yRange) * (h - pad - 16); }
+
+  const baseY = yFor(BOT_STARTING_CAPITAL);
+  let svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">`;
+  // baseline (starting capital)
+  svg += `<line x1="${pad}" y1="${baseY}" x2="${w - 8}" y2="${baseY}" stroke="var(--rule)" stroke-dasharray="3,3" stroke-width="1"/>`;
+  svg += `<text x="${pad - 4}" y="${baseY - 3}" font-family="monospace" font-size="9" fill="var(--ink-muted)" text-anchor="end">$${BOT_STARTING_CAPITAL.toLocaleString()}</text>`;
+  // y-axis labels
+  svg += `<text x="${pad - 4}" y="${pad + 4}" font-family="monospace" font-size="9" fill="var(--ink-muted)" text-anchor="end">$${Math.round(maxV).toLocaleString()}</text>`;
+  svg += `<text x="${pad - 4}" y="${h - pad}" font-family="monospace" font-size="9" fill="var(--ink-muted)" text-anchor="end">$${Math.round(minV).toLocaleString()}</text>`;
+  // series
+  for (const s of series) {
+    const points = s.data.map(p => `${xFor(new Date(p.date).getTime())},${yFor(p.value)}`).join(" ");
+    svg += `<polyline points="${points}" stroke="${s.color}" fill="none" stroke-width="1.6" stroke-linejoin="round"/>`;
+  }
+  // legend
+  let lx = pad;
+  for (const s of series) {
+    svg += `<rect x="${lx}" y="6" width="9" height="9" fill="${s.color}"/>`;
+    svg += `<text x="${lx + 12}" y="14" font-family="sans-serif" font-size="10" fill="var(--ink-soft)">${s.label}</text>`;
+    lx += 70;
+  }
+  svg += `</svg>`;
+  return svg;
+}
+
+function renderStrategyCard(sim, tag, tagClass) {
+  if (!sim) return "";
+  const m = botMetrics(sim);
+  const isBuyAndHold = tagClass === "classic"; // B&H uses the "classic" slot
+  const recent = (sim.trades || []).slice(-5).reverse();
+  const openPositions = Object.entries(sim.positions || {});
+
+  let tradesHtml = "";
+  if (openPositions.length > 0) {
+    tradesHtml += openPositions.map(([sym, pos]) => {
+      const cur = state.prices[sym]?.current_price || pos.entryPrice;
+      const pnlPct = ((cur / pos.entryPrice) - 1) * 100;
+      const pnlAbs = (cur - pos.entryPrice) * pos.qty;
+      const cls = pnlAbs >= 0 ? "pos" : "neg";
+      return `<div class="bot-trade">
+        <div class="bot-trade-l">
+          <span class="bot-trade-sym"><span class="bot-trade-act open-pos">OPEN</span>${escAttr(sym)}</span>
+          <span class="bot-trade-meta">@$${fmtUSD(pos.entryPrice)} · ${escAttr(pos.entryDate)} · ${escAttr(pos.entryReason || "")}</span>
+        </div>
+        <div class="bot-trade-r">
+          <div class="bot-trade-pnl ${cls}">${pnlAbs >= 0 ? "+" : ""}$${fmtUSD(Math.abs(pnlAbs))}</div>
+          <div class="bot-trade-meta">${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%</div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+  if (recent.length > 0) {
+    tradesHtml += recent.map(t => {
+      const cls = t.pnl >= 0 ? "pos" : "neg";
+      return `<div class="bot-trade">
+        <div class="bot-trade-l">
+          <span class="bot-trade-sym"><span class="bot-trade-act ${t.pnl >= 0 ? "buy" : "sell"}">CLOSED</span>${escAttr(t.symbol)}</span>
+          <span class="bot-trade-meta">${escAttr(t.entryDate)} → ${escAttr(t.exitDate)} · ${escAttr(t.exitReason || "")}</span>
+        </div>
+        <div class="bot-trade-r">
+          <div class="bot-trade-pnl ${cls}">${t.pnl >= 0 ? "+" : ""}$${fmtUSD(Math.abs(t.pnl))}</div>
+          <div class="bot-trade-meta">${t.pnlPct >= 0 ? "+" : ""}${t.pnlPct.toFixed(2)}%</div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+  if (!tradesHtml) tradesHtml = `<div class="bot-trade" style="color:var(--ink-muted);justify-content:center;">No positions yet.</div>`;
+
+  const retClass = m.totalReturn >= 0 ? "pos" : "neg";
+
+  // B&H gets a simpler metric block (closed-trade stats are meaningless when nothing ever closes)
+  const metricsBlock = isBuyAndHold ? `
+      <div class="strat-metrics">
+        <div class="strat-metric">
+          <div class="label">Equity</div>
+          <div class="val">$${fmtUSD(m.equity, 0)}</div>
+        </div>
+        <div class="strat-metric">
+          <div class="label">Return</div>
+          <div class="val ${retClass}">${m.totalReturn >= 0 ? "+" : ""}${m.totalReturn.toFixed(2)}%</div>
+        </div>
+        <div class="strat-metric">
+          <div class="label">Holdings</div>
+          <div class="val">${m.openCount} pos</div>
+        </div>
+        <div class="strat-metric">
+          <div class="label">Cash Idle</div>
+          <div class="val">$${fmtUSD(m.cashLeft, 0)}</div>
+        </div>
+        <div class="strat-metric" style="grid-column:span 2;">
+          <div class="label">Position Value</div>
+          <div class="val">$${fmtUSD(m.positionsValue, 0)}</div>
+        </div>
+      </div>
+  ` : `
+      <div class="strat-metrics">
+        <div class="strat-metric">
+          <div class="label">Equity</div>
+          <div class="val">$${fmtUSD(m.equity, 0)}</div>
+        </div>
+        <div class="strat-metric">
+          <div class="label">Return</div>
+          <div class="val ${retClass}">${m.totalReturn >= 0 ? "+" : ""}${m.totalReturn.toFixed(2)}%</div>
+        </div>
+        <div class="strat-metric">
+          <div class="label">Win Rate</div>
+          <div class="val">${m.winRate.toFixed(0)}%</div>
+        </div>
+        <div class="strat-metric">
+          <div class="label">Cash</div>
+          <div class="val">$${fmtUSD(m.cashLeft, 0)}</div>
+        </div>
+        <div class="strat-metric">
+          <div class="label">Open</div>
+          <div class="val">${m.openCount} pos</div>
+        </div>
+        <div class="strat-metric">
+          <div class="label">Avg Win / Loss</div>
+          <div class="val" style="font-size:11.5px;">
+            <span class="pos">+${m.avgWin.toFixed(1)}%</span> / <span class="neg">${m.avgLoss.toFixed(1)}%</span>
+          </div>
+        </div>
+      </div>
+  `;
+
+  const subline = isBuyAndHold
+    ? `Started ${escAttr((sim.started_at || "").slice(0,10))} · Equal-weight, never sells`
+    : `Started ${escAttr((sim.started_at || "").slice(0,10))} · ${m.tradeCount} trades closed`;
+
+  return `
+    <div class="strategy-card">
+      <div class="strat-head">
+        <div>
+          <div class="strat-name">${escAttr(sim.label)}</div>
+          <div style="font-size:10.5px;color:var(--ink-muted);font-family:var(--mono);">${subline}</div>
+        </div>
+        <span class="strat-tag ${tagClass}">${tag}</span>
+      </div>
+      ${metricsBlock}
+      <div class="bot-trade-list">${tradesHtml}</div>
+    </div>
+  `;
+}
+
+function renderHeadToHead(simApp, simBh) {
+  if (!simApp || !simBh) return "";
+  const a = botMetrics(simApp);
+  const b = botMetrics(simBh);
+  const diff = a.equity - b.equity;
+  const diffPct = b.equity > 0 ? ((a.equity / b.equity) - 1) * 100 : 0;
+  const rows = [
+    { label: "Equity",       app: `$${fmtUSD(a.equity, 0)}`,       classic: `$${fmtUSD(b.equity, 0)}`,       winner: a.equity > b.equity ? "app" : "classic" },
+    { label: "Return %",     app: `${a.totalReturn >= 0 ? "+" : ""}${a.totalReturn.toFixed(2)}%`, classic: `${b.totalReturn >= 0 ? "+" : ""}${b.totalReturn.toFixed(2)}%`, winner: a.totalReturn > b.totalReturn ? "app" : "classic" },
+    { label: "Open / Closed", app: `${a.openCount} / ${a.tradeCount}`, classic: `${b.openCount} / ${b.tradeCount}`, winner: null },
+    { label: "Cash Idle",    app: `$${fmtUSD(a.cashLeft, 0)}`,     classic: `$${fmtUSD(b.cashLeft, 0)}`, winner: null },
+  ];
+  const verdictClass = diff > 0 ? "pos" : "neg";
+  const verdictText = diff > 0
+    ? `App beats B&H by $${fmtUSD(Math.abs(diff), 0)} (${diffPct >= 0 ? "+" : ""}${diffPct.toFixed(2)}%)`
+    : `App trails B&H by $${fmtUSD(Math.abs(diff), 0)} (${diffPct.toFixed(2)}%) — signals not adding value`;
+  return `
+    <div class="head-to-head">
+      <h4>App vs Buy & Hold</h4>
+      <div style="font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);margin-bottom:12px;padding:8px 10px;background:var(--bg-elev);border-radius:6px;border-left:2px solid var(--${diff > 0 ? 'green' : 'red'});">
+        ${escAttr(verdictText)}
+      </div>
+      ${rows.map(r => `
+        <div class="h2h-row">
+          <div class="h2h-side app ${r.winner === "app" ? "winner" : ""}">${r.app}</div>
+          <div class="h2h-label">${r.label}</div>
+          <div class="h2h-side classic ${r.winner === "classic" ? "winner" : ""}">${r.classic}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderBot() {
+  $("#topbarTitle").textContent = "Trading Bot";
+  const view = $("#view");
+  const universe = botUniverse();
+  const noData = !state.bot.app && !state.bot.classic;
+  const lastRun = state.bot.app?.last_run_at || state.bot.classic?.last_run_at;
+
+  let body = "";
+  if (noData) {
+    body = `
+      <div class="bot-empty">
+        <span class="display">Trading Bot Sandbox</span>
+        <p>The app's signals (RSI&lt;35 + drop from peak) paper-trade against a <b>Buy & Hold</b> benchmark
+        on the same universe (<b>${universe.length}</b> symbols from your watchlist + holdings). Both start with
+        $${BOT_STARTING_CAPITAL.toLocaleString()}. The question this answers: <i>do the app's clever entries
+        actually beat just buying and sitting on the basket?</i> If not, the signals aren't worth following.</p>
+        <button class="btn" data-act="bot-backtest">Run 2-Year Backtest</button>
+      </div>
+    `;
+  } else {
+    body = `
+      <div class="bot-hero">
+        <h3>Paper Trading Bot</h3>
+        <div class="sub">Universe: ${universe.length} symbols · ${lastRun ? "Last run " + fmtRel(lastRun) : "Never run"}</div>
+        ${renderEquityChart(state.bot.app, state.bot.classic) ? `<div class="equity-chart" style="margin:0;padding:0;border:none;background:transparent;">${renderEquityChart(state.bot.app, state.bot.classic)}</div>` : ""}
+      </div>
+      ${renderHeadToHead(state.bot.app, state.bot.classic)}
+      ${renderStrategyCard(state.bot.app, "App Signals", "app")}
+      ${renderStrategyCard(state.bot.classic, "Buy & Hold", "classic")}
+    `;
+  }
+
+  view.innerHTML = `
+    <div class="bot-bar">
+      <span class="grow">${state.botRunning ? '<span class="spinner"></span> Running…' : "Paper trades · no real money"}</span>
+      <button data-act="bot-step" ${state.botRunning ? "disabled" : ""}>Step Forward</button>
+      <button data-act="bot-backtest" ${state.botRunning ? "disabled" : ""}>Backtest</button>
+      <button data-act="bot-reset" ${state.botRunning ? "disabled" : ""} style="background:transparent;color:var(--red);border:1px solid var(--red);">Reset</button>
+    </div>
+    ${body}
+  `;
+}
+
 function renderSettings() {
   $("#topbarTitle").textContent = "Settings";
   const view = $("#view");
@@ -2458,6 +3501,7 @@ async function exportData() {
     analyses: state.analyses,
     portfolio_analysis: state.portfolioAnalysis,
     watchlist: state.watchlist,
+    bot: state.bot,
     journal, alerts,
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -2922,6 +3966,9 @@ document.addEventListener("click", (e) => {
       case "reset-pin":              resetPin(); break;
       case "manual-refresh":         manualRefresh(); break;
       case "export-data":            exportData(); break;
+      case "bot-backtest":           runBacktest(); break;
+      case "bot-step":               runForwardStep(); break;
+      case "bot-reset":              resetBot(); break;
     }
   } catch (err) {
     showError("Action failed: " + err.message);
