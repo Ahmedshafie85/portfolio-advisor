@@ -1023,6 +1023,96 @@ body {
 .bot-empty .display { font-family: var(--display); font-size: 22px; display: block; margin-bottom: 8px; }
 .bot-empty p { color: var(--ink-muted); font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
 
+/* ===== DAILY WATCHOUTS ===== */
+.watchouts-card {
+  margin: 12px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.watchouts-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 18px 8px;
+}
+.watchouts-head h3 {
+  font-family: var(--display); font-size: 15px; font-weight: 500;
+}
+.watchouts-count {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em;
+  background: var(--bg-elev); color: var(--ink-muted);
+  padding: 3px 9px; border-radius: 10px;
+  text-transform: uppercase;
+}
+.watchouts-list {}
+.watchout-item {
+  display: flex; gap: 12px;
+  padding: 11px 18px;
+  border-top: 1px solid var(--rule-soft);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: background-color .12s;
+}
+.watchout-item:hover { background: var(--bg-elev); }
+.watchout-icon {
+  font-family: var(--display); font-size: 20px; line-height: 1;
+  width: 22px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+}
+.watchout-body { flex: 1; min-width: 0; }
+.watchout-title {
+  font-family: var(--display); font-size: 14px; font-weight: 500;
+  margin-bottom: 2px;
+}
+.watchout-detail {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-muted);
+  line-height: 1.4;
+}
+.watchouts-more {
+  padding: 9px 18px; text-align: center;
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted);
+  background: var(--bg-elev); border-top: 1px solid var(--rule-soft);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+
+/* ===== COLLAPSIBLE ANALYSIS ===== */
+.collapsible-card {
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  margin: 12px 20px;
+  overflow: hidden;
+}
+.collapsible-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  cursor: pointer;
+  user-select: none;
+}
+.collapsible-head:hover { background: var(--bg-elev); }
+.collapsible-head h3 {
+  font-family: var(--display); font-size: 15px; font-weight: 500;
+}
+.collapsible-summary {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-muted);
+  margin-top: 2px;
+}
+.collapsible-chev {
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-muted);
+  transition: transform .2s;
+  flex-shrink: 0;
+}
+.collapsible-card.expanded .collapsible-chev { transform: rotate(180deg); }
+.collapsible-body {
+  display: none;
+  padding: 0 18px 16px;
+  border-top: 1px solid var(--rule-soft);
+}
+.collapsible-card.expanded .collapsible-body { display: block; }
+
 </style>
 </head>
 <body>
@@ -1291,6 +1381,7 @@ const state = {
   botRunning: false,
   botChartVisible: { dip: true, bh: true, composite: true, trend: false, golden: false, meanrev: false, dca: false },
   ohlcvCache: {}, // symbol -> { ohlcv, fetched_at }
+  expandedAnalyses: {}, // key -> bool; "portfolio" or symbol
 };
 document.documentElement.setAttribute("data-theme", state.theme);
 
@@ -2011,6 +2102,125 @@ function setView(v) {
 }
 
 // ----- Portfolio
+// ============================================================================
+// DAILY WATCHOUTS — observational warnings on currently-held positions only.
+// Mixes 3 signal sources:
+//   1) Drawdown alerts:    position down > X% from cost basis
+//   2) Take-profit candidates: position up > Y% from cost basis
+//   3) Watchlist crossover: a position you OWN has a watchlist condition firing
+// ============================================================================
+const WATCHOUT_DRAWDOWN_PCT = -8;   // flag if position is down 8%+ from cost
+const WATCHOUT_TAKEPROFIT_PCT = 15; // flag if position is up 15%+ from cost
+
+function computeWatchouts() {
+  const items = [];
+
+  for (const h of state.holdings) {
+    if (h.asset_class === "cash") continue;
+    const hm = holdingMetrics(h);
+    if (hm.pnlPct == null) continue;
+    const cur = state.prices[h.symbol]?.current_price;
+    if (!cur) continue;
+
+    // Drawdown
+    if (hm.pnlPct <= WATCHOUT_DRAWDOWN_PCT) {
+      items.push({
+        kind: "drawdown",
+        symbol: h.symbol,
+        severity: hm.pnlPct <= -15 ? "high" : "medium",
+        title: `${h.symbol} ${hm.pnlPct.toFixed(1)}% from cost`,
+        detail: `Held ${h.quantity} @ ~$${fmtUSD(h.avg_cost ?? h.cost_basis ?? cur)}, now $${fmtUSD(cur)}`,
+        sortKey: hm.pnlPct, // most negative first
+      });
+    }
+    // Take-profit
+    else if (hm.pnlPct >= WATCHOUT_TAKEPROFIT_PCT) {
+      items.push({
+        kind: "takeprofit",
+        symbol: h.symbol,
+        severity: hm.pnlPct >= 30 ? "high" : "medium",
+        title: `${h.symbol} +${hm.pnlPct.toFixed(1)}% from cost`,
+        detail: `Position up — consider trimming. Cost ~$${fmtUSD(h.avg_cost ?? h.cost_basis ?? cur)}, now $${fmtUSD(cur)}`,
+        sortKey: -hm.pnlPct, // biggest gains first
+      });
+    }
+  }
+
+  // Watchlist crossover: positions you OWN that have a watchlist condition firing
+  const heldSymbols = new Set(state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol));
+  for (const t of (state.triggers || [])) {
+    if (!heldSymbols.has(t.symbol)) continue;
+    items.push({
+      kind: "crossover",
+      symbol: t.symbol,
+      severity: "medium",
+      title: `${t.symbol} · watchlist condition firing`,
+      detail: `${describeTriggerCondition(t)} — you own this position`,
+      sortKey: 1000, // group at top within their bucket
+      triggerId: t.id,
+    });
+  }
+
+  // Sort: drawdown first (most negative), then crossover, then take-profit
+  const order = { drawdown: 0, crossover: 1, takeprofit: 2 };
+  items.sort((a, b) => {
+    const oa = order[a.kind], ob = order[b.kind];
+    if (oa !== ob) return oa - ob;
+    return a.sortKey - b.sortKey;
+  });
+  return items;
+}
+
+function describeTriggerCondition(trigger) {
+  if (trigger.detail) return trigger.detail;
+  if (trigger.condition_type) {
+    return trigger.condition_type.replace(/_/g, " ");
+  }
+  return "condition fired";
+}
+
+function renderWatchouts() {
+  const items = computeWatchouts();
+  if (items.length === 0) return "";
+
+  const iconFor = (kind) => {
+    if (kind === "drawdown") return "↓";
+    if (kind === "takeprofit") return "↑";
+    return "⚑";
+  };
+  const colorFor = (kind, severity) => {
+    if (kind === "drawdown") return severity === "high" ? "var(--red)" : "#c25a3a";
+    if (kind === "takeprofit") return "var(--green)";
+    return "var(--gold)";
+  };
+
+  // Show top 4, collapsible if more
+  const visibleCount = 4;
+  const visible = items.slice(0, visibleCount);
+  const hiddenCount = items.length - visibleCount;
+
+  const itemsHtml = visible.map(it => `
+    <div class="watchout-item" data-act="open-asset" data-symbol="${escAttr(it.symbol)}" style="border-left-color:${colorFor(it.kind, it.severity)};">
+      <div class="watchout-icon" style="color:${colorFor(it.kind, it.severity)};">${iconFor(it.kind)}</div>
+      <div class="watchout-body">
+        <div class="watchout-title">${escAttr(it.title)}</div>
+        <div class="watchout-detail">${escAttr(it.detail)}</div>
+      </div>
+    </div>
+  `).join("");
+
+  return `
+    <div class="watchouts-card">
+      <div class="watchouts-head">
+        <h3>Today's Watchouts</h3>
+        <span class="watchouts-count">${items.length}</span>
+      </div>
+      <div class="watchouts-list">${itemsHtml}</div>
+      ${hiddenCount > 0 ? `<div class="watchouts-more">+${hiddenCount} more</div>` : ""}
+    </div>
+  `;
+}
+
 function renderPortfolio() {
   const m = portfolioMetrics();
   const view = $("#view");
@@ -2081,6 +2291,8 @@ function renderPortfolio() {
       <div class="alloc-legend">${allocLegend}</div>
     </div>
 
+    ${renderWatchouts()}
+
     ${oppCard}
 
     ${portAnalysisCard}
@@ -2134,16 +2346,25 @@ function renderPortAnalysisInlineCard() {
       </div>
     `;
   }
+  const expanded = !!state.expandedAnalyses["portfolio"];
   return `
     <div class="port-analysis-card">
-      <div class="port-stance-hero">
-        <div class="stance-eyebrow">Portfolio Stance · ${fmtRel(a.generated_at)}</div>
-        <div class="port-stance-verb ${stanceToClass(a.portfolio_stance)}">${escAttr(a.portfolio_stance || "—")}</div>
-        <div class="stance-headline">${escAttr(a.headline || "")}</div>
-        <div class="stance-pills">
-          <span class="pill pill-conf ${escAttr(a.confidence || '')}">conf: ${escAttr(a.confidence || "—")}</span>
+      <div class="port-stance-hero collapsible-head" data-act="toggle-analysis" data-key="portfolio" style="cursor:pointer;display:block;">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:12px;">
+          <div style="flex:1;min-width:0;">
+            <div class="stance-eyebrow">Portfolio Stance · ${fmtRel(a.generated_at)}</div>
+            <div class="port-stance-verb ${stanceToClass(a.portfolio_stance)}">${escAttr(a.portfolio_stance || "—")}</div>
+            <div class="stance-headline">${escAttr(a.headline || "")}</div>
+            <div class="stance-pills">
+              <span class="pill pill-conf ${escAttr(a.confidence || '')}">conf: ${escAttr(a.confidence || "—")}</span>
+            </div>
+          </div>
+          <div class="collapsible-chev" style="transform:${expanded ? 'rotate(180deg)' : 'rotate(0)'};margin-top:8px;">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
         </div>
       </div>
+      ${expanded ? `
       <div class="ai-body">
         ${a.implicit_bets?.length ? `
           <div class="ai-section"><h4>Implicit Bets</h4>
@@ -2176,6 +2397,9 @@ function renderPortAnalysisInlineCard() {
         <button class="btn btn-sm" data-act="run-portfolio-analysis">Re-analyze Portfolio</button>
       </div>
       <div class="ai-stamp">Generated ${fmtRel(a.generated_at)} · This is not financial advice.</div>
+      ` : `
+      <div class="ai-stamp" style="padding: 10px 18px 14px; border-top: 1px solid var(--rule-soft);">Tap to expand · ${fmtRel(a.generated_at)}</div>
+      `}
     </div>
   `;
 }
@@ -2528,16 +2752,26 @@ function renderAiCard(symbol, a) {
     `;
   };
 
+  const expanded = !!state.expandedAnalyses[symbol];
+
   return `<div class="ai-card">
-    <div class="stance-hero">
-      <div class="stance-eyebrow">Recommendation</div>
-      <div class="stance-verb ${stanceToClass(stance)}">${escAttr(stance)}</div>
-      ${a.headline ? `<div class="stance-headline">${escAttr(a.headline)}</div>` : ""}
-      <div class="stance-pills">
-        <span class="pill pill-conf ${escAttr(a.confidence || '')}">confidence: ${escAttr(a.confidence || "—")}</span>
-        <span class="pill pill-conv ${escAttr(a.conviction || '')}">conviction: ${escAttr(a.conviction || "—")}</span>
+    <div class="stance-hero collapsible-head" data-act="toggle-analysis" data-key="${escAttr(symbol)}" style="cursor:pointer;">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:12px;">
+        <div style="flex:1;min-width:0;">
+          <div class="stance-eyebrow">Recommendation</div>
+          <div class="stance-verb ${stanceToClass(stance)}">${escAttr(stance)}</div>
+          ${a.headline ? `<div class="stance-headline">${escAttr(a.headline)}</div>` : ""}
+          <div class="stance-pills">
+            <span class="pill pill-conf ${escAttr(a.confidence || '')}">confidence: ${escAttr(a.confidence || "—")}</span>
+            <span class="pill pill-conv ${escAttr(a.conviction || '')}">conviction: ${escAttr(a.conviction || "—")}</span>
+          </div>
+        </div>
+        <div class="collapsible-chev" style="transform:${expanded ? 'rotate(180deg)' : 'rotate(0)'};margin-top:8px;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
       </div>
     </div>
+    ${expanded ? `
     ${(action.what || action.price_zone) ? `
     <div class="action-block">
       <h4>Action</h4>
@@ -2612,6 +2846,9 @@ function renderAiCard(symbol, a) {
       <button class="btn btn-secondary btn-sm" data-act="log-trade" data-symbol="${escAttr(symbol)}">Log Trade</button>
     </div>
     <div class="ai-stamp">Generated ${fmtRel(a.generated_at)} · This is a tool, not advice. You decide.</div>
+    ` : `
+    <div class="ai-stamp" style="padding: 10px 20px 14px; border-top: 1px solid var(--rule-soft);">Tap to expand · ${fmtRel(a.generated_at)}</div>
+    `}
   </div>`;
 }
 
@@ -3854,6 +4091,16 @@ function toggleBotLine(key) {
   renderBot();
 }
 
+function toggleAnalysis(key) {
+  state.expandedAnalyses[key] = !state.expandedAnalyses[key];
+  // If we're on an asset detail page (key is a symbol other than "portfolio"), re-render the detail
+  if (state.selectedSymbol && key === state.selectedSymbol) {
+    renderAssetDetail(state.selectedSymbol);
+  } else {
+    renderCurrentView();
+  }
+}
+
 function renderSettings() {
   $("#topbarTitle").textContent = "Settings";
   const view = $("#view");
@@ -4316,6 +4563,8 @@ async function submitTrade(sig, conf) {
   const price  = parseFloat($("#lt_price").value);
   const reason = $("#lt_reason").value.trim();
   if (!symbol || !qty || !price) { toast("Fill all fields", 2400, "error"); return; }
+
+  // 1) Save journal entry
   await db.collection("users").doc(state.uid).collection("journal").add({
     symbol, action, quantity: qty, price, reason,
     date: new Date().toISOString().slice(0, 10),
@@ -4323,9 +4572,82 @@ async function submitTrade(sig, conf) {
     signal_at_time: sig || null,
     confidence_at_time: conf || null,
   });
-  toast("Trade logged");
+
+  // 2) Sync to portfolio holdings
+  try {
+    await syncTradeToHoldings(symbol, action, qty, price);
+  } catch (e) {
+    toast(`Logged but couldn't sync: ${e.message || e}`, 4000, "error");
+    closeModal();
+    if (state.currentView === "journal") renderJournal();
+    return;
+  }
+
+  toast(`Trade logged · Portfolio updated`);
   closeModal();
-  if (state.currentView === "journal") renderJournal();
+  // Refresh whichever view is open
+  await loadHoldingsFromFirestore();
+  await refreshAllPrices();
+  renderCurrentView();
+}
+
+// Apply a logged trade to the user's actual holdings.
+// BUY: add to existing position (weighted-avg cost) or create new.
+// SELL: subtract qty (delete if zero); warn if insufficient shares.
+async function syncTradeToHoldings(symbol, action, qty, price) {
+  const holdingsRef = db.collection("users").doc(state.uid).collection("holdings");
+  const docId = symbol; // most apps key holdings by symbol; check if your existing holdings use this convention
+  // Find existing holding (by symbol — it might not have docId == symbol)
+  const existing = state.holdings.find(h => h.symbol === symbol && h.asset_class !== "cash");
+
+  if (action === "buy") {
+    if (existing) {
+      const oldQty  = existing.quantity || 0;
+      const oldCost = existing.avg_cost ?? existing.cost_basis ?? existing.entry_price ?? price;
+      const newQty  = oldQty + qty;
+      const newCost = ((oldQty * oldCost) + (qty * price)) / newQty;
+      await holdingsRef.doc(existing.id).update({
+        quantity: newQty,
+        avg_cost: newCost,
+        last_updated: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Create new holding. Best-guess asset_class from existing data
+      const assetClass = guessAssetClass(symbol);
+      await holdingsRef.add({
+        symbol, quantity: qty, avg_cost: price, asset_class: assetClass,
+        added_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+  } else if (action === "sell") {
+    if (!existing) {
+      throw new Error(`No ${symbol} position to sell from`);
+    }
+    const oldQty = existing.quantity || 0;
+    if (qty > oldQty + 1e-9) {
+      throw new Error(`Trying to sell ${qty} ${symbol} but only have ${oldQty}`);
+    }
+    const newQty = oldQty - qty;
+    if (newQty <= 1e-9) {
+      // Closed out — delete the holding
+      await holdingsRef.doc(existing.id).delete();
+    } else {
+      // Partial sell — keep avg_cost (cost basis doesn't change on a sale)
+      await holdingsRef.doc(existing.id).update({
+        quantity: newQty,
+        last_updated: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+  }
+}
+
+// Heuristic: is this likely crypto, ETF, or stock? Used when creating new holdings.
+function guessAssetClass(sym) {
+  const knownCrypto = ["BTC", "ETH", "SOL", "ADA", "DOT", "MATIC", "LINK", "AVAX", "DOGE", "XRP", "MSTR"];
+  const knownETF    = ["VOO", "QQQ", "SPY", "IWM", "DIA", "VTI", "GLD", "SLV", "TLT", "EIMI", "ISLN", "IGLN", "SWRD", "VEA", "EFA"];
+  if (knownCrypto.includes(sym)) return "crypto";
+  if (knownETF.includes(sym)) return "etf";
+  return "stock";
 }
 
 function openAddAlert() {
@@ -4424,6 +4746,7 @@ document.addEventListener("click", (e) => {
       case "bot-step":               runForwardStep(); break;
       case "bot-reset":              resetBot(); break;
       case "bot-toggle-line":        toggleBotLine(target.dataset.key); break;
+      case "toggle-analysis":        toggleAnalysis(target.dataset.key); break;
     }
   } catch (err) {
     showError("Action failed: " + err.message);
