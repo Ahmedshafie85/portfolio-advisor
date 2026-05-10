@@ -428,6 +428,64 @@ body {
 .pin-key.del { font-size: 22px; }
 .pin-error { color: var(--red); font-size: 12px; margin-top: 14px; letter-spacing: 0.04em; height: 16px; }
 
+/* ===== AUTH SCREEN ===== */
+.auth-screen {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 99; padding: 40px 22px;
+  overflow-y: auto;
+}
+.auth-card {
+  width: 100%; max-width: 380px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 30px 24px 22px;
+}
+.auth-logo { font-family: var(--display); font-size: 28px; font-weight: 500; letter-spacing: -0.02em; text-align: center; margin-bottom: 4px; }
+.auth-tag { font-size: 11.5px; color: var(--ink-muted); letter-spacing: 0.12em; text-transform: uppercase; text-align: center; margin-bottom: 24px; }
+.auth-tabs {
+  display: flex; gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.auth-tab {
+  flex: 1; padding: 10px 0; background: transparent; border: none;
+  font-family: var(--sans); font-size: 13px; color: var(--ink-muted);
+  cursor: pointer; border-bottom: 2px solid transparent;
+  letter-spacing: 0.04em;
+}
+.auth-tab.active { color: var(--ink); border-bottom-color: var(--ink); }
+.auth-fields .field { margin-bottom: 14px; }
+.auth-fields .field label { display: block; font-size: 11px; color: var(--ink-muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+.auth-fields .field input {
+  width: 100%; padding: 10px 12px;
+  background: var(--bg); border: 1px solid var(--rule); border-radius: 6px;
+  font-family: var(--sans); font-size: 14px; color: var(--ink);
+  -webkit-appearance: none;
+}
+.auth-fields .field input:focus { outline: none; border-color: var(--ink); }
+.auth-error {
+  color: var(--red); font-size: 12px; min-height: 16px;
+  margin-bottom: 10px; line-height: 1.4;
+}
+.auth-secondary { text-align: center; margin-top: 14px; }
+.link-btn {
+  background: transparent; border: none; color: var(--ink-muted);
+  font-family: var(--sans); font-size: 12px; cursor: pointer;
+  text-decoration: underline; padding: 4px 8px;
+}
+.auth-migrate {
+  margin-top: 18px; padding: 14px;
+  background: rgba(176,141,60,0.10);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+}
+.auth-migrate-head { font-family: var(--display); font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+.auth-migrate p { font-size: 12px; color: var(--ink-soft); line-height: 1.4; margin-bottom: 12px; }
+.auth-migrate-actions { display: flex; gap: 8px; }
+.auth-migrate-actions button { flex: 1; }
+
 .loader-screen {
   position: fixed; inset: 0; background: var(--bg);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -830,6 +888,16 @@ body {
   margin-top: 6px; padding: 6px 8px; background: var(--bg-elev);
   border-radius: 4px; letter-spacing: 0.02em;
 }
+.journal-del {
+  background: transparent; border: 1px solid var(--rule); border-radius: 4px;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-muted); cursor: pointer;
+  transition: all .12s;
+  padding: 0;
+}
+.journal-del:hover { color: var(--red); border-color: var(--red); }
+.journal-del:active { transform: scale(0.92); }
 
 .alert-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--rule-soft); }
 .alert-info .symbol { font-family: var(--display); font-size: 15px; font-weight: 600; }
@@ -1132,6 +1200,40 @@ body {
   </div>
   <div class="pin-pad" id="pinPad"></div>
   <div class="pin-error" id="pinError"></div>
+</div>
+
+<div class="auth-screen hidden" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">Portfolio</div>
+    <div class="auth-tag">Sign in to sync across devices</div>
+    <div id="authMode" class="auth-tabs">
+      <button class="auth-tab active" data-act="auth-tab" data-mode="signin">Sign In</button>
+      <button class="auth-tab" data-act="auth-tab" data-mode="signup">Create Account</button>
+    </div>
+    <div class="auth-fields">
+      <div class="field">
+        <label>Email</label>
+        <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input id="authPassword" type="password" autocomplete="current-password" placeholder="At least 6 characters" />
+      </div>
+    </div>
+    <div class="auth-error" id="authError"></div>
+    <button class="btn btn-block" data-act="auth-submit" id="authSubmitBtn">Sign In</button>
+    <div class="auth-secondary">
+      <button class="link-btn" data-act="auth-skip">Continue without account (this device only)</button>
+    </div>
+    <div id="authMigrate" class="auth-migrate hidden">
+      <div class="auth-migrate-head">Existing data found</div>
+      <p>This device already has trades, holdings, and watchlist data tied to a temporary account. Import them into your new account?</p>
+      <div class="auth-migrate-actions">
+        <button class="btn btn-sm" data-act="auth-migrate-yes">Import data</button>
+        <button class="btn btn-secondary btn-sm" data-act="auth-migrate-no">Start fresh</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="app hidden" id="app">
@@ -1532,9 +1634,16 @@ function hashPin(p) {
 }
 function unlockApp() {
   $("#pinScreen").classList.add("hidden");
-  $("#app").classList.remove("hidden");
   $("#topbarMeta").textContent = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-  loadInitialData().catch(e => showError("Init: " + e.message));
+  // Check auth state — if signed in (anonymous or email), proceed to app
+  // If never authed AND user hasn't opted into anonymous, show auth screen
+  const skipAuth = localStorage.getItem("skipAuth") === "1";
+  const currentUser = auth.currentUser;
+  if (currentUser && (!currentUser.isAnonymous || skipAuth)) {
+    enterApp();
+  } else {
+    showAuthScreen();
+  }
 }
 function showPinScreen() {
   $("#loader").classList.add("hidden");
@@ -1546,15 +1655,183 @@ function showPinScreen() {
   }
 }
 
+function showAuthScreen() {
+  $("#authScreen").classList.remove("hidden");
+  $("#authError").textContent = "";
+  state.authMode = "signin";
+  updateAuthMode();
+  $("#authMigrate").classList.add("hidden");
+}
+
+function updateAuthMode() {
+  const mode = state.authMode || "signin";
+  $$(".auth-tab").forEach(t => t.classList.toggle("active", t.dataset.mode === mode));
+  $("#authSubmitBtn").textContent = mode === "signup" ? "Create Account" : "Sign In";
+  const pwInput = $("#authPassword");
+  if (pwInput) pwInput.autocomplete = mode === "signup" ? "new-password" : "current-password";
+}
+
+function setAuthMode(mode) {
+  state.authMode = mode;
+  updateAuthMode();
+  $("#authError").textContent = "";
+}
+
+async function submitAuth() {
+  const email = $("#authEmail").value.trim();
+  const password = $("#authPassword").value;
+  const errEl = $("#authError");
+  errEl.textContent = "";
+  const submitBtn = $("#authSubmitBtn");
+  if (!email || !password) { errEl.textContent = "Email and password required"; return; }
+  if (password.length < 6) { errEl.textContent = "Password must be at least 6 characters"; return; }
+  if (submitBtn.disabled) return;
+  submitBtn.disabled = true;
+  submitBtn.textContent = "...";
+
+  // Capture the anonymous UID BEFORE we sign in (so we can migrate from it)
+  const anonUid = (auth.currentUser?.isAnonymous && auth.currentUser?.uid) || null;
+  const mode = state.authMode || "signin";
+
+  try {
+    if (mode === "signup") {
+      await auth.createUserWithEmailAndPassword(email, password);
+    } else {
+      await auth.signInWithEmailAndPassword(email, password);
+    }
+    // Auth state listener will update state.uid
+    await new Promise(r => setTimeout(r, 200)); // allow listener to settle
+    state.uid = auth.currentUser.uid;
+    localStorage.removeItem("skipAuth");
+
+    // If we had anonymous data, offer migration
+    if (anonUid && anonUid !== state.uid) {
+      const hasAnonData = await checkAnonHasData(anonUid);
+      if (hasAnonData) {
+        state._pendingAnonUid = anonUid;
+        $("#authMigrate").classList.remove("hidden");
+        submitBtn.disabled = false;
+        submitBtn.textContent = mode === "signup" ? "Create Account" : "Sign In";
+        return;
+      }
+    }
+    enterApp();
+  } catch (e) {
+    errEl.textContent = friendlyAuthError(e);
+    submitBtn.disabled = false;
+    submitBtn.textContent = mode === "signup" ? "Create Account" : "Sign In";
+  }
+}
+
+function friendlyAuthError(e) {
+  const code = e.code || "";
+  if (code === "auth/email-already-in-use") return "Email already registered. Try signing in.";
+  if (code === "auth/invalid-email") return "That doesn't look like a valid email";
+  if (code === "auth/weak-password") return "Password too weak";
+  if (code === "auth/user-not-found" || code === "auth/wrong-password" || code === "auth/invalid-credential") return "Email or password incorrect";
+  if (code === "auth/too-many-requests") return "Too many attempts. Try again in a moment.";
+  if (code === "auth/network-request-failed") return "Network error — check connection";
+  return e.message || "Sign-in failed";
+}
+
+async function checkAnonHasData(anonUid) {
+  try {
+    const holdings = await db.collection("users").doc(anonUid).collection("holdings").limit(1).get();
+    if (holdings.docs.length > 0) return true;
+    const journal = await db.collection("users").doc(anonUid).collection("journal").limit(1).get();
+    if (journal.docs.length > 0) return true;
+    return false;
+  } catch (e) { return false; }
+}
+
+async function migrateAnonData(anonUid, newUid) {
+  // Copy these subcollections from anon to new account
+  const subcollections = ["holdings", "watchlist", "journal", "alerts", "analyses", "portfolio_analyses", "triggers", "bot"];
+  for (const sub of subcollections) {
+    try {
+      const snap = await db.collection("users").doc(anonUid).collection(sub).get();
+      for (const doc of snap.docs) {
+        const data = doc.data();
+        // Avoid copying serverTimestamp() sentinels (they become null on a re-write); strip them
+        delete data.added_at; delete data.last_updated; delete data.timestamp; delete data.saved_at;
+        await db.collection("users").doc(newUid).collection(sub).doc(doc.id).set(data, { merge: true });
+      }
+    } catch (e) { console.warn("migrate failed for", sub, e); }
+  }
+}
+
+async function handleMigrate(yes) {
+  const anonUid = state._pendingAnonUid;
+  if (!anonUid) { enterApp(); return; }
+  const submitBtn = $("#authSubmitBtn");
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Importing...";
+  $("#authError").textContent = "";
+  try {
+    if (yes) {
+      await migrateAnonData(anonUid, state.uid);
+      toast("Data imported");
+    }
+    state._pendingAnonUid = null;
+    enterApp();
+  } catch (e) {
+    $("#authError").textContent = "Import failed: " + (e.message || e);
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Sign In";
+  }
+}
+
+function skipAuth() {
+  // Use anonymous account — single device only
+  localStorage.setItem("skipAuth", "1");
+  if (!auth.currentUser) {
+    auth.signInAnonymously().then(() => {
+      state.uid = auth.currentUser.uid;
+      enterApp();
+    }).catch(e => {
+      $("#authError").textContent = "Could not start anonymous session: " + (e.message || e);
+    });
+  } else {
+    state.uid = auth.currentUser.uid;
+    enterApp();
+  }
+}
+
+function enterApp() {
+  $("#authScreen").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+  loadInitialData().catch(e => showError("Init: " + e.message));
+}
+
+async function signOutUser() {
+  if (!confirm("Sign out? You'll need to sign back in to see your synced data.")) return;
+  try {
+    await auth.signOut();
+    localStorage.removeItem("skipAuth");
+    location.reload();
+  } catch (e) { toast("Sign out failed: " + (e.message || e), 3000, "error"); }
+}
+
 // ============================================================================
 // AUTH + DATA
 // ============================================================================
 async function ensureAuth() {
+  // By the time loadInitialData runs, auth has been settled by the auth-screen flow.
+  // This is just a safety check + state.uid sync.
   return new Promise((resolve, reject) => {
+    if (auth.currentUser) {
+      state.uid = auth.currentUser.uid;
+      resolve(auth.currentUser);
+      return;
+    }
     auth.onAuthStateChanged(async user => {
       if (user) { state.uid = user.uid; resolve(user); }
       else {
-        try { await auth.signInAnonymously(); }
+        try {
+          await auth.signInAnonymously();
+          state.uid = auth.currentUser.uid;
+          resolve(auth.currentUser);
+        }
         catch (e) { reject(e); }
       }
     });
@@ -3101,13 +3378,31 @@ async function renderJournal() {
           <span class="journal-symbol">${escAttr(e.symbol)}</span>
           <span class="journal-action ${e.action}">${escAttr(e.action)}</span>
         </div>
-        <div class="journal-meta">${escAttr(e.date)}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="journal-meta">${escAttr(e.date)}</div>
+          <button class="journal-del" data-act="delete-journal" data-id="${escAttr(e.id)}" title="Delete this entry">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1.5 14a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
       </div>
       <div class="journal-meta">${fmtNum(e.quantity, 6)} @ $${fmtUSD(e.price)}</div>
       ${e.reason ? `<div class="journal-reason">${escAttr(e.reason)}</div>` : ""}
       ${e.signal_at_time ? `<div class="journal-snapshot">App stance at time: ${escAttr(e.signal_at_time)} · ${escAttr(e.confidence_at_time || "")}</div>` : ""}
     </div>
   `).join("");
+}
+
+async function deleteJournalEntry(id) {
+  if (!id) return;
+  const ok = confirm("Delete this journal entry?\n\nNote: this only removes the log. It does NOT reverse the portfolio change. If you need to undo the portfolio update, log a corrective trade.");
+  if (!ok) return;
+  try {
+    await db.collection("users").doc(state.uid).collection("journal").doc(id).delete();
+    toast("Entry deleted");
+    renderJournal();
+  } catch (e) {
+    toast("Delete failed: " + (e.message || e), 3000, "error");
+  }
 }
 
 async function loadAlerts() {
@@ -4104,9 +4399,21 @@ function toggleAnalysis(key) {
 function renderSettings() {
   $("#topbarTitle").textContent = "Settings";
   const view = $("#view");
+  const user = auth.currentUser;
+  const isAnon = user?.isAnonymous;
+  const email = user?.email || "Anonymous (this device only)";
   view.innerHTML = `
     <div class="section-head" style="padding: 20px 20px 0;"><h2>Settings</h2></div>
     <div class="settings-group">
+      <div class="setting-row">
+        <div>
+          <div class="lbl">Account</div>
+          <div class="sub" style="font-family:var(--mono);">${escAttr(email)}</div>
+        </div>
+        ${isAnon
+          ? `<button class="btn btn-sm" data-act="sign-out">Sign In / Up</button>`
+          : `<button class="btn btn-secondary btn-sm" data-act="sign-out">Sign Out</button>`}
+      </div>
       <div class="setting-row">
         <div><div class="lbl">Theme</div><div class="sub">Day or night</div></div>
         <div class="toggle ${state.theme === 'night' ? 'on' : ''}" data-act="toggle-theme"></div>
@@ -4533,67 +4840,141 @@ async function removeCondition(symbol, condId) {
 function openLogTrade(symbol) {
   const sigSnapshot = symbol && state.analyses[symbol] ? state.analyses[symbol] : null;
   const stanceLabel = sigSnapshot?.stance || sigSnapshot?.signal || null;
+
+  // Build picker options from holdings + watchlist (deduped, alphabetical)
+  const seen = new Set();
+  const opts = [];
+  for (const h of state.holdings) {
+    if (h.asset_class === "cash") continue;
+    if (seen.has(h.symbol)) continue;
+    seen.add(h.symbol);
+    opts.push({ symbol: h.symbol, name: h.name || "", source: "owned" });
+  }
+  for (const w of (state.watchlist || [])) {
+    if (seen.has(w.symbol)) continue;
+    seen.add(w.symbol);
+    opts.push({ symbol: w.symbol, name: w.name || "", source: "watch" });
+  }
+  opts.sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+  const optionsHtml = opts.map(o => {
+    const sel = o.symbol === symbol ? "selected" : "";
+    return `<option value="${escAttr(o.symbol)}" ${sel}>${escAttr(o.symbol)}${o.name ? " — " + escAttr(o.name) : ""}${o.source === "owned" ? " (held)" : ""}</option>`;
+  }).join("");
+
   openModal(`
     <div class="modal-head"><h3>Log Trade</h3></div>
+    <div class="field">
+      <label>Symbol</label>
+      <select id="lt_symbol_select" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--rule);border-radius:6px;font-family:var(--sans);font-size:14px;color:var(--ink);">
+        <option value="">— Select a symbol —</option>
+        ${optionsHtml}
+        <option value="__OTHER__">Other (type manually)</option>
+      </select>
+    </div>
+    <div class="field hidden" id="lt_symbol_other_wrap">
+      <label>Symbol Code</label>
+      <input id="lt_symbol_other" placeholder="e.g. SOL" style="text-transform:uppercase;" />
+      <div class="field-hint" style="font-size:11px;color:var(--ink-muted);margin-top:4px;">Use the same code your data source uses (e.g. BTC, AAPL, VOO).</div>
+    </div>
     <div class="field-row">
-      <div class="field"><label>Symbol</label><input id="lt_symbol" value="${escAttr(symbol || '')}" /></div>
       <div class="field"><label>Action</label>
         <select id="lt_action">
           <option value="buy">Buy</option>
           <option value="sell">Sell</option>
         </select>
       </div>
-    </div>
-    <div class="field-row">
       <div class="field"><label>Quantity</label><input id="lt_qty" type="number" step="any" /></div>
-      <div class="field"><label>Price (USD)</label><input id="lt_price" type="number" step="any" /></div>
+    </div>
+    <div class="field">
+      <label>Price per Unit (USD)</label>
+      <input id="lt_price" type="number" step="any" />
     </div>
     <div class="field">
       <label>Reason / Thesis</label>
       <textarea id="lt_reason" rows="3" placeholder="Why did you make this trade?" style="font-family:var(--sans);"></textarea>
     </div>
     ${stanceLabel ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--ink-muted);margin-bottom:14px;padding:10px;background:var(--bg-elev);border-radius:6px;">App stance: ${escAttr(stanceLabel)} · ${escAttr(sigSnapshot.confidence || "")} confidence</div>` : ""}
-    <button class="btn btn-block" data-act="submit-trade" ${stanceLabel ? `data-sig="${escAttr(stanceLabel)}" data-conf="${escAttr(sigSnapshot.confidence || '')}"` : ""}>Save</button>
+    <button class="btn btn-block" data-act="submit-trade" id="lt_submit_btn" ${stanceLabel ? `data-sig="${escAttr(stanceLabel)}" data-conf="${escAttr(sigSnapshot.confidence || '')}"` : ""}>Save</button>
   `);
-}
-async function submitTrade(sig, conf) {
-  const symbol = $("#lt_symbol").value.trim().toUpperCase();
-  const action = $("#lt_action").value;
-  const qty    = parseFloat($("#lt_qty").value);
-  const price  = parseFloat($("#lt_price").value);
-  const reason = $("#lt_reason").value.trim();
-  if (!symbol || !qty || !price) { toast("Fill all fields", 2400, "error"); return; }
 
-  // 1) Save journal entry
-  await db.collection("users").doc(state.uid).collection("journal").add({
-    symbol, action, quantity: qty, price, reason,
-    date: new Date().toISOString().slice(0, 10),
-    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-    signal_at_time: sig || null,
-    confidence_at_time: conf || null,
+  // Show "other symbol" input when user picks "Other"
+  const sel = $("#lt_symbol_select");
+  const otherWrap = $("#lt_symbol_other_wrap");
+  sel.addEventListener("change", () => {
+    if (sel.value === "__OTHER__") otherWrap.classList.remove("hidden");
+    else otherWrap.classList.add("hidden");
   });
+}
 
-  // 2) Sync to portfolio holdings
+async function submitTrade(sig, conf) {
+  const submitBtn = $("#lt_submit_btn");
+  if (!submitBtn || submitBtn.disabled) return; // hard debounce: prevents double-tap double-save
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Saving...";
+
   try {
-    await syncTradeToHoldings(symbol, action, qty, price);
-  } catch (e) {
-    toast(`Logged but couldn't sync: ${e.message || e}`, 4000, "error");
-    closeModal();
-    if (state.currentView === "journal") renderJournal();
-    return;
-  }
+    // Resolve symbol from picker (or manual fallback)
+    const sel = $("#lt_symbol_select");
+    let symbol = sel.value;
+    if (symbol === "__OTHER__") {
+      symbol = ($("#lt_symbol_other")?.value || "").trim().toUpperCase();
+    } else if (!symbol) {
+      symbol = "";
+    }
+    const action = $("#lt_action").value;
+    const qty    = parseFloat($("#lt_qty").value);
+    const price  = parseFloat($("#lt_price").value);
+    const reason = $("#lt_reason").value.trim();
+    if (!symbol || !qty || !price) {
+      toast("Fill symbol, quantity, and price", 2400, "error");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Save";
+      return;
+    }
+    if (qty <= 0 || price <= 0) {
+      toast("Quantity and price must be positive", 2400, "error");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Save";
+      return;
+    }
 
-  toast(`Trade logged · Portfolio updated`);
-  closeModal();
-  // Refresh whichever view is open
-  await loadHoldingsFromFirestore();
-  await refreshAllPrices();
-  renderCurrentView();
+    // 1) Save journal entry
+    const journalRef = await db.collection("users").doc(state.uid).collection("journal").add({
+      symbol, action, quantity: qty, price, reason,
+      date: new Date().toISOString().slice(0, 10),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      signal_at_time: sig || null,
+      confidence_at_time: conf || null,
+    });
+
+    // 2) Sync to portfolio holdings
+    try {
+      await syncTradeToHoldings(symbol, action, qty, price);
+    } catch (e) {
+      // Roll back the journal entry so it doesn't show a phantom trade
+      try { await journalRef.delete(); } catch (_) {}
+      toast(`Couldn't sync: ${e.message || e}`, 4000, "error");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Save";
+      return;
+    }
+
+    toast(`Trade logged · Portfolio updated`);
+    closeModal();
+    await loadHoldingsFromFirestore();
+    await refreshAllPrices();
+    renderCurrentView();
+  } catch (e) {
+    toast("Save failed: " + (e.message || e), 4000, "error");
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Save";
+  }
 }
 
 // Apply a logged trade to the user's actual holdings.
-// BUY: add to existing position (weighted-avg cost) or create new.
-// SELL: subtract qty (delete if zero); warn if insufficient shares.
+// BUY:  add to position (or create), AND subtract proceeds from cash
+// SELL: subtract from position (or close), AND add proceeds to cash
 //
 // IMPORTANT: this app's holdings schema uses these fields:
 //   - quantity:        units held
@@ -4602,10 +4983,20 @@ async function submitTrade(sig, conf) {
 //   - asset_class:     "crypto" | "etf" | "metal" | "us_stock" | "cash"
 //   - name:            optional display name
 async function syncTradeToHoldings(symbol, action, qty, price) {
+  if (symbol === "CASH") throw new Error("Cannot trade CASH directly");
   const holdingsRef = db.collection("users").doc(state.uid).collection("holdings");
   const existing = state.holdings.find(h => h.symbol === symbol && h.asset_class !== "cash");
+  const cashHolding = state.holdings.find(h => h.symbol === "CASH" && h.asset_class === "cash");
+  const tradeValue = qty * price;
 
   if (action === "buy") {
+    // Validate cash if we have a cash holding tracked
+    if (cashHolding) {
+      const available = cashHolding.quantity || 0;
+      if (tradeValue > available + 1e-6) {
+        throw new Error(`Need $${fmtUSD(tradeValue)} but only have $${fmtUSD(available)} cash`);
+      }
+    }
     if (existing) {
       const oldQty   = existing.quantity || 0;
       const oldUnit  = existing.avg_cost_unit ?? (existing.avg_cost_total ? existing.avg_cost_total / oldQty : price);
@@ -4619,7 +5010,6 @@ async function syncTradeToHoldings(symbol, action, qty, price) {
         last_updated: firebase.firestore.FieldValue.serverTimestamp(),
       });
     } else {
-      // Create new holding. Doc ID = symbol (matches seed convention).
       const assetClass = guessAssetClass(symbol);
       await holdingsRef.doc(symbol).set({
         symbol,
@@ -4629,6 +5019,14 @@ async function syncTradeToHoldings(symbol, action, qty, price) {
         asset_class: assetClass,
         currency: "USD",
         added_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    // Subtract from cash
+    if (cashHolding) {
+      const newCash = cashHolding.quantity - tradeValue;
+      await holdingsRef.doc(cashHolding.id).update({
+        quantity: newCash, avg_cost_total: newCash, avg_cost_unit: 1,
+        last_updated: firebase.firestore.FieldValue.serverTimestamp(),
       });
     }
   } else if (action === "sell") {
@@ -4641,16 +5039,28 @@ async function syncTradeToHoldings(symbol, action, qty, price) {
     }
     const newQty = oldQty - qty;
     if (newQty <= 1e-9) {
-      // Closed out — delete the holding
       await holdingsRef.doc(existing.id).delete();
     } else {
-      // Partial sell — keep avg_cost_unit (cost basis per unit doesn't change on a sale),
-      // but update avg_cost_total to reflect the smaller remaining position
       const oldUnit = existing.avg_cost_unit ?? (existing.avg_cost_total ? existing.avg_cost_total / oldQty : 0);
       await holdingsRef.doc(existing.id).update({
         quantity: newQty,
         avg_cost_total: oldUnit * newQty,
         last_updated: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    // Add proceeds to cash (or create cash holding if none yet)
+    if (cashHolding) {
+      const newCash = (cashHolding.quantity || 0) + tradeValue;
+      await holdingsRef.doc(cashHolding.id).update({
+        quantity: newCash, avg_cost_total: newCash, avg_cost_unit: 1,
+        last_updated: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      await holdingsRef.doc("CASH").set({
+        symbol: "CASH", asset_class: "cash",
+        quantity: tradeValue, avg_cost_total: tradeValue, avg_cost_unit: 1,
+        currency: "USD", name: "Cash (USD)",
+        added_at: firebase.firestore.FieldValue.serverTimestamp(),
       });
     }
   }
@@ -4764,6 +5174,13 @@ document.addEventListener("click", (e) => {
       case "bot-reset":              resetBot(); break;
       case "bot-toggle-line":        toggleBotLine(target.dataset.key); break;
       case "toggle-analysis":        toggleAnalysis(target.dataset.key); break;
+      case "auth-tab":               setAuthMode(target.dataset.mode); break;
+      case "auth-submit":            submitAuth(); break;
+      case "auth-skip":              skipAuth(); break;
+      case "auth-migrate-yes":       handleMigrate(true); break;
+      case "auth-migrate-no":        handleMigrate(false); break;
+      case "sign-out":               signOutUser(); break;
+      case "delete-journal":         deleteJournalEntry(target.dataset.id); break;
     }
   } catch (err) {
     showError("Action failed: " + err.message);
