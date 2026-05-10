@@ -4594,28 +4594,40 @@ async function submitTrade(sig, conf) {
 // Apply a logged trade to the user's actual holdings.
 // BUY: add to existing position (weighted-avg cost) or create new.
 // SELL: subtract qty (delete if zero); warn if insufficient shares.
+//
+// IMPORTANT: this app's holdings schema uses these fields:
+//   - quantity:        units held
+//   - avg_cost_unit:   weighted-average cost per unit (USD)
+//   - avg_cost_total:  total invested (= quantity × avg_cost_unit)
+//   - asset_class:     "crypto" | "etf" | "metal" | "us_stock" | "cash"
+//   - name:            optional display name
 async function syncTradeToHoldings(symbol, action, qty, price) {
   const holdingsRef = db.collection("users").doc(state.uid).collection("holdings");
-  const docId = symbol; // most apps key holdings by symbol; check if your existing holdings use this convention
-  // Find existing holding (by symbol — it might not have docId == symbol)
   const existing = state.holdings.find(h => h.symbol === symbol && h.asset_class !== "cash");
 
   if (action === "buy") {
     if (existing) {
-      const oldQty  = existing.quantity || 0;
-      const oldCost = existing.avg_cost ?? existing.cost_basis ?? existing.entry_price ?? price;
-      const newQty  = oldQty + qty;
-      const newCost = ((oldQty * oldCost) + (qty * price)) / newQty;
+      const oldQty   = existing.quantity || 0;
+      const oldUnit  = existing.avg_cost_unit ?? (existing.avg_cost_total ? existing.avg_cost_total / oldQty : price);
+      const newQty   = oldQty + qty;
+      const newUnit  = ((oldQty * oldUnit) + (qty * price)) / newQty;
+      const newTotal = newUnit * newQty;
       await holdingsRef.doc(existing.id).update({
         quantity: newQty,
-        avg_cost: newCost,
+        avg_cost_unit: newUnit,
+        avg_cost_total: newTotal,
         last_updated: firebase.firestore.FieldValue.serverTimestamp(),
       });
     } else {
-      // Create new holding. Best-guess asset_class from existing data
+      // Create new holding. Doc ID = symbol (matches seed convention).
       const assetClass = guessAssetClass(symbol);
-      await holdingsRef.add({
-        symbol, quantity: qty, avg_cost: price, asset_class: assetClass,
+      await holdingsRef.doc(symbol).set({
+        symbol,
+        quantity: qty,
+        avg_cost_unit: price,
+        avg_cost_total: qty * price,
+        asset_class: assetClass,
+        currency: "USD",
         added_at: firebase.firestore.FieldValue.serverTimestamp(),
       });
     }
@@ -4623,7 +4635,7 @@ async function syncTradeToHoldings(symbol, action, qty, price) {
     if (!existing) {
       throw new Error(`No ${symbol} position to sell from`);
     }
-    const oldQty = existing.quantity || 0;
+    const oldQty  = existing.quantity || 0;
     if (qty > oldQty + 1e-9) {
       throw new Error(`Trying to sell ${qty} ${symbol} but only have ${oldQty}`);
     }
@@ -4632,22 +4644,27 @@ async function syncTradeToHoldings(symbol, action, qty, price) {
       // Closed out — delete the holding
       await holdingsRef.doc(existing.id).delete();
     } else {
-      // Partial sell — keep avg_cost (cost basis doesn't change on a sale)
+      // Partial sell — keep avg_cost_unit (cost basis per unit doesn't change on a sale),
+      // but update avg_cost_total to reflect the smaller remaining position
+      const oldUnit = existing.avg_cost_unit ?? (existing.avg_cost_total ? existing.avg_cost_total / oldQty : 0);
       await holdingsRef.doc(existing.id).update({
         quantity: newQty,
+        avg_cost_total: oldUnit * newQty,
         last_updated: firebase.firestore.FieldValue.serverTimestamp(),
       });
     }
   }
 }
 
-// Heuristic: is this likely crypto, ETF, or stock? Used when creating new holdings.
+// Heuristic: is this likely crypto, ETF, metal, or stock? Used when creating new holdings.
 function guessAssetClass(sym) {
-  const knownCrypto = ["BTC", "ETH", "SOL", "ADA", "DOT", "MATIC", "LINK", "AVAX", "DOGE", "XRP", "MSTR"];
-  const knownETF    = ["VOO", "QQQ", "SPY", "IWM", "DIA", "VTI", "GLD", "SLV", "TLT", "EIMI", "ISLN", "IGLN", "SWRD", "VEA", "EFA"];
+  const knownCrypto = ["BTC", "ETH", "SOL", "ADA", "DOT", "MATIC", "LINK", "AVAX", "DOGE", "XRP"];
+  const knownMetal  = ["GLD", "SLV", "IGLN", "ISLN", "PSLV"];
+  const knownETF    = ["VOO", "QQQ", "SPY", "IWM", "DIA", "VTI", "TLT", "EIMI", "SWRD", "VEA", "EFA"];
   if (knownCrypto.includes(sym)) return "crypto";
-  if (knownETF.includes(sym)) return "etf";
-  return "stock";
+  if (knownMetal.includes(sym))  return "metal";
+  if (knownETF.includes(sym))    return "etf";
+  return "us_stock";
 }
 
 function openAddAlert() {
