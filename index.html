@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en" data-theme="day">
 <head>
 <meta charset="UTF-8" />
@@ -1025,7 +1024,6 @@ body {
 .bot-empty p { color: var(--ink-muted); font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
 
 </style>
-
 </head>
 <body>
 
@@ -1117,11 +1115,8 @@ body {
 <div class="toast" id="toast"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
-
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
-
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 
 <script>
@@ -4223,143 +4218,150 @@ function openLogTrade(symbol) {
     <div class="field">
       <label>Reason / Thesis</label>
       <textarea id="lt_reason" rows="3" placeholder="Why did you make this trade?" style="font-family:var(--sans);"></textarea>
-
-```
-</div>
-${stanceLabel ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--ink-muted);margin-bottom:14px;padding:10px;background:var(--bg-elev);border-radius:6px;">App stance: ${escAttr(stanceLabel)} · ${escAttr(sigSnapshot.confidence || "")} confidence</div>` : ""}
-<button class="btn btn-block" data-act="submit-trade" ${stanceLabel ? `data-sig="${escAttr(stanceLabel)}" data-conf="${escAttr(sigSnapshot.confidence || '')}"` : ""}>Save</button>
-```
-
-`);
+    </div>
+    ${stanceLabel ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--ink-muted);margin-bottom:14px;padding:10px;background:var(--bg-elev);border-radius:6px;">App stance: ${escAttr(stanceLabel)} · ${escAttr(sigSnapshot.confidence || "")} confidence</div>` : ""}
+    <button class="btn btn-block" data-act="submit-trade" ${stanceLabel ? `data-sig="${escAttr(stanceLabel)}" data-conf="${escAttr(sigSnapshot.confidence || '')}"` : ""}>Save</button>
+  `);
 }
 async function submitTrade(sig, conf) {
-const symbol = $(”#lt_symbol”).value.trim().toUpperCase();
-const action = $(”#lt_action”).value;
-const qty    = parseFloat($(”#lt_qty”).value);
-const price  = parseFloat($(”#lt_price”).value);
-const reason = $(”#lt_reason”).value.trim();
-if (!symbol || !qty || !price) { toast(“Fill all fields”, 2400, “error”); return; }
-await db.collection(“users”).doc(state.uid).collection(“journal”).add({
-symbol, action, quantity: qty, price, reason,
-date: new Date().toISOString().slice(0, 10),
-timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-signal_at_time: sig || null,
-confidence_at_time: conf || null,
-});
-toast(“Trade logged”);
-closeModal();
-if (state.currentView === “journal”) renderJournal();
+  const symbol = $("#lt_symbol").value.trim().toUpperCase();
+  const action = $("#lt_action").value;
+  const qty    = parseFloat($("#lt_qty").value);
+  const price  = parseFloat($("#lt_price").value);
+  const reason = $("#lt_reason").value.trim();
+  if (!symbol || !qty || !price) { toast("Fill all fields", 2400, "error"); return; }
+  await db.collection("users").doc(state.uid).collection("journal").add({
+    symbol, action, quantity: qty, price, reason,
+    date: new Date().toISOString().slice(0, 10),
+    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    signal_at_time: sig || null,
+    confidence_at_time: conf || null,
+  });
+  toast("Trade logged");
+  closeModal();
+  if (state.currentView === "journal") renderJournal();
 }
 
 function openAddAlert() {
-const opts = state.holdings.filter(h => h.asset_class !== “cash”).map(h => `<option value="${escAttr(h.symbol)}">${escAttr(h.symbol)}</option>`).join(””);
-openModal(`<div class="modal-head"><h3>New Alert</h3></div> <div class="field"><label>Symbol</label><select id="al_symbol">${opts}</select></div> <div class="field"><label>Trigger</label> <select id="al_type"> <option value="price_above">Price above</option> <option value="price_below">Price below</option> </select> </div> <div class="field"><label>Threshold (USD)</label><input id="al_threshold" type="number" step="any" /></div> <button class="btn btn-block" data-act="submit-alert">Create Alert</button>`);
+  const opts = state.holdings.filter(h => h.asset_class !== "cash").map(h => `<option value="${escAttr(h.symbol)}">${escAttr(h.symbol)}</option>`).join("");
+  openModal(`
+    <div class="modal-head"><h3>New Alert</h3></div>
+    <div class="field"><label>Symbol</label><select id="al_symbol">${opts}</select></div>
+    <div class="field"><label>Trigger</label>
+      <select id="al_type">
+        <option value="price_above">Price above</option>
+        <option value="price_below">Price below</option>
+      </select>
+    </div>
+    <div class="field"><label>Threshold (USD)</label><input id="al_threshold" type="number" step="any" /></div>
+    <button class="btn btn-block" data-act="submit-alert">Create Alert</button>
+  `);
 }
 async function submitAlert() {
-const symbol = $(”#al_symbol”).value;
-const type   = $(”#al_type”).value;
-const threshold = parseFloat($(”#al_threshold”).value);
-if (!symbol || !threshold) { toast(“Fill all fields”, 2400, “error”); return; }
-await db.collection(“users”).doc(state.uid).collection(“alerts”).add({
-symbol, type, threshold, active: true,
-created_at: firebase.firestore.FieldValue.serverTimestamp(),
-});
-toast(“Alert created”);
-closeModal();
-if (state.currentView === “alerts”) renderAlerts();
+  const symbol = $("#al_symbol").value;
+  const type   = $("#al_type").value;
+  const threshold = parseFloat($("#al_threshold").value);
+  if (!symbol || !threshold) { toast("Fill all fields", 2400, "error"); return; }
+  await db.collection("users").doc(state.uid).collection("alerts").add({
+    symbol, type, threshold, active: true,
+    created_at: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  toast("Alert created");
+  closeModal();
+  if (state.currentView === "alerts") renderAlerts();
 }
 
 // Open trigger from opportunity card → mark seen, open asset
 async function openTrigger(symbol, triggerId) {
-if (triggerId) await markTriggerSeen(triggerId);
-openAsset(symbol, “portfolio”);
+  if (triggerId) await markTriggerSeen(triggerId);
+  openAsset(symbol, "portfolio");
 }
 
 // ============================================================================
 // EVENT DELEGATION
 // ============================================================================
-document.addEventListener(“click”, (e) => {
-const target = e.target.closest(”[data-act], [data-view]”);
-if (!target) return;
+document.addEventListener("click", (e) => {
+  const target = e.target.closest("[data-act], [data-view]");
+  if (!target) return;
 
-if (target.dataset.view) {
-setView(target.dataset.view);
-return;
-}
+  if (target.dataset.view) {
+    setView(target.dataset.view);
+    return;
+  }
 
-const act = target.dataset.act;
-const symbol = target.dataset.symbol;
+  const act = target.dataset.act;
+  const symbol = target.dataset.symbol;
 
-try {
-switch (act) {
-case “open-asset”:             openAsset(symbol); break;
-case “open-asset-from-watch”:  openAsset(symbol, “watchlist”); break;
-case “open-watch”:             openWatchItem(symbol); break;
-case “back-watch”:             backToWatchlist(); break;
-case “back-markets”:           backToMarkets(); break;
-case “set-range”:              setRange(target.dataset.range, symbol); break;
-case “run-analysis”:           runAnalysis(symbol); break;
-case “run-portfolio-analysis”: runPortfolioAnalysis(); break;
-case “rescan”:                 rescan(); break;
-case “open-trigger”:           openTrigger(symbol, target.dataset.triggerId); break;
-case “log-trade”:              openLogTrade(symbol); break;
-case “add-holding”:            openAddHolding(); break;
-case “submit-add”:             submitAddHolding(); break;
-case “edit-holding”:           openEditHolding(symbol); break;
-case “submit-edit”:            submitEditHolding(symbol); break;
-case “delete-holding”:         confirmDeleteHolding(symbol); break;
-case “submit-trade”:           submitTrade(target.dataset.sig, target.dataset.conf); break;
-case “add-watch”:              openAddWatch(); break;
-case “submit-add-watch”:       submitAddWatch(); break;
-case “rm-watch”:               removeFromWatch(symbol); break;
-case “add-cond”:               openAddCondition(symbol); break;
-case “submit-cond”:            submitCondition(symbol); break;
-case “rm-cond”:                removeCondition(symbol, target.dataset.cid); break;
-case “add-alert”:              openAddAlert(); break;
-case “submit-alert”:           submitAlert(); break;
-case “delete-alert”:           deleteAlert(target.dataset.id); break;
-case “pick-symbol”:
-$(”#ah_symbol”).value = target.dataset.symbol;
-$(”#ah_name”).value = target.dataset.name || “”;
-$(”#ah_search_results”).classList.add(“hidden”);
-break;
-case “pick-aw-symbol”:
-$(”#aw_symbol”).value = target.dataset.symbol;
-$(”#aw_name”).value = target.dataset.name || “”;
-$(”#aw_search_results”).classList.add(“hidden”);
-break;
-case “toggle-theme”:           toggleTheme(); break;
-case “reset-pin”:              resetPin(); break;
-case “manual-refresh”:         manualRefresh(); break;
-case “export-data”:            exportData(); break;
-case “bot-backtest”:           runBacktest(); break;
-case “bot-step”:               runForwardStep(); break;
-case “bot-reset”:              resetBot(); break;
-case “bot-toggle-line”:        toggleBotLine(target.dataset.key); break;
-}
-} catch (err) {
-showError(“Action failed: “ + err.message);
-}
+  try {
+    switch (act) {
+      case "open-asset":             openAsset(symbol); break;
+      case "open-asset-from-watch":  openAsset(symbol, "watchlist"); break;
+      case "open-watch":             openWatchItem(symbol); break;
+      case "back-watch":             backToWatchlist(); break;
+      case "back-markets":           backToMarkets(); break;
+      case "set-range":              setRange(target.dataset.range, symbol); break;
+      case "run-analysis":           runAnalysis(symbol); break;
+      case "run-portfolio-analysis": runPortfolioAnalysis(); break;
+      case "rescan":                 rescan(); break;
+      case "open-trigger":           openTrigger(symbol, target.dataset.triggerId); break;
+      case "log-trade":              openLogTrade(symbol); break;
+      case "add-holding":            openAddHolding(); break;
+      case "submit-add":             submitAddHolding(); break;
+      case "edit-holding":           openEditHolding(symbol); break;
+      case "submit-edit":            submitEditHolding(symbol); break;
+      case "delete-holding":         confirmDeleteHolding(symbol); break;
+      case "submit-trade":           submitTrade(target.dataset.sig, target.dataset.conf); break;
+      case "add-watch":              openAddWatch(); break;
+      case "submit-add-watch":       submitAddWatch(); break;
+      case "rm-watch":               removeFromWatch(symbol); break;
+      case "add-cond":               openAddCondition(symbol); break;
+      case "submit-cond":            submitCondition(symbol); break;
+      case "rm-cond":                removeCondition(symbol, target.dataset.cid); break;
+      case "add-alert":              openAddAlert(); break;
+      case "submit-alert":           submitAlert(); break;
+      case "delete-alert":           deleteAlert(target.dataset.id); break;
+      case "pick-symbol":
+        $("#ah_symbol").value = target.dataset.symbol;
+        $("#ah_name").value = target.dataset.name || "";
+        $("#ah_search_results").classList.add("hidden");
+        break;
+      case "pick-aw-symbol":
+        $("#aw_symbol").value = target.dataset.symbol;
+        $("#aw_name").value = target.dataset.name || "";
+        $("#aw_search_results").classList.add("hidden");
+        break;
+      case "toggle-theme":           toggleTheme(); break;
+      case "reset-pin":              resetPin(); break;
+      case "manual-refresh":         manualRefresh(); break;
+      case "export-data":            exportData(); break;
+      case "bot-backtest":           runBacktest(); break;
+      case "bot-step":               runForwardStep(); break;
+      case "bot-reset":              resetBot(); break;
+      case "bot-toggle-line":        toggleBotLine(target.dataset.key); break;
+    }
+  } catch (err) {
+    showError("Action failed: " + err.message);
+  }
 });
 
-$(”#themeBtn”).addEventListener(“click”, toggleTheme);
-$(”#refreshBtn”).addEventListener(“click”, manualRefresh);
-$(”#modalBg”).addEventListener(“click”, closeModal);
+$("#themeBtn").addEventListener("click", toggleTheme);
+$("#refreshBtn").addEventListener("click", manualRefresh);
+$("#modalBg").addEventListener("click", closeModal);
 
 // Show PIN screen after load, with a fallback in case `load` never fires
 let _pinShown = false;
 function safeShowPin() {
-if (_pinShown) return;
-_pinShown = true;
-try { showPinScreen(); }
-catch (e) { showBootError(“Failed to show PIN screen: “ + e.message); }
+  if (_pinShown) return;
+  _pinShown = true;
+  try { showPinScreen(); }
+  catch (e) { showBootError("Failed to show PIN screen: " + e.message); }
 }
-window.addEventListener(“load”, () => { setTimeout(safeShowPin, 600); });
-// Fallback: if for any reason the load event hasn’t triggered our handler within 3 seconds, force it
+window.addEventListener("load", () => { setTimeout(safeShowPin, 600); });
+// Fallback: if for any reason the load event hasn't triggered our handler within 3 seconds, force it
 setTimeout(safeShowPin, 3000);
 
-if (“serviceWorker” in navigator) {
-navigator.serviceWorker.register(“sw.js”).catch(()=>{});
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
 </script>
 
