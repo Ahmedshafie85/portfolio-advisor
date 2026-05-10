@@ -1127,12 +1127,45 @@ body {
 <script>
 "use strict";
 
+// Boot-time error trap: if anything goes wrong before the app shows, display it on the loader.
+function showBootError(msg) {
+  console.error("BOOT ERROR:", msg);
+  const loader = document.getElementById("loader");
+  if (loader) {
+    loader.innerHTML = `
+      <div style="font-family: serif; font-size: 24px; margin-bottom: 18px;">Portfolio</div>
+      <div style="font-family: monospace; font-size: 12px; color: #a13d2d; padding: 16px; max-width: 90%; word-break: break-word; line-height: 1.5; background: rgba(161,61,45,0.08); border-radius: 8px; margin: 0 20px;">
+        <b>Boot error:</b><br>${String(msg).slice(0, 400)}
+      </div>
+      <button onclick="location.reload()" style="margin-top: 16px; padding: 8px 18px; background: #1a1814; color: #f5f1e8; border: none; border-radius: 6px; font-family: sans-serif; font-size: 13px; cursor: pointer;">Reload</button>
+    `;
+    loader.style.flexDirection = "column";
+    loader.style.justifyContent = "center";
+    loader.style.alignItems = "center";
+  }
+}
+
 window.addEventListener("error", (e) => {
-  showError(e.message + (e.filename ? ` (${e.filename}:${e.lineno})` : ""));
+  // Always show boot errors visibly during startup
+  if (document.getElementById("loader") && !document.getElementById("loader").classList.contains("hidden")) {
+    showBootError((e.error?.message || e.message) + (e.filename ? ` (line ${e.lineno})` : ""));
+  } else {
+    showError(e.message + (e.filename ? ` (${e.filename}:${e.lineno})` : ""));
+  }
 });
 window.addEventListener("unhandledrejection", (e) => {
-  showError("Promise: " + (e.reason?.message || e.reason));
+  if (document.getElementById("loader") && !document.getElementById("loader").classList.contains("hidden")) {
+    showBootError("Promise: " + (e.reason?.message || e.reason));
+  } else {
+    showError("Promise: " + (e.reason?.message || e.reason));
+  }
 });
+
+// Sanity check: are the external libraries loaded?
+if (typeof firebase === "undefined") {
+  showBootError("Firebase scripts didn't load. Check your network or wait and reload.");
+  throw new Error("firebase undefined");
+}
 
 function showError(msg) {
   console.error("APP ERROR:", msg);
@@ -4313,7 +4346,17 @@ $(”#themeBtn”).addEventListener(“click”, toggleTheme);
 $(”#refreshBtn”).addEventListener(“click”, manualRefresh);
 $(”#modalBg”).addEventListener(“click”, closeModal);
 
-window.addEventListener(“load”, () => { setTimeout(showPinScreen, 600); });
+// Show PIN screen after load, with a fallback in case `load` never fires
+let _pinShown = false;
+function safeShowPin() {
+if (_pinShown) return;
+_pinShown = true;
+try { showPinScreen(); }
+catch (e) { showBootError(“Failed to show PIN screen: “ + e.message); }
+}
+window.addEventListener(“load”, () => { setTimeout(safeShowPin, 600); });
+// Fallback: if for any reason the load event hasn’t triggered our handler within 3 seconds, force it
+setTimeout(safeShowPin, 3000);
 
 if (“serviceWorker” in navigator) {
 navigator.serviceWorker.register(“sw.js”).catch(()=>{});
