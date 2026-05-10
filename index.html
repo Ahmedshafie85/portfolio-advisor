@@ -1286,10 +1286,10 @@ const state = {
   chart: null,
   theme: localStorage.getItem("theme") || "day",
   lastScanAt: null,
-  // bot simulator: 6 strategies in parallel
-  bot: { dip: null, trend: null, golden: null, meanrev: null, dca: null, bh: null },
+  // bot simulator: 7 strategies in parallel
+  bot: { dip: null, trend: null, composite: null, golden: null, meanrev: null, dca: null, bh: null },
   botRunning: false,
-  botChartVisible: { dip: true, bh: true, trend: false, golden: false, meanrev: false, dca: false },
+  botChartVisible: { dip: true, bh: true, composite: true, trend: false, golden: false, meanrev: false, dca: false },
   ohlcvCache: {}, // symbol -> { ohlcv, fetched_at }
 };
 document.documentElement.setAttribute("data-theme", state.theme);
@@ -2948,6 +2948,7 @@ const BOT_POSITION_PCT     = 0.10;
 const BOT_MAX_POSITIONS    = 5;
 const BOT_STOP_LOSS_PCT    = 0.92;  // -8%
 const BOT_TAKE_PROFIT_PCT  = 1.15;  // +15%
+const BOT_TX_COST_PCT      = 0.001; // 0.1% per side (buy + sell), realistic friction
 
 function emptyBotState(label) {
   return {
@@ -3054,9 +3055,12 @@ function trendSignal(closes, highs, idx, hasPosition, entryPrice, position, _tim
   return null;
 }
 
-// ----- Golden Cross: MA50 vs MA200 -----
-// Entry: MA50 crossed above MA200 in the last 3 sessions
-// Exit:  MA50 crosses below MA200, or -10% stop loss
+// ----- Golden Cross (loosened): MA50 > MA200 AND price near MA50 -----
+// Original "cross within 3d" version produced 0 trades over 2 years on the
+// test universe — too rare to be useful. This version fires whenever the
+// uptrend is intact (MA50 > MA200) AND the price has pulled back to within
+// 3% of MA50 (a normal support level during uptrends).
+// Exit: MA50 < MA200 (death cross) OR -10% stop loss
 function goldenCrossSignal(closes, highs, idx, hasPosition, entryPrice, _position, _times) {
   if (idx < 200) return null;
   const cur = closes[idx];
@@ -3070,19 +3074,11 @@ function goldenCrossSignal(closes, highs, idx, hasPosition, entryPrice, _positio
     if (cur <= entryPrice * 0.90) return { side: "sell", reason: `-10% stop` };
     return null;
   }
-  // Detect cross within last 3 sessions
-  for (let lookback = 0; lookback <= 2; lookback++) {
-    const i = idx - lookback;
-    if (i < 200) break;
-    const upToI    = closes.slice(0, i + 1);
-    const upToIm1  = closes.slice(0, i);
-    const m50_i    = computeMA(upToI, 50);
-    const m200_i   = computeMA(upToI, 200);
-    const m50_im1  = computeMA(upToIm1, 50);
-    const m200_im1 = computeMA(upToIm1, 200);
-    if (m50_i == null || m200_i == null || m50_im1 == null || m200_im1 == null) continue;
-    if (m50_im1 <= m200_im1 && m50_i > m200_i) {
-      return { side: "buy", reason: `Golden cross ${lookback}d ago` };
+  // Entry: uptrend established + price near MA50 support
+  if (ma50 > ma200) {
+    const distFromMa50 = Math.abs((cur - ma50) / ma50);
+    if (distFromMa50 <= 0.03) {
+      return { side: "buy", reason: `Uptrend + ${(distFromMa50 * 100).toFixed(1)}% from MA50` };
     }
   }
   return null;
@@ -3126,6 +3122,33 @@ function meanReversionSignal(closes, highs, idx, hasPosition, entryPrice, positi
 // Buys $100 of each universe symbol every 14 sessions. Doesn't use this signal fn
 // directly — the backtest engine handles it via mode "dca".
 function dcaSignal() { return null; }
+
+// ----- App Composite: Trend OR Dip Buyer (whichever fires) -----
+// The reasoning: Trend Follower captures bull-market breakouts, Dip Buyer
+// captures corrections. Each is in the market only ~25% of the time alone.
+// Combined, they should be in the market more often without sacrificing
+// signal quality. Exit rules use whichever rule the entry came from
+// (we tag the position with which strategy bought it via entryReason).
+function compositeSignal(closes, highs, idx, hasPosition, entryPrice, position, times) {
+  if (hasPosition) {
+    // Use exit logic matching the entry strategy. The entryReason starts
+    // with "TREND:" or "DIP:" so we can route accordingly.
+    const tag = (position?.entryReason || "").startsWith("TREND:") ? "trend" : "dip";
+    const exitFn = tag === "trend" ? trendSignal : appSignal;
+    return exitFn(closes, highs, idx, true, entryPrice, position, times);
+  }
+  // For buy decisions, prefer Trend Follower (it fires on strength,
+  // arguably better entry quality). If Trend doesn't fire, try Dip.
+  const trendSig = trendSignal(closes, highs, idx, false, null, null, times);
+  if (trendSig?.side === "buy") {
+    return { side: "buy", reason: "TREND: " + trendSig.reason };
+  }
+  const dipSig = appSignal(closes, highs, idx, false, null, null, times);
+  if (dipSig?.side === "buy") {
+    return { side: "buy", reason: "DIP: " + dipSig.reason };
+  }
+  return null;
+}
 
 // Backtest a single strategy over the provided per-symbol OHLCV.
 // `mode` controls position sizing: "active" (10% per trade, max 5 concurrent)
@@ -3208,10 +3231,13 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
 
       if (sig?.side === "sell" && hasPos) {
         const pos = sim.positions[sym];
-        const proceeds = pos.qty * cur;
+        const grossProceeds = pos.qty * cur;
+        const txCost = grossProceeds * BOT_TX_COST_PCT;
+        const proceeds = grossProceeds - txCost;
         const pnl = proceeds - (pos.qty * pos.entryPrice);
         const pnlPct = ((cur / pos.entryPrice) - 1) * 100;
         sim.cash += proceeds;
+        sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
         sim.trades.push({
           symbol: sym,
           entryDate: pos.entryDate, exitDate: new Date(t).toISOString().slice(0,10),
@@ -3226,22 +3252,26 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
           if (hasPos) continue;
           sizeUSD = bhSliceUSD;
           if (sim.cash < sizeUSD || sizeUSD < 100) continue;
-          const qty = sizeUSD / cur;
+          const txCost = sizeUSD * BOT_TX_COST_PCT;
+          const investAmount = sizeUSD - txCost;
+          const qty = investAmount / cur;
           sim.positions[sym] = {
             entryDate: new Date(t).toISOString().slice(0,10),
             entryPrice: cur, qty, entryReason: sig.reason,
             peakSinceEntry: cur, daysHeld: 0, _entryIdx: idx,
           };
-          sim.cash -= qty * cur;
+          sim.cash -= sizeUSD;
+          sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
         } else if (mode === "dca") {
-          // DCA: add to existing position (averages cost) or open new
           sizeUSD = DCA_PER_SYMBOL;
           if (sim.cash < sizeUSD) continue;
-          const addQty = sizeUSD / cur;
+          const txCost = sizeUSD * BOT_TX_COST_PCT;
+          const investAmount = sizeUSD - txCost;
+          const addQty = investAmount / cur;
           if (hasPos) {
             const pos = sim.positions[sym];
             const newQty = pos.qty + addQty;
-            const newCost = (pos.qty * pos.entryPrice) + sizeUSD;
+            const newCost = (pos.qty * pos.entryPrice) + investAmount;
             pos.qty = newQty;
             pos.entryPrice = newCost / newQty;
           } else {
@@ -3252,6 +3282,7 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
             };
           }
           sim.cash -= sizeUSD;
+          sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
         } else {
           // Active strategies: 10% per trade, max 5 concurrent
           if (hasPos) continue;
@@ -3259,27 +3290,40 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
           const equity = sim.cash + positionsValue;
           sizeUSD = equity * BOT_POSITION_PCT;
           if (sim.cash < sizeUSD || sizeUSD < 100) continue;
-          const qty = sizeUSD / cur;
+          const txCost = sizeUSD * BOT_TX_COST_PCT;
+          const investAmount = sizeUSD - txCost;
+          const qty = investAmount / cur;
           sim.positions[sym] = {
             entryDate: new Date(t).toISOString().slice(0,10),
             entryPrice: cur, qty, entryReason: sig.reason,
             peakSinceEntry: cur, daysHeld: 0, _entryIdx: idx,
           };
-          sim.cash -= qty * cur;
+          sim.cash -= sizeUSD;
+          sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
         }
       }
 
       if (sim.positions[sym]) positionsValue += sim.positions[sym].qty * cur;
     }
 
-    // Equity curve
+    // Equity curve + deployment + drawdown tracking
     let v = 0;
     for (const sym of Object.keys(sim.positions)) {
       const idx = indexed[sym].byT[t];
       const last = idx != null ? indexed[sym].closes[idx] : sim.positions[sym].entryPrice;
       v += sim.positions[sym].qty * last;
     }
-    sim.equity.push({ date: new Date(t).toISOString().slice(0,10), value: sim.cash + v });
+    const equity = sim.cash + v;
+    const deploymentPct = equity > 0 ? (v / equity) * 100 : 0;
+    sim.equity.push({ date: new Date(t).toISOString().slice(0,10), value: equity });
+    sim.deploymentSum = (sim.deploymentSum || 0) + deploymentPct;
+    sim.deploymentCount = (sim.deploymentCount || 0) + 1;
+    // Max drawdown: track running peak, biggest % drop from any peak
+    if (equity > (sim.equityPeak || 0)) sim.equityPeak = equity;
+    if (sim.equityPeak > 0) {
+      const dd = ((equity - sim.equityPeak) / sim.equityPeak) * 100; // negative
+      if (dd < (sim.maxDrawdown || 0)) sim.maxDrawdown = dd;
+    }
   }
 
   return sim;
@@ -3289,12 +3333,13 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
 // `mode` = "active" | "bh" | "dca" — controls sizing in backtestStrategy.
 // The order here drives display order in the bot view.
 const BOT_STRATEGIES = [
-  { key: "dip",     label: "Dip Buyer",      tag: "DIP",     fn: appSignal,           mode: "active", color: "#b08d3c", desc: "RSI<35 + drop from peak" },
-  { key: "trend",   label: "Trend Follower", tag: "TREND",   fn: trendSignal,         mode: "active", color: "#4a7a4a", desc: "50-day high breakout" },
-  { key: "golden",  label: "Golden Cross",   tag: "GOLDEN",  fn: goldenCrossSignal,   mode: "active", color: "#a13d2d", desc: "MA50 crosses MA200" },
-  { key: "meanrev", label: "Mean Reversion", tag: "MEAN",    fn: meanReversionSignal, mode: "active", color: "#7a5cb0", desc: "Lower Bollinger Band" },
-  { key: "dca",     label: "Dollar-Cost Avg", tag: "DCA",    fn: dcaSignal,           mode: "dca",    color: "#5c8aa1", desc: "Buy $100 per symbol every 2 weeks" },
-  { key: "bh",      label: "Buy & Hold",     tag: "B&H",     fn: bhSignal,            mode: "bh",     color: "#4a4639", desc: "Equal-weight, never sells" },
+  { key: "dip",       label: "Dip Buyer",       tag: "DIP",     fn: appSignal,           mode: "active", color: "#b08d3c", desc: "RSI<35 + drop from peak" },
+  { key: "trend",     label: "Trend Follower",  tag: "TREND",   fn: trendSignal,         mode: "active", color: "#4a7a4a", desc: "50-day high breakout" },
+  { key: "composite", label: "App Composite",   tag: "COMP",    fn: compositeSignal,     mode: "active", color: "#c25a3a", desc: "Trend OR Dip — best of both" },
+  { key: "golden",    label: "Golden Cross",    tag: "GOLDEN",  fn: goldenCrossSignal,   mode: "active", color: "#a13d2d", desc: "MA50>MA200 + pullback to MA50" },
+  { key: "meanrev",   label: "Mean Reversion",  tag: "MEAN",    fn: meanReversionSignal, mode: "active", color: "#7a5cb0", desc: "Lower Bollinger Band" },
+  { key: "dca",       label: "Dollar-Cost Avg", tag: "DCA",     fn: dcaSignal,           mode: "dca",    color: "#5c8aa1", desc: "Buy $100 per symbol every 2 weeks" },
+  { key: "bh",        label: "Buy & Hold",      tag: "B&H",     fn: bhSignal,            mode: "bh",     color: "#4a4639", desc: "Equal-weight, never sells" },
 ];
 
 function getStrategy(key) { return BOT_STRATEGIES.find(s => s.key === key); }
@@ -3414,10 +3459,13 @@ async function runForwardStep() {
       if (!sig) continue;
 
       if (sig.side === "sell" && hasPos) {
-        const proceeds = position.qty * cur;
+        const grossProceeds = position.qty * cur;
+        const txCost = grossProceeds * BOT_TX_COST_PCT;
+        const proceeds = grossProceeds - txCost;
         const pnl = proceeds - (position.qty * position.entryPrice);
         const pnlPct = ((cur / position.entryPrice) - 1) * 100;
         sim.cash += proceeds;
+        sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
         sim.trades.push({
           symbol: sym, entryDate: position.entryDate, exitDate: today,
           entryPrice: position.entryPrice, exitPrice: cur,
@@ -3434,18 +3482,20 @@ async function runForwardStep() {
         } else if (strat.mode === "dca") {
           sizeUSD = DCA_PER_SYMBOL;
           if (sim.cash < sizeUSD) continue;
-          // Add to or open position
+          const txCost = sizeUSD * BOT_TX_COST_PCT;
+          const investAmount = sizeUSD - txCost;
           if (hasPos) {
-            const addQty = sizeUSD / cur;
+            const addQty = investAmount / cur;
             const newQty = position.qty + addQty;
-            const newCost = (position.qty * position.entryPrice) + sizeUSD;
+            const newCost = (position.qty * position.entryPrice) + investAmount;
             position.qty = newQty;
             position.entryPrice = newCost / newQty;
           } else {
-            const qty = sizeUSD / cur;
+            const qty = investAmount / cur;
             sim.positions[sym] = { entryDate: today, entryPrice: cur, qty, entryReason: sig.reason };
           }
           sim.cash -= sizeUSD;
+          sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
           tradesAdded[strat.key] = (tradesAdded[strat.key] || 0) + 1;
           continue;
         } else {
@@ -3461,18 +3511,21 @@ async function runForwardStep() {
           sizeUSD = equity * BOT_POSITION_PCT;
           if (sim.cash < sizeUSD || sizeUSD < 100) continue;
         }
-        const qty = sizeUSD / cur;
+        const txCost = sizeUSD * BOT_TX_COST_PCT;
+        const investAmount = sizeUSD - txCost;
+        const qty = investAmount / cur;
         sim.positions[sym] = {
           entryDate: today, entryPrice: cur, qty, entryReason: sig.reason,
           peakSinceEntry: cur, daysHeld: 0,
         };
-        sim.cash -= qty * cur;
+        sim.cash -= sizeUSD;
+        sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
         tradesAdded[strat.key] = (tradesAdded[strat.key] || 0) + 1;
       }
     }
   }
 
-  // Append equity snapshots for every strategy
+  // Append equity snapshots for every strategy + track deployment + drawdown
   for (const strat of BOT_STRATEGIES) {
     const sim = state.bot[strat.key];
     let positionsValue = 0;
@@ -3480,7 +3533,16 @@ async function runForwardStep() {
       const p2 = state.prices[s]?.current_price || sim.positions[s].entryPrice;
       positionsValue += sim.positions[s].qty * p2;
     }
-    sim.equity.push({ date: today, value: sim.cash + positionsValue });
+    const equity = sim.cash + positionsValue;
+    const deploymentPct = equity > 0 ? (positionsValue / equity) * 100 : 0;
+    sim.equity.push({ date: today, value: equity });
+    sim.deploymentSum = (sim.deploymentSum || 0) + deploymentPct;
+    sim.deploymentCount = (sim.deploymentCount || 0) + 1;
+    if (equity > (sim.equityPeak || 0)) sim.equityPeak = equity;
+    if (sim.equityPeak > 0) {
+      const dd = ((equity - sim.equityPeak) / sim.equityPeak) * 100;
+      if (dd < (sim.maxDrawdown || 0)) sim.maxDrawdown = dd;
+    }
     sim.last_run_at = new Date().toISOString();
   }
 
@@ -3508,7 +3570,6 @@ function botMetrics(sim) {
   const losses = trades.filter(t => t.pnl <= 0).length;
   const winRate = trades.length > 0 ? (wins / trades.length) * 100 : 0;
 
-  // Current equity (mark-to-market open positions with latest price)
   let posValue = 0;
   let openCount = 0;
   for (const sym of Object.keys(sim.positions || {})) {
@@ -3521,10 +3582,21 @@ function botMetrics(sim) {
   const realizedPnL = trades.reduce((sum, t) => sum + t.pnl, 0);
   const avgWin   = wins   > 0 ? trades.filter(t => t.pnl > 0).reduce((s, t) => s + t.pnlPct, 0) / wins : 0;
   const avgLoss  = losses > 0 ? trades.filter(t => t.pnl <= 0).reduce((s, t) => s + t.pnlPct, 0) / losses : 0;
+
+  // New metrics: average deployment, max drawdown, transaction cost drag
+  const avgDeployment = sim.deploymentCount > 0
+    ? sim.deploymentSum / sim.deploymentCount
+    : (equity > 0 ? (posValue / equity) * 100 : 0);
+  const maxDrawdown = sim.maxDrawdown || 0;
+  const totalTxCost = sim.totalTxCost || 0;
+  // Drag = how many percentage points of return were eaten by transaction costs
+  const txDragPct = (totalTxCost / BOT_STARTING_CAPITAL) * 100;
+
   return {
     equity, cashLeft: sim.cash, positionsValue: posValue,
     openCount, tradeCount: trades.length, wins, losses, winRate,
     totalReturn, realizedPnL, avgWin, avgLoss,
+    avgDeployment, maxDrawdown, totalTxCost, txDragPct,
   };
 }
 
@@ -3677,21 +3749,29 @@ function renderStrategyCard(stratKey) {
 
   const retClass = m.totalReturn >= 0 ? "pos" : "neg";
 
+  const hasNewMetrics = sim.deploymentCount > 0 || sim.equityPeak > 0;
+  const ddDisplay = hasNewMetrics ? `${m.maxDrawdown.toFixed(2)}%` : "—";
+  const txDisplay = hasNewMetrics ? `−${m.txDragPct.toFixed(2)}%` : "—";
+  const deployDisplay = hasNewMetrics ? `${m.avgDeployment.toFixed(0)}%` : "—";
+
   const metricsBlock = noClosedTrades ? `
       <div class="strat-metrics">
         <div class="strat-metric"><div class="label">Equity</div><div class="val">$${fmtUSD(m.equity, 0)}</div></div>
         <div class="strat-metric"><div class="label">Return</div><div class="val ${retClass}">${m.totalReturn >= 0 ? "+" : ""}${m.totalReturn.toFixed(2)}%</div></div>
         <div class="strat-metric"><div class="label">Holdings</div><div class="val">${m.openCount} pos</div></div>
         <div class="strat-metric"><div class="label">Cash Idle</div><div class="val">$${fmtUSD(m.cashLeft, 0)}</div></div>
-        <div class="strat-metric" style="grid-column:span 2;"><div class="label">Position Value</div><div class="val">$${fmtUSD(m.positionsValue, 0)}</div></div>
+        <div class="strat-metric"><div class="label">Max Drawdown</div><div class="val ${hasNewMetrics ? 'neg' : ''}">${ddDisplay}</div></div>
+        <div class="strat-metric"><div class="label">Tx Cost Drag</div><div class="val">${txDisplay}</div></div>
       </div>
   ` : `
       <div class="strat-metrics">
         <div class="strat-metric"><div class="label">Equity</div><div class="val">$${fmtUSD(m.equity, 0)}</div></div>
         <div class="strat-metric"><div class="label">Return</div><div class="val ${retClass}">${m.totalReturn >= 0 ? "+" : ""}${m.totalReturn.toFixed(2)}%</div></div>
         <div class="strat-metric"><div class="label">Win Rate</div><div class="val">${m.winRate.toFixed(0)}%</div></div>
-        <div class="strat-metric"><div class="label">Cash</div><div class="val">$${fmtUSD(m.cashLeft, 0)}</div></div>
-        <div class="strat-metric"><div class="label">Open</div><div class="val">${m.openCount} pos</div></div>
+        <div class="strat-metric"><div class="label">Avg Deploy</div><div class="val">${deployDisplay}</div></div>
+        <div class="strat-metric"><div class="label">Max Drawdown</div><div class="val ${hasNewMetrics ? 'neg' : ''}">${ddDisplay}</div></div>
+        <div class="strat-metric"><div class="label">Tx Cost Drag</div><div class="val">${txDisplay}</div></div>
+        <div class="strat-metric"><div class="label">Open / Cash</div><div class="val" style="font-size:11.5px;">${m.openCount} pos / $${fmtUSD(m.cashLeft, 0)}</div></div>
         <div class="strat-metric"><div class="label">Avg Win / Loss</div><div class="val" style="font-size:11.5px;">
             <span class="pos">+${m.avgWin.toFixed(1)}%</span> / <span class="neg">${m.avgLoss.toFixed(1)}%</span>
         </div></div>
@@ -3740,6 +3820,11 @@ function renderBot() {
     `;
   } else {
     const cards = BOT_STRATEGIES.filter(s => state.bot[s.key]).map(s => renderStrategyCard(s.key)).join("");
+    const needsRerun = BOT_STRATEGIES.some(s => state.bot[s.key] && !state.bot[s.key].deploymentCount && !state.bot[s.key].equityPeak);
+    const rerunNotice = needsRerun ? `
+      <div style="margin:12px 20px;padding:10px 14px;background:rgba(176,141,60,0.10);border:1px solid var(--gold);border-radius:8px;font-size:12px;color:var(--ink-soft);font-family:var(--mono);">
+        New metrics available (Avg Deploy, Max Drawdown, Tx Cost Drag, App Composite). Re-run the backtest to populate them.
+      </div>` : "";
     body = `
       <div class="bot-hero">
         <h3>Paper Trading Bot</h3>
@@ -3747,6 +3832,7 @@ function renderBot() {
         ${renderChartToggles(state.botChartVisible)}
         <div style="margin:0;padding:0;border:none;background:transparent;">${renderEquityChart(state.botChartVisible)}</div>
       </div>
+      ${rerunNotice}
       ${renderLeaderboard()}
       ${cards}
     `;
