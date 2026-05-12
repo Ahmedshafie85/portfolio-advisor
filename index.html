@@ -4490,6 +4490,31 @@ async function runAnalysis(symbol) {
   const btn = $(`[data-act="run-analysis"][data-symbol="${symbol}"]`);
   if (btn) { btn.innerHTML = '<span class="spinner"></span> Analyzing…'; btn.disabled = true; }
   try {
+    // === DATA SANITY PRE-CHECK ===
+    // Fetch price data first to check for anomalies BEFORE sending to AI.
+    // Catches: cross-listed/multi-currency tickers (.L, .AS, .MI, .TO, .PA), suspicious
+    // overnight gaps, mismatched prev-close vs current-price representations.
+    // Without this, the AI gets bad data → produces "data error, avoid" verdicts on
+    // legitimate but data-flaky assets (e.g. URNU.L showing 114% phantom gap).
+    let preCheck = null;
+    try {
+      const priceR = await fetch(`${WORKER_URL}/price/${encodeURIComponent(symbol)}`);
+      if (priceR.ok) {
+        const priceData = await priceR.json();
+        preCheck = await runDataSanityCheck(symbol, priceData);
+      }
+    } catch (e) { /* sanity check is best-effort; if it fails we just proceed */ }
+
+    if (preCheck && preCheck.severity === "critical") {
+      // Critical issue — ask the user before spending tokens on a flawed analysis
+      const proceed = await confirmDataAnomaly(symbol, preCheck);
+      if (!proceed) {
+        if (btn) { btn.innerHTML = "Re-analyze"; btn.disabled = false; }
+        return;
+      }
+    }
+    // === END SANITY ===
+
     const holding = state.holdings.find(h => h.symbol === symbol);
     const idToken = await auth.currentUser.getIdToken();
     const m = portfolioMetrics();
@@ -4506,6 +4531,8 @@ async function runAnalysis(symbol) {
         uid: state.uid, symbol,
         holding: holding ? { quantity: holding.quantity, avg_cost: holding.avg_cost_unit } : null,
         portfolio_context: portfolioContext,
+        // Pass the sanity result so the AI prompt can include it
+        data_sanity: preCheck,
         idToken,
       }),
     });
@@ -4524,6 +4551,104 @@ async function runAnalysis(symbol) {
     toast("Analysis failed: " + (e.message || "unknown error").slice(0, 80), 3000, "error");
     if (btn) { btn.innerHTML = "Try Again"; btn.disabled = false; }
   }
+}
+
+// ============================================================================
+// DATA SANITY CHECK
+// Detects anomalies that should be flagged to user BEFORE running AI analysis.
+// Returns null if everything looks fine, or { severity, type, issues, recommendation }
+// ============================================================================
+const INTERNATIONAL_SUFFIXES = [".L", ".AS", ".MI", ".TO", ".PA", ".DE", ".SW", ".HK", ".T", ".AX"];
+
+async function runDataSanityCheck(symbol, priceData) {
+  const issues = [];
+  let severity = "none"; // "none" | "warning" | "critical"
+
+  // 1. International ticker — common source of currency-conversion issues
+  const isInternational = INTERNATIONAL_SUFFIXES.some(suf => symbol.toUpperCase().endsWith(suf));
+  if (isInternational) {
+    issues.push({
+      type: "international_ticker",
+      msg: `${symbol} is a non-US listing. Cross-currency data feeds can produce phantom price gaps.`,
+    });
+    severity = "warning";
+  }
+
+  // 2. Extreme price gap — prev_close vs current_price
+  const cur = priceData.current_price;
+  const prev = priceData.prev_close;
+  if (cur != null && prev != null && prev > 0) {
+    const gapPct = ((cur - prev) / prev) * 100;
+    if (Math.abs(gapPct) > 50) {
+      issues.push({
+        type: "extreme_gap",
+        msg: `Price reports ${gapPct.toFixed(0)}% gap from previous close ($${fmtUSD(prev)} → $${fmtUSD(cur)}). This is exceptionally rare without a known corporate action.`,
+      });
+      severity = "critical";
+    } else if (Math.abs(gapPct) > 25) {
+      issues.push({
+        type: "large_gap",
+        msg: `Price gapped ${gapPct.toFixed(1)}% from previous close. Verify no corporate action explains this.`,
+      });
+      if (severity === "none") severity = "warning";
+    }
+  }
+
+  // 3. Volume sanity — was the gap supported by volume?
+  if (priceData.ohlcv && priceData.ohlcv.length >= 20) {
+    const recent = priceData.ohlcv.slice(-20);
+    const todayVol = recent[recent.length - 1]?.v || 0;
+    const avgVol = recent.slice(0, -1).reduce((s, d) => s + (d.v || 0), 0) / Math.max(1, recent.length - 1);
+    if (avgVol > 0 && todayVol < avgVol * 0.5 && Math.abs(((cur - prev) / prev) * 100) > 30) {
+      issues.push({
+        type: "volume_mismatch",
+        msg: `Large price move on below-average volume (${(todayVol/avgVol).toFixed(2)}x avg). Real moves are typically accompanied by elevated volume.`,
+      });
+      severity = "critical";
+    }
+  }
+
+  // 4. Currency mismatch hint — if symbol info reports currency != USD but prices look like USD or vice versa
+  // (We can't fully detect this client-side without more data, but the international flag covers most cases)
+
+  if (issues.length === 0) return null;
+
+  let recommendation;
+  if (severity === "critical") {
+    recommendation = "Likely a data feed error or unconverted currency representation. Verify the price elsewhere (Yahoo Finance, IBKR) before running analysis. AI analysis on bad data produces 'avoid' verdicts that may not reflect the real asset.";
+  } else {
+    recommendation = "Proceed with caution. The AI will note the anomaly but the analysis remains useful.";
+  }
+
+  return { severity, issues, recommendation, symbol };
+}
+
+function confirmDataAnomaly(symbol, preCheck) {
+  return new Promise(resolve => {
+    const issuesHtml = preCheck.issues.map(i => `<li>${escAttr(i.msg)}</li>`).join("");
+    openModal(`
+      <div class="modal-head"><h3>⚠ Data Sanity Check</h3></div>
+      <div style="padding: 0 0 12px;">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--ink-muted);margin-bottom:10px;letter-spacing:0.04em;">${escAttr(symbol)} · severity: ${preCheck.severity.toUpperCase()}</div>
+        <ul style="font-family:var(--sans);font-size:13px;line-height:1.5;color:var(--ink);margin:0 0 14px 18px;">
+          ${issuesHtml}
+        </ul>
+        <div style="font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);line-height:1.5;padding:10px 12px;background:var(--bg-elev);border-radius:6px;margin-bottom:14px;">
+          ${escAttr(preCheck.recommendation)}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" id="sanity-cancel" style="flex:1;">Cancel</button>
+        <button class="btn" id="sanity-proceed" style="flex:1;">Proceed anyway</button>
+      </div>
+    `);
+    setTimeout(() => {
+      const cancel = document.getElementById("sanity-cancel");
+      const proceed = document.getElementById("sanity-proceed");
+      if (cancel) cancel.addEventListener("click", () => { closeModal(); resolve(false); });
+      if (proceed) proceed.addEventListener("click", () => { closeModal(); resolve(true); });
+    }, 30);
+  });
 }
 
 async function runPortfolioAnalysis() {
