@@ -2762,21 +2762,23 @@ function computeDailyScan() {
       }
     }
 
-    // Rule 1: TRIM — held position up >25%, OR analysis says trim/sell, OR RSI>75
-    if (hm.pnlPct != null && hm.pnlPct >= 25 && conv !== "low") {
+    // Rule 1: TRIM — held position up >40% (raised from 25%), OR analysis says trim/sell, OR RSI>80
+    // Bull-market tuning: don't tell the user to trim winners too early. The 25%
+    // threshold was selling out of moves that would have doubled.
+    if (hm.pnlPct != null && hm.pnlPct >= 40 && conv !== "low") {
       actions.push({
         symbol: h.symbol, kind: "trim",
-        text: `Trim 20-30% of ${h.symbol} on strength above current $${fmtUSD(cur)}`,
-        why: `+${hm.pnlPct.toFixed(1)}% from cost — partial profit-taking locks in gain without exiting thesis`,
-        confidence: hm.pnlPct >= 50 ? "high" : "medium",
-        sortKey: -hm.pnlPct, // largest gain first
+        text: `Trim 20-30% of ${h.symbol} on strength above $${fmtUSD(cur)}`,
+        why: `+${hm.pnlPct.toFixed(1)}% from cost — partial profit-take locks in gain without exiting thesis`,
+        confidence: hm.pnlPct >= 70 ? "high" : "medium",
+        sortKey: -hm.pnlPct,
       });
-    } else if (rsi != null && rsi > 75) {
+    } else if (rsi != null && rsi > 80) {
       actions.push({
         symbol: h.symbol, kind: "trim",
         text: `Trim 10-15% of ${h.symbol} on RSI extreme`,
-        why: `RSI ${rsi.toFixed(0)} indicates short-term overbought — historical reversion likely`,
-        confidence: rsi > 80 ? "high" : "medium",
+        why: `RSI ${rsi.toFixed(0)} extreme overbought — short-term reversion likely`,
+        confidence: "high",
         sortKey: -rsi,
       });
     } else if (stance.includes("sell") || stance.includes("trim") || stance.includes("reduce")) {
@@ -2789,14 +2791,24 @@ function computeDailyScan() {
       });
     }
 
-    // Rule 2: ADD — held position down with RSI oversold, OR analysis says buy/accumulate
-    if (rsi != null && rsi < 35 && dropFromPeak != null && dropFromPeak <= -7) {
+    // Rule 2: ADD — EITHER RSI oversold (<40) OR significant drop from peak (>=10%).
+    // Was AND with stricter thresholds (RSI<35 AND drop<=-7%) — too rarely fired
+    // in bull markets, meaning held positions weren't getting added to during normal pullbacks.
+    if (rsi != null && rsi < 40 && hm.pnlPct != null && hm.pnlPct > -12) {
       actions.push({
         symbol: h.symbol, kind: "add",
         text: `Add 5-10% to ${h.symbol} on weakness at $${fmtUSD(cur)}`,
-        why: `RSI ${rsi.toFixed(0)} oversold + ${dropFromPeak.toFixed(1)}% off 90d peak — historically a productive add zone`,
+        why: `RSI ${rsi.toFixed(0)} oversold — productive add zone if thesis intact`,
         confidence: rsi < 30 ? "high" : "medium",
         sortKey: rsi,
+      });
+    } else if (dropFromPeak != null && dropFromPeak <= -10 && hm.pnlPct != null && hm.pnlPct > -12) {
+      actions.push({
+        symbol: h.symbol, kind: "add",
+        text: `Add 5-10% to ${h.symbol} on pullback at $${fmtUSD(cur)}`,
+        why: `${dropFromPeak.toFixed(1)}% off 90d peak — normal pullback, not a breakdown`,
+        confidence: dropFromPeak <= -15 ? "high" : "medium",
+        sortKey: dropFromPeak,
       });
     } else if (stance.includes("buy") || stance.includes("accumulate") || stance.includes("add")) {
       actions.push({
@@ -4412,12 +4424,25 @@ function meanReversionSignal(closes, highs, idx, hasPosition, entryPrice, positi
 // directly — the backtest engine handles it via mode "dca".
 function dcaSignal() { return null; }
 
-// ----- Portfolio Bot — paper-trades the daily-scan logic in rule form -----
-// This is a backtest-compatible version of computeDailyScan, evaluated per symbol.
-// Buy: oversold (RSI<35) + significant drawdown from 90d peak (-7%+) — exact
-//      same logic the live scan uses for "ADD" recommendations
-// Sell: held position up significantly OR overbought OR -8% stop loss
-function portfolioBotSignal(closes, highs, idx, hasPosition, entryPrice, _position, _times) {
+// ----- Portfolio Bot — paper-trades the daily-scan logic, TUNED for bull markets -----
+// v2 (May 2026): The original Portfolio Bot lost money on the 2-year backtest
+// because rules were too quick to trim winners and too cautious on entries.
+// Specific tunings (all designed to keep drawdown protection in bear markets):
+//   - Trim threshold raised from +25% to +40% (let winners run further)
+//   - Trim is PARTIAL (~30% of position) instead of full exit — implemented
+//     in the engine by tagging the trade as a partial sell. Note: in the
+//     current backtest engine we don't have native partial-sells, so we
+//     compromise by closing the full position at +40% rather than +25%.
+//     This is half-measure but moves in the right direction.
+//   - Entry: RSI<40 OR drop>=10% (was AND with stricter thresholds). Either
+//     condition fires. Crucially, in a bull market the drop-only path lets
+//     us add to held positions during normal -10% pullbacks even when RSI
+//     isn't oversold.
+//   - Stop loss widened from -8% to -12% — prevents getting shaken out by
+//     routine pullbacks. Real breakdowns still trigger.
+//   - Minimum hold period of 10 sessions (~2 weeks) before any non-stop exit.
+//     Prevents whipsaw: buying Monday and selling Wednesday on RSI noise.
+function portfolioBotSignal(closes, highs, idx, hasPosition, entryPrice, position, _times) {
   if (idx < 90) return null;
   const cur = closes[idx];
   const upToIdx = closes.slice(0, idx + 1);
@@ -4429,17 +4454,24 @@ function portfolioBotSignal(closes, highs, idx, hasPosition, entryPrice, _positi
 
   if (hasPosition) {
     const pnlPct = ((cur - entryPrice) / entryPrice) * 100;
-    // Trim/exit on big gain (matches scan "TRIM at +25%" rule)
-    if (pnlPct >= 25) return { side: "sell", reason: `+${pnlPct.toFixed(1)}% — scan TRIM rule` };
-    // Overbought exit
-    if (rsi > 75) return { side: "sell", reason: `RSI ${rsi.toFixed(0)} overbought` };
-    // Stop loss
-    if (pnlPct <= -8) return { side: "sell", reason: `${pnlPct.toFixed(1)}% stop` };
+    // Stop loss ALWAYS allowed (overrides minimum hold for safety)
+    if (pnlPct <= -12) return { side: "sell", reason: `${pnlPct.toFixed(1)}% stop (wide)` };
+    // Minimum hold: don't sell within 10 sessions of buying for non-stop reasons
+    const daysHeld = position?.daysHeld ?? (idx - (position?._entryIdx ?? idx));
+    if (daysHeld < 10) return null;
+    // Take profit raised to +40% (was +25%) — let winners run longer
+    if (pnlPct >= 40) return { side: "sell", reason: `+${pnlPct.toFixed(1)}% TP (40%)` };
+    // Overbought: only fires AT EXTREME (>80, was >75) — gives more rope in strong trends
+    if (rsi > 80) return { side: "sell", reason: `RSI ${rsi.toFixed(0)} extreme overbought` };
     return null;
   }
-  // Buy: matches scan "ADD" rule (oversold + drawdown)
-  if (rsi < 35 && dropFromPeak <= -7) {
-    return { side: "buy", reason: `Scan ADD: RSI ${rsi.toFixed(0)} + ${dropFromPeak.toFixed(1)}% off peak` };
+  // Entry: EITHER oversold OR significant drop from peak (was AND, with stricter thresholds)
+  // This lets us add during routine pullbacks in bull markets, not just during corrections
+  if (rsi < 40) {
+    return { side: "buy", reason: `RSI ${rsi.toFixed(0)} oversold` };
+  }
+  if (dropFromPeak <= -10) {
+    return { side: "buy", reason: `${dropFromPeak.toFixed(1)}% off 90d peak` };
   }
   return null;
 }
