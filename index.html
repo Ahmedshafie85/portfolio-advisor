@@ -1164,6 +1164,48 @@ body {
 }
 .discover-src::before { content: "via "; }
 
+.discover-actions {
+  display: flex; gap: 8px;
+  padding: 10px 18px;
+  background: var(--bg-elev);
+  border-top: 1px solid var(--rule-soft);
+}
+.discover-fresh-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em;
+  padding: 2px 6px; border-radius: 3px; text-transform: uppercase;
+  background: var(--gold); color: var(--bg);
+}
+
+/* Breakout-conditions prompt banner (Portfolio tab) */
+.breakout-prompt-card {
+  margin: 12px 20px;
+  padding: 12px 16px;
+  background: rgba(74,122,74,0.08);
+  border: 1px solid var(--green);
+  border-radius: 6px;
+  display: flex; align-items: start; justify-content: space-between; gap: 12px;
+}
+.breakout-prompt-body { flex: 1; min-width: 0; }
+.breakout-prompt-head {
+  font-family: var(--display); font-size: 14px; font-weight: 500;
+  margin-bottom: 4px;
+}
+.breakout-prompt-sub {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-muted);
+  line-height: 1.4; margin-bottom: 8px;
+}
+.breakout-prompt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.breakout-prompt-dismiss {
+  background: transparent; border: none;
+  font-family: var(--display); font-size: 18px;
+  color: var(--ink-muted); cursor: pointer;
+  padding: 4px 8px; line-height: 1;
+  flex-shrink: 0;
+}
+.breakout-prompt-dismiss:hover { color: var(--red); }
+
 /* ===== DAILY PORTFOLIO SCAN ===== */
 .scan-card {
   margin: 14px 20px;
@@ -1705,6 +1747,11 @@ const state = {
   ohlcvCache: {}, // symbol -> { ohlcv, fetched_at }
   expandedAnalyses: {}, // key -> bool; "portfolio" or symbol
   showWatchouts: localStorage.getItem("showWatchouts") === "1", // opt-in
+  breakoutPromptDismissed: localStorage.getItem("breakoutPromptDismissed") === "1",
+  // Discover Ideas runtime state
+  discoverDynamic: null,        // array of {symbol, name, theme, source, date, thesis} from live refresh
+  discoverDynamicFetchedAt: null,
+  discoverRefreshing: false,
 };
 document.documentElement.setAttribute("data-theme", state.theme);
 
@@ -2588,6 +2635,103 @@ function setView(v) {
 
 // ----- Portfolio
 // ============================================================================
+// BREAKOUT CONDITION PROMPT
+// Detects held symbols that have NO upward-direction watchlist conditions
+// (breakout_high, near_52w_high, momentum_above, rsi_above).
+// These are the conditions that would alert you to RISING prices — which is
+// what we missed on silver. Shows a one-tap prompt to add them in bulk.
+// ============================================================================
+const UPWARD_CONDITION_TYPES = ["breakout_high", "near_52w_high", "momentum_above", "rsi_above"];
+
+function getHeldSymbolsMissingBreakouts() {
+  const heldNonCash = state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol);
+  if (heldNonCash.length === 0) return [];
+  const result = [];
+  for (const sym of heldNonCash) {
+    const watchEntry = state.watchlist.find(w => w.symbol === sym);
+    const conds = watchEntry?.conditions || [];
+    const hasUpward = conds.some(c => UPWARD_CONDITION_TYPES.includes(c.type));
+    if (!hasUpward) result.push(sym);
+  }
+  return result;
+}
+
+function renderBreakoutPrompt() {
+  if (state.breakoutPromptDismissed) return "";
+  const missing = getHeldSymbolsMissingBreakouts();
+  if (missing.length === 0) return "";
+  const preview = missing.slice(0, 5).join(", ") + (missing.length > 5 ? `, +${missing.length - 5} more` : "");
+  return `
+    <div class="breakout-prompt-card">
+      <div class="breakout-prompt-body">
+        <div class="breakout-prompt-head">Get alerts on rising prices too?</div>
+        <div class="breakout-prompt-sub">
+          ${missing.length} of your held positions have no upward-direction alerts (50-day high breakout, near 52w high, etc.). You currently only get alerted on weakness — silver-style rallies will be missed.<br><br>
+          Positions: <strong>${escAttr(preview)}</strong>
+        </div>
+        <div class="breakout-prompt-actions">
+          <button class="btn btn-sm" data-act="add-breakout-conditions">Add breakout alerts to all</button>
+        </div>
+      </div>
+      <button class="breakout-prompt-dismiss" data-act="dismiss-breakout-prompt" title="Dismiss">×</button>
+    </div>
+  `;
+}
+
+async function addBreakoutConditionsToHeld() {
+  const symbols = getHeldSymbolsMissingBreakouts();
+  if (symbols.length === 0) {
+    toast("All held positions already have upward alerts", 2400);
+    return;
+  }
+  let added = 0;
+  for (const sym of symbols) {
+    try {
+      const existing = state.watchlist.find(w => w.symbol === sym);
+      // Three breakout conditions: 50-day high, near 52w high, RSI overbought
+      const newConditions = [
+        { id: cryptoRandomId(), type: "breakout_high", period: 50 },
+        { id: cryptoRandomId(), type: "near_52w_high", threshold_pct: 3 },
+        { id: cryptoRandomId(), type: "rsi_above", threshold: 70 },
+      ];
+      if (existing) {
+        // Append to existing watchlist entry
+        const mergedConds = [...(existing.conditions || []), ...newConditions];
+        await db.collection("users").doc(state.uid).collection("watchlist").doc(existing.id).update({
+          conditions: mergedConds,
+        });
+      } else {
+        // Create new watchlist entry for this held symbol
+        await db.collection("users").doc(state.uid).collection("watchlist").doc(sym).set({
+          symbol: sym,
+          name: state.holdings.find(h => h.symbol === sym)?.name || sym,
+          conditions: newConditions,
+          asset_class: guessAssetClass(sym),
+          added_at: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      added++;
+    } catch (e) {
+      console.warn("Failed to add breakout conditions for", sym, e);
+    }
+  }
+  await loadWatchlist();
+  // Auto-scan to evaluate new conditions
+  fetchWatchlistSnapshot().catch(() => {});
+  toast(`Added breakout alerts to ${added} position${added === 1 ? "" : "s"}`);
+  // Dismiss the prompt so it doesn't reappear immediately
+  state.breakoutPromptDismissed = true;
+  localStorage.setItem("breakoutPromptDismissed", "1");
+  renderCurrentView();
+}
+
+function dismissBreakoutPrompt() {
+  state.breakoutPromptDismissed = true;
+  localStorage.setItem("breakoutPromptDismissed", "1");
+  renderCurrentView();
+}
+
+// ============================================================================
 // DAILY PORTFOLIO SCAN — synthesized "what to do today" actions.
 // Rule-based so it works in backtest. AI analyses are used as a conviction modifier.
 // ============================================================================
@@ -2927,6 +3071,8 @@ function renderPortfolio() {
       <div class="alloc-legend">${allocLegend}</div>
     </div>
 
+    ${renderBreakoutPrompt()}
+
     ${renderDailyScan()}
 
     ${renderWatchouts()}
@@ -3140,21 +3286,40 @@ function openWatchItem(symbol) {
 
 // ============================================================================
 // DISCOVER IDEAS — surface CURATED_PICKS, group by theme. Single-tap to add.
+// Static picks + optional live-refreshed dynamic picks via worker.
 // ============================================================================
 function renderDiscoverIdeas() {
   const expanded = !!state.expandedAnalyses["discover"];
   const inWatchlist = new Set(state.watchlist.map(w => w.symbol));
   const held = new Set(state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol));
 
+  // Merge static + dynamic ideas, dedupe by symbol (dynamic wins — usually fresher)
+  const merged = [];
+  const seenSymbols = new Set();
+  const dynamicPicks = state.discoverDynamic || [];
+  for (const p of dynamicPicks) {
+    if (seenSymbols.has(p.symbol)) continue;
+    seenSymbols.add(p.symbol);
+    merged.push({ ...p, _dynamic: true });
+  }
+  for (const p of CURATED_PICKS) {
+    if (seenSymbols.has(p.symbol)) continue;
+    seenSymbols.add(p.symbol);
+    merged.push(p);
+  }
+
   // Group by theme
   const byTheme = {};
-  for (const p of CURATED_PICKS) {
+  for (const p of merged) {
     if (!byTheme[p.theme]) byTheme[p.theme] = [];
     byTheme[p.theme].push(p);
   }
   const themes = Object.keys(byTheme).sort((a, b) => byTheme[b].length - byTheme[a].length);
 
-  const summary = `${CURATED_PICKS.length} ideas · ${themes.length} themes · sourced from credible analysts`;
+  const freshLabel = state.discoverDynamicFetchedAt
+    ? `Fresh: ${fmtRel(state.discoverDynamicFetchedAt)}`
+    : "Static snapshot (Dec 2025 – May 2026)";
+  const summary = `${merged.length} ideas · ${themes.length} themes · ${freshLabel}`;
 
   if (!expanded) {
     return `
@@ -3172,17 +3337,21 @@ function renderDiscoverIdeas() {
     `;
   }
 
+  const refreshBtnLabel = state.discoverRefreshing ? "Refreshing..." : "Refresh ideas";
+
   const themeBlocks = themes.map(theme => {
     const picks = byTheme[theme];
     const items = picks.map(p => {
       const onList = inWatchlist.has(p.symbol);
       const owned = held.has(p.symbol);
+      const dynamicBadge = p._dynamic ? `<span class="discover-fresh-badge">new</span>` : "";
       return `
         <div class="discover-item">
           <div class="discover-item-head">
             <div>
               <span class="discover-sym">${escAttr(p.symbol)}</span>
               <span class="discover-name">${escAttr(p.name)}</span>
+              ${dynamicBadge}
             </div>
             ${owned ? `<span class="discover-tag held">Held</span>`
               : onList ? `<span class="discover-tag onlist">On Watchlist</span>`
@@ -3215,10 +3384,71 @@ function renderDiscoverIdeas() {
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
       </div>
-      <div class="discover-disclaimer">Research from credible sources. Not advice — you decide. Snapshot updated when this build was deployed.</div>
+      <div class="discover-actions">
+        <button class="btn btn-sm" data-act="refresh-discover" ${state.discoverRefreshing ? "disabled" : ""}>${refreshBtnLabel}</button>
+        ${state.discoverDynamicFetchedAt ? `<button class="btn btn-secondary btn-sm" data-act="clear-discover">Reset to static</button>` : ""}
+      </div>
+      <div class="discover-disclaimer">Research from credible sources. Not advice — you decide. Tap Refresh to fetch fresh ideas via AI (requires worker support).</div>
       ${themeBlocks}
     </div>
   `;
+}
+
+async function refreshDiscover() {
+  if (state.discoverRefreshing) return;
+  state.discoverRefreshing = true;
+  renderCurrentView();
+  try {
+    const res = await fetch(`${WORKER_URL}/discover-ideas`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        held_symbols: state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol),
+        watchlist_symbols: state.watchlist.map(w => w.symbol),
+      }),
+    });
+    if (!res.ok) {
+      if (res.status === 404) {
+        toast("Worker doesn't support /discover-ideas yet — using static picks", 4000, "error");
+      } else {
+        toast(`Refresh failed: ${res.status}`, 3000, "error");
+      }
+      state.discoverRefreshing = false;
+      renderCurrentView();
+      return;
+    }
+    const j = await res.json();
+    if (!Array.isArray(j.ideas)) {
+      toast("Worker returned malformed response", 3000, "error");
+      state.discoverRefreshing = false;
+      renderCurrentView();
+      return;
+    }
+    // Sanitize: ensure all entries have required fields
+    const sanitized = j.ideas
+      .filter(p => p && typeof p.symbol === "string")
+      .map(p => ({
+        symbol: String(p.symbol).toUpperCase().slice(0, 12),
+        name: String(p.name || p.symbol),
+        theme: String(p.theme || "Other"),
+        source: String(p.source || "AI Refresh"),
+        date: String(p.date || new Date().toISOString().slice(0, 10)),
+        thesis: String(p.thesis || "").slice(0, 500),
+      }));
+    state.discoverDynamic = sanitized;
+    state.discoverDynamicFetchedAt = new Date().toISOString();
+    toast(`Refreshed ${sanitized.length} ideas`);
+  } catch (e) {
+    toast(`Refresh failed: ${e.message || e}`, 3000, "error");
+  }
+  state.discoverRefreshing = false;
+  renderCurrentView();
+}
+
+function clearDiscoverDynamic() {
+  state.discoverDynamic = null;
+  state.discoverDynamicFetchedAt = null;
+  renderCurrentView();
 }
 
 async function addCuratedToWatchlist(symbol, name) {
@@ -4321,7 +4551,8 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
       let sig = null;
       if (mode === "dca") {
         // DCA bypasses strategy fn: buy on cadence, never sell
-        if (isDcaDay && sim.cash >= DCA_PER_SYMBOL) {
+        const sliceForThis = dcaSliceFor(sym);
+        if (isDcaDay && sim.cash >= sliceForThis) {
           sig = { side: "buy", reason: `DCA cycle ${Math.ceil(dcaSessionCounter / DCA_INTERVAL)}` };
         }
       } else {
@@ -4435,7 +4666,7 @@ const BOT_STRATEGIES = [
   { key: "dip",       label: "Dip Buyer",       tag: "DIP",      fn: appSignal,           mode: "active",    color: "#b08d3c", desc: "RSI<35 + drop from peak" },
   { key: "trend",     label: "Trend Follower",  tag: "TREND",    fn: trendSignal,         mode: "active",    color: "#4a7a4a", desc: "50-day high breakout" },
   { key: "composite", label: "App Composite",   tag: "COMP",     fn: compositeSignal,     mode: "active",    color: "#c25a3a", desc: "Trend OR Dip — best of both" },
-  { key: "portfolio", label: "Portfolio Bot",   tag: "PORTF",    fn: portfolioBotSignal,  mode: "active",    color: "#7a4a4a", desc: "Executes daily scan recommendations" },
+  { key: "portfolio", label: "Portfolio Bot",   tag: "PORTF",    fn: portfolioBotSignal,  mode: "active",    color: "#7a4a4a", desc: "Daily scan rules + AI analysis stances (forward mode)" },
   { key: "golden",    label: "Dual Momentum",   tag: "DUAL",     fn: goldenCrossSignal,   mode: "active",    color: "#a13d2d", desc: "12-month absolute momentum (Antonacci)" },
   { key: "adaptive",  label: "Adaptive AA",     tag: "ADAPT",    fn: adaptiveSignal,      mode: "active",    color: "#8a6a9c", desc: "6m momentum + volatility filter" },
   { key: "meanrev",   label: "Mean Reversion",  tag: "MEAN",     fn: meanReversionSignal, mode: "active",    color: "#7a5cb0", desc: "Lower Bollinger Band" },
@@ -4451,35 +4682,69 @@ function getStrategy(key) { return BOT_STRATEGIES.find(s => s.key === key); }
 // Snapshot taken from sources published Dec 2025 - Feb 2026.
 // ============================================================================
 const CURATED_PICKS = [
-  // High-conviction individual stocks
-  { symbol: "BN",    name: "Brookfield Corp",         theme: "AI Infrastructure + Real Estate",  source: "Motley Fool",     date: "Jan 2026", thesis: "AI infrastructure fund (up to $100B AUM target), wealth solutions growth, real estate recovery. 25% est. annual earnings growth over 5 years." },
+  // === HIGH-CONVICTION INDIVIDUAL STOCKS ===
+  { symbol: "BN",    name: "Brookfield Corp",         theme: "AI Infrastructure",                source: "Motley Fool",     date: "Jan 2026", thesis: "AI infrastructure fund (up to $100B AUM target), wealth solutions growth, real estate recovery. 25% est. annual earnings growth over 5 years." },
   { symbol: "META",  name: "Meta Platforms",          theme: "AI Applications",                  source: "Motley Fool",     date: "Jan 2026", thesis: "Personal AI superintelligence vision, billions of daily AI chatbot users, growing AI glasses demand. Reinvesting heavily in moat." },
   { symbol: "NEE",   name: "NextEra Energy",          theme: "AI Power Demand",                  source: "Motley Fool",     date: "Jan 2026", thesis: "Partner of choice for AI data center power deals (Meta, Google). Clean energy + grid build-out beneficiary." },
   { symbol: "KMI",   name: "Kinder Morgan",           theme: "Natural Gas for AI",               source: "Motley Fool",     date: "Jan 2026", thesis: "$20B+ in gas infra capex, 28 bcf/day gas demand growth by 2030 (~25%). 4%+ dividend with growth runway." },
   { symbol: "AMZN",  name: "Amazon",                  theme: "AI Cloud + AWS",                   source: "RBC Capital",     date: "Jan 2026", thesis: "Best-in-class AWS AI ROIC, compelling product/capacity acceleration cycle. AWS growth expected to accelerate." },
   { symbol: "MSFT",  name: "Microsoft",               theme: "Large-cap Software/AI",            source: "Morgan Stanley",  date: "Jan 2026", thesis: "Robust mid-teens top-line growth, room for margin expansion. $650 PT. Top pick in large-cap software." },
-  { symbol: "MU",    name: "Micron",                  theme: "Semis (Memory)",                   source: "TipRanks/RBC",    date: "Jan 2026", thesis: "DRAM + NAND bit shipments +20% in 2026 from AI demand. Stock trades at <6x next-12mo EPS." },
+  { symbol: "MU",    name: "Micron",                  theme: "Semiconductors",                   source: "TipRanks/RBC",    date: "Jan 2026", thesis: "DRAM + NAND bit shipments +20% in 2026 from AI demand. Stock trades at <6x next-12mo EPS." },
   { symbol: "MRK",   name: "Merck",                   theme: "Healthcare Value",                 source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Attractive valuation + clinical catalysts. Safe haven from expensive tech multiples." },
   { symbol: "VRTX",  name: "Vertex Pharma",           theme: "Healthcare Value",                 source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Attractive valuation, clinical catalysts. Defensive healthcare with growth visibility." },
   { symbol: "CEG",   name: "Constellation Energy",    theme: "Nuclear Power for AI",             source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Pure-play nuclear utility, AI data-center power contracts. Multi-decade visibility from hyperscaler deals." },
-  { symbol: "BA",    name: "Boeing",                  theme: "Industrial Cyclical",              source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Production stability catalyst, recovery from 2024-25 issues. Balanced barbell to high-growth tech." },
-  { symbol: "SPOT",  name: "Spotify",                 theme: "High-quality Cyclical",            source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Audio platform monetization curve, pricing power, healthy free cash flow trajectory." },
+  { symbol: "BA",    name: "Boeing",                  theme: "Industrial Recovery",              source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Production stability catalyst, recovery from 2024-25 issues. Balanced barbell to high-growth tech." },
+  { symbol: "SPOT",  name: "Spotify",                 theme: "Quality Growth",                   source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Audio platform monetization curve, pricing power, healthy free cash flow trajectory." },
   { symbol: "DG",    name: "Dollar General",          theme: "K-shaped Consumer",                source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Higher-than-expected tax refund cycle as tailwind for lower-income shoppers." },
   { symbol: "NKE",   name: "Nike",                    theme: "Recovery Story",                   source: "BTIG",            date: "Jan 2026", thesis: "$100 PT (~57% upside from Dec 2025). Product pipeline, 2026 World Cup catalyst, insider buying." },
   { symbol: "XYZ",   name: "Block (Square)",          theme: "Fintech Growth",                   source: "BTIG",            date: "Jan 2026", thesis: "$90 PT (~38% upside). Most compelling large-cap fintech, profitable mid-teens growth Cash App + Square." },
-  { symbol: "LVMUY", name: "LVMH (ADR)",              theme: "Luxury / Europe Rotation",         source: "Kiplinger",       date: "Dec 2025", thesis: "French luxury conglomerate, 75 elite brands (Dior, Tiffany, Dom Perignon). International rotation play." },
+  { symbol: "LVMUY", name: "LVMH (ADR)",              theme: "International / Europe",           source: "Kiplinger",       date: "Dec 2025", thesis: "French luxury conglomerate, 75 elite brands (Dior, Tiffany, Dom Perignon). International rotation play." },
   { symbol: "ROP",   name: "Roper Technologies",      theme: "Niche Software",                   source: "Truist/Kiplinger",date: "Dec 2025", thesis: "Diversified niche software (education, transport, healthcare). Off March highs — re-entry zone." },
 
-  // ETFs (sector / thematic)
-  { symbol: "URA",   name: "Global X Uranium ETF",    theme: "Nuclear Power for AI",             source: "Global X Themes", date: "Feb 2026", thesis: "Dominant nuclear ETF as corporates pivot to clean firm power. 6+ GW corporate clean firm announcements in 2025." },
-  { symbol: "SMH",   name: "VanEck Semiconductors",   theme: "AI Picks & Shovels",               source: "WalletInvestor",  date: "Feb 2026", thesis: "Premier semi vehicle. TSMC + chip designers as 'picks and shovels' of AI revolution." },
-  { symbol: "XLU",   name: "Utilities Sector",        theme: "AI Power Demand",                  source: "WalletInvestor",  date: "Feb 2026", thesis: "Defensive growth + AI power play. Multi-year up-cycle from data center electricity demand." },
-  { symbol: "BAI",   name: "BlackRock AI ETF",        theme: "AI Infrastructure (active)",       source: "etf.com",         date: "Feb 2026", thesis: "Largest thematic ETF ($13.7B AUM), 38% 3-month return. Actively managed AI infra exposure." },
-  { symbol: "CHAT",  name: "Roundhill Generative AI", theme: "Generative AI (active)",           source: "Roundhill",       date: "Feb 2026", thesis: "Actively managed, proprietary AI exposure scoring. 0.75% ER. Targeted gen-AI play." },
-  { symbol: "CIBR",  name: "First Trust Cybersec",    theme: "Cybersecurity",                    source: "etf.com",         date: "Feb 2026", thesis: "$11B+ AUM cyber leader. CrowdStrike, Broadcom holdings. Beneficiary of AI-driven threat landscape." },
-  { symbol: "GRID",  name: "First Trust Grid Infra",  theme: "Electrification",                  source: "etf.com",         date: "Feb 2026", thesis: "16.8% quarterly return. Grid modernization for AI data centers + electrification transition." },
-  { symbol: "IGM",   name: "iShares Expanded Tech",   theme: "Broad NA Tech",                    source: "etf.com",         date: "Feb 2026", thesis: "Cost-effective ($9.71B AUM, 0.39% ER) diversified NA tech exposure beyond S&P 500 tech." },
-  { symbol: "ARGT",  name: "Global X Argentina",      theme: "EM Rotation",                      source: "Kiplinger",       date: "Dec 2025", thesis: "Diversified play on Milei's reforms post-midterm victory. Riskier but contrarian EM exposure." },
+  // === ETFs: AI / TECH / SEMIS ===
+  { symbol: "SMH",   name: "VanEck Semiconductors",       theme: "Semiconductors",               source: "WalletInvestor",  date: "Feb 2026", thesis: "Premier semi vehicle. TSMC + chip designers as 'picks and shovels' of AI revolution." },
+  { symbol: "BAI",   name: "BlackRock AI ETF",            theme: "AI Infrastructure",            source: "etf.com",         date: "Feb 2026", thesis: "Largest thematic ETF ($13.7B AUM), 38% 3-month return. Actively managed AI infra exposure." },
+  { symbol: "CHAT",  name: "Roundhill Generative AI",     theme: "AI Applications",              source: "Roundhill",       date: "Feb 2026", thesis: "Actively managed, proprietary AI exposure scoring. 0.75% ER. Targeted gen-AI play." },
+  { symbol: "BOTZ",  name: "Global X Robotics & AI",      theme: "AI Applications",              source: "Investing.com",   date: "Feb 2026", thesis: "40+ robotics/AI innovators (NVDA, ABB, Intuitive Surgical). $2.5B+ AUM, broad robotics exposure." },
+  { symbol: "AIQ",   name: "Global X AI & Tech",          theme: "AI Applications",              source: "etf.com",         date: "Feb 2026", thesis: "Developed-markets AI exposure across applications, hardware, services. 20.5% 3-mo return." },
+  { symbol: "IGM",   name: "iShares Expanded Tech",       theme: "Broad Tech",                   source: "etf.com",         date: "Feb 2026", thesis: "Cost-effective ($9.71B AUM, 0.39% ER) diversified NA tech beyond S&P 500 tech." },
+  { symbol: "CIBR",  name: "First Trust Cybersec",        theme: "Cybersecurity",                source: "etf.com",         date: "Feb 2026", thesis: "$11B+ AUM cyber leader. CrowdStrike, Broadcom holdings. Beneficiary of AI-driven threat landscape." },
+
+  // === ETFs: ENERGY / NUCLEAR / GRID ===
+  { symbol: "URA",   name: "Global X Uranium",            theme: "Nuclear Power for AI",         source: "Global X",        date: "Feb 2026", thesis: "Dominant nuclear ETF as corporates pivot to clean firm power. 6+ GW corporate clean firm announcements in 2025." },
+  { symbol: "SMRF",  name: "VettaFi Small Modular Reactor", theme: "Nuclear Power for AI",       source: "ALPS",            date: "Feb 2026", thesis: "Pure-play on SMR + uranium cycle. Top holdings: Oklo, Energy Fuels, NexGen. Heavy nuclear-cycle weight." },
+  { symbol: "XLU",   name: "Utilities Sector SPDR",       theme: "AI Power Demand",              source: "WalletInvestor",  date: "Feb 2026", thesis: "Defensive growth + AI power play. Multi-year up-cycle from data center electricity demand." },
+  { symbol: "GRID",  name: "First Trust Grid Infra",      theme: "Electrification",              source: "etf.com",         date: "Feb 2026", thesis: "16.8% quarterly return. Grid modernization for AI data centers + electrification transition." },
+  { symbol: "ELFY",  name: "ALPS Electrification Infra",  theme: "Electrification",              source: "ALPS",            date: "Feb 2026", thesis: "27.3% YTD return. 18 electrification sub-industries building/upgrading power grid across sectors." },
+  { symbol: "ACES",  name: "ALPS Clean Energy",           theme: "Clean Energy",                 source: "ALPS",            date: "Feb 2026", thesis: "12.3% YTD return. Pure-play renewables for AI + electrification. Plug Power, First Solar holdings." },
+  { symbol: "XLE",   name: "Energy Sector SPDR",          theme: "Energy",                       source: "Bankrate",        date: "Feb 2026", thesis: "Outperformed early 2026 due to geopolitical tensions. Broad energy sector hedge against tech concentration." },
+
+  // === ETFs: PRECIOUS METALS / COMMODITIES (NEW — addresses silver miss) ===
+  { symbol: "GLD",   name: "SPDR Gold Trust",             theme: "Precious Metals",              source: "Motley Fool",     date: "May 2026", thesis: "Largest gold ETF ($154B AUM). Most liquid gold proxy. Central bank demand strong; de-dollarization tailwind." },
+  { symbol: "SLV",   name: "iShares Silver Trust",        theme: "Precious Metals",              source: "USNews",          date: "Feb 2026", thesis: "Physical silver. Industrial demand from solar/electrification (~55% of consumption) + safe-haven flows. Highly volatile." },
+  { symbol: "SIL",   name: "Global X Silver Miners",      theme: "Precious Metals",              source: "USNews",          date: "Apr 2026", thesis: "Leveraged play on silver: miners benefit from fixed costs when prices rise. $5.7B AUM, 38 holdings, materials sector." },
+  { symbol: "SLVR",  name: "Sprott Silver Miners + PSLV", theme: "Precious Metals",              source: "USNews",          date: "Apr 2026", thesis: "Silver miners + direct physical silver allocation via PSLV in one ETF. Sprott commodities expertise." },
+  { symbol: "GDX",   name: "VanEck Gold Miners",          theme: "Precious Metals",              source: "Motley Fool",     date: "May 2026", thesis: "Gold miners outperformed bullion in 2026 (15% vs 6% bullion YTD). Operational leverage to rising gold prices." },
+  { symbol: "GDXJ",  name: "VanEck Junior Gold Miners",   theme: "Precious Metals",              source: "Motley Fool",     date: "May 2026", thesis: "$8.5B AUM, 120 smaller miners. Higher beta to gold price than majors. Reasonable 0.52% ER." },
+  { symbol: "PPLT",  name: "abrdn Physical Platinum",     theme: "Precious Metals",              source: "Motley Fool",     date: "May 2026", thesis: "Direct platinum exposure. Lower correlation with gold/silver — diversifies precious metals basket." },
+  { symbol: "GUNR",  name: "FlexShares Global Resources", theme: "Commodities",                  source: "etf.com",         date: "Feb 2026", thesis: "Diversified natural resources (energy, metals, ag, timber). Inflation hedge + infrastructure demand." },
+
+  // === ETFs: DIVIDEND / DEFENSIVE (NEW) ===
+  { symbol: "SCHD",  name: "Schwab US Dividend Equity",   theme: "Dividend / Defensive",         source: "Morningstar",     date: "May 2026", thesis: "Top-rated dividend ETF. Quality dividend payers with low fees. Defensive in tech selloffs, steady income." },
+  { symbol: "VYM",   name: "Vanguard High Dividend",      theme: "Dividend / Defensive",         source: "WalletInvestor",  date: "Feb 2026", thesis: "Cushion in current expensive S&P. Lower relative valuations + 3%+ yield. Value rotation beneficiary." },
+  { symbol: "TDVG",  name: "T. Rowe Price Dividend Growth", theme: "Dividend / Defensive",       source: "Morningstar",     date: "Mar 2026", thesis: "Top-rated dividend-growth ETF. Financially healthy companies that consistently raise dividends." },
+  { symbol: "VIG",   name: "Vanguard Dividend Appreciation", theme: "Dividend / Defensive",      source: "Bankrate",        date: "Nov 2025", thesis: "Dividend growth focus — companies with 10+ years of consecutive increases. Low ER, large-cap quality bias." },
+
+  // === ETFs: DEFENSE (NEW) ===
+  { symbol: "ITA",   name: "iShares US Aerospace & Defense", theme: "Defense",                   source: "USNews",          date: "Feb 2026", thesis: "Geopolitical conflict tailwind. Defense ETF exposure to reliable + emerging leaders in conflict-driven spend." },
+  { symbol: "SHLD",  name: "Global X Defense Tech",       theme: "Defense",                      source: "Global X",        date: "Jan 2026", thesis: "Modern defense tech exposure — drones, cyber, autonomous systems. Different angle vs traditional ITA primes." },
+
+  // === ETFs: INTERNATIONAL ROTATION (NEW) ===
+  { symbol: "ARGT",  name: "Global X Argentina",          theme: "Emerging Markets",             source: "Kiplinger",       date: "Dec 2025", thesis: "Diversified play on Milei's reforms post-midterm victory. Riskier but contrarian EM exposure." },
+  { symbol: "VEA",   name: "Vanguard FTSE Developed Markets", theme: "International / Europe",  source: "WalletInvestor",  date: "Feb 2026", thesis: "Japan/Eurozone earnings gap with US has narrowed — rotation candidate. Cheap valuations + currency diversification." },
+  { symbol: "EFA",   name: "iShares MSCI EAFE",           theme: "International / Europe",       source: "WalletInvestor",  date: "Feb 2026", thesis: "Broad developed ex-US. Trades at large valuation discount to S&P 500. Stimulus + reform stories." },
+  { symbol: "EWJ",   name: "iShares MSCI Japan",          theme: "International / Europe",       source: "WalletInvestor",  date: "Feb 2026", thesis: "Japan corporate reform, yen weakness benefiting exporters. Cheap relative to historical multiples." },
+  { symbol: "EEM",   name: "iShares MSCI Emerging Markets", theme: "Emerging Markets",           source: "USNews",          date: "Feb 2026", thesis: "Stretched US valuations driving capital into EM ETFs. Broad EM exposure (India, Brazil, EM-Asia)." },
 ];
 
 // Conviction-based weight for a symbol. Used to size B&H and DCA positions.
@@ -4599,15 +4864,29 @@ async function runForwardStep() {
       // Determine signal
       let sig = null;
       if (strat.mode === "dca") {
-        if (isDcaDay && sim.cash >= DCA_PER_SYMBOL) {
+        const sliceForThis = dcaSliceFor(sym);
+        if (isDcaDay && sim.cash >= sliceForThis) {
           sig = { side: "buy", reason: `DCA cycle ${Math.ceil((sim.equity?.length || 0) / 14) + 1}` };
         }
       } else if (strat.mode === "bh") {
-        if (!hasPos && sim.cash >= bhSliceUSD && bhSliceUSD >= 100) {
+        const sliceForThis = bhSliceFor(sym);
+        if (!hasPos && sim.cash >= sliceForThis && sliceForThis >= 50) {
           sig = { side: "buy", reason: "Buy & hold (initial buy)" };
         }
       } else {
         sig = strat.fn(closes, highs, idx, hasPos, entryPrice, position, times);
+        // Portfolio Bot also honors live AI analysis cards (forward mode only).
+        // If the rule-scan didn't fire but the analysis stance is decisive, act on it.
+        if (strat.key === "portfolio") {
+          const analysis = state.analyses?.[sym];
+          const stance = (analysis?.stance || "").toLowerCase();
+          const conv = (analysis?.conviction || "").toLowerCase();
+          if (!sig && !hasPos && (stance.includes("buy") || stance.includes("accumulate") || stance.includes("add"))) {
+            sig = { side: "buy", reason: `AI: ${(analysis.stance || "BUY")}${conv ? " (" + conv + " conv)" : ""}` };
+          } else if (!sig && hasPos && (stance.includes("sell") || stance.includes("trim") || stance.includes("reduce"))) {
+            sig = { side: "sell", reason: `AI: ${(analysis.stance || "SELL")}${conv ? " (" + conv + " conv)" : ""}` };
+          }
+        }
       }
 
       if (!sig) continue;
@@ -5818,6 +6097,10 @@ document.addEventListener("click", (e) => {
       case "delete-journal":         deleteJournalEntry(target.dataset.id); break;
       case "add-curated":            addCuratedToWatchlist(target.dataset.symbol, target.dataset.name); break;
       case "toggle-watchouts":       toggleWatchouts(); break;
+      case "refresh-discover":       refreshDiscover(); break;
+      case "clear-discover":         clearDiscoverDynamic(); break;
+      case "dismiss-breakout-prompt": dismissBreakoutPrompt(); break;
+      case "add-breakout-conditions": addBreakoutConditionsToHeld(); break;
     }
   } catch (err) {
     showError("Action failed: " + err.message);
