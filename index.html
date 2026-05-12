@@ -1091,9 +1091,173 @@ body {
 .bot-empty .display { font-family: var(--display); font-size: 22px; display: block; margin-bottom: 8px; }
 .bot-empty p { color: var(--ink-muted); font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
 
+/* ===== DISCOVER IDEAS (curated research) ===== */
+.discover-card {
+  margin: 18px 20px 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+}
+.discover-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--gold) 0%, var(--green) 100%);
+}
+.discover-card.collapsed { cursor: pointer; }
+.discover-card.collapsed:hover { background: var(--bg-elev); }
+.discover-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 18px 12px;
+}
+.discover-head h3 {
+  font-family: var(--display); font-size: 17px; font-weight: 500;
+}
+.discover-sub {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-muted);
+  margin-top: 4px;
+}
+.discover-disclaimer {
+  padding: 8px 18px;
+  background: var(--bg-elev);
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted);
+  line-height: 1.5;
+  border-top: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.discover-theme-block { padding: 4px 0; }
+.discover-theme-head {
+  padding: 12px 18px 4px;
+  font-family: var(--mono); font-size: 10px;
+  color: var(--ink-soft); letter-spacing: 0.10em;
+  text-transform: uppercase; font-weight: 600;
+}
+.discover-item {
+  padding: 12px 18px;
+  border-top: 1px solid var(--rule-soft);
+}
+.discover-item-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  margin-bottom: 6px;
+}
+.discover-sym {
+  font-family: var(--display); font-size: 14px; font-weight: 600;
+  margin-right: 6px;
+}
+.discover-name {
+  font-family: var(--sans); font-size: 12px; color: var(--ink-soft);
+}
+.discover-tag {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em;
+  padding: 4px 9px; border-radius: 3px; text-transform: uppercase;
+  flex-shrink: 0;
+}
+.discover-tag.held   { background: rgba(74,122,74,0.15); color: var(--green); }
+.discover-tag.onlist { background: rgba(176,141,60,0.15); color: var(--gold); }
+.discover-thesis {
+  font-family: var(--sans); font-size: 12.5px; color: var(--ink);
+  line-height: 1.45; margin-bottom: 8px;
+}
+.discover-source {
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted);
+}
+.discover-src::before { content: "via "; }
+
+/* ===== DAILY PORTFOLIO SCAN ===== */
+.scan-card {
+  margin: 14px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+}
+.scan-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--green) 0%, var(--gold) 50%, var(--red) 100%);
+}
+.scan-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 18px 10px;
+}
+.scan-head h3 {
+  font-family: var(--display); font-size: 17px; font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.scan-pill {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em;
+  background: var(--ink); color: var(--bg);
+  padding: 4px 10px; border-radius: 12px;
+  text-transform: uppercase;
+}
+.scan-empty {
+  padding: 14px 18px 22px;
+  font-family: var(--mono); font-size: 12px; color: var(--ink-muted);
+  text-align: center; font-style: italic;
+}
+.scan-list { padding: 0; }
+.scan-item {
+  display: grid; grid-template-columns: 28px 1fr auto;
+  gap: 12px; align-items: start;
+  padding: 12px 18px;
+  border-top: 1px solid var(--rule-soft);
+  cursor: pointer;
+  transition: background-color .12s;
+}
+.scan-item:hover { background: var(--bg-elev); }
+.scan-icon {
+  font-family: var(--display); font-size: 22px; font-weight: 700;
+  line-height: 1; padding-top: 2px;
+  display: flex; justify-content: center;
+}
+.scan-body { min-width: 0; }
+.scan-action {
+  font-family: var(--display); font-size: 14px; font-weight: 500;
+  margin-bottom: 4px; line-height: 1.35;
+}
+.scan-why {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-muted);
+  line-height: 1.4; margin-bottom: 6px;
+}
+.scan-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.scan-sym {
+  font-family: var(--display); font-size: 11px; font-weight: 600;
+  padding: 2px 7px; background: var(--bg-elev); border-radius: 3px;
+}
+.scan-kind {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em;
+  padding: 2px 6px; border-radius: 3px;
+}
+.scan-kind.trim { background: rgba(161,61,45,0.15); color: var(--red); }
+.scan-kind.add  { background: rgba(74,122,74,0.15); color: var(--green); }
+.scan-kind.open { background: rgba(176,141,60,0.15); color: var(--gold); }
+.scan-conf {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em;
+  padding: 2px 6px; border-radius: 3px;
+  background: var(--bg-elev); color: var(--ink-muted);
+  text-transform: uppercase;
+}
+.scan-conf.high { color: var(--green); }
+.scan-conf.low { color: var(--ink-muted); }
+.scan-log {
+  background: var(--ink); color: var(--bg); border: none;
+  padding: 6px 12px; border-radius: 4px;
+  font-family: var(--sans); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.04em; cursor: pointer; align-self: center;
+  flex-shrink: 0;
+}
+.scan-footer {
+  padding: 8px 18px;
+  border-top: 1px solid var(--rule-soft);
+  background: var(--bg-elev);
+  font-family: var(--mono); font-size: 10px; color: var(--ink-muted);
+  text-align: center; letter-spacing: 0.04em;
+}
+
 /* ===== DAILY WATCHOUTS ===== */
-.watchouts-card {
-  margin: 12px 20px;
+.watchouts-card {  margin: 12px 20px;
   background: var(--bg-card);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
@@ -1152,6 +1316,64 @@ body {
   margin: 12px 20px;
   overflow: hidden;
 }
+
+/* Recommended action banner — shown prominently at top of expanded analysis */
+.recommended-action-banner {
+  margin: 0 20px 12px;
+  padding: 14px 16px;
+  background: var(--bg-elev);
+  border-left: 4px solid var(--ink-soft);
+  border-radius: 6px;
+}
+.recommended-action-banner.compact {
+  margin: 12px 20px 0;
+  padding: 10px 14px;
+}
+.recommended-action-banner.buy,
+.recommended-action-banner.strong-buy,
+.recommended-action-banner.accumulate { border-left-color: var(--green); background: rgba(74,122,74,0.08); }
+.recommended-action-banner.sell,
+.recommended-action-banner.strong-sell,
+.recommended-action-banner.trim,
+.recommended-action-banner.reduce { border-left-color: var(--red); background: rgba(161,61,45,0.08); }
+.recommended-action-banner.hold,
+.recommended-action-banner.wait,
+.recommended-action-banner.neutral { border-left-color: var(--gold); background: rgba(176,141,60,0.08); }
+.rab-lbl {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.10em;
+  text-transform: uppercase; color: var(--ink-muted);
+  margin-bottom: 6px;
+}
+.rab-text {
+  font-family: var(--display); font-size: 15px; font-weight: 500;
+  line-height: 1.4; color: var(--ink);
+}
+.rab-inv {
+  margin-top: 10px; padding-top: 8px;
+  border-top: 1px dashed var(--rule);
+  font-family: var(--mono); font-size: 11px; color: var(--ink-soft);
+  line-height: 1.45;
+}
+.rab-inv strong { color: var(--ink); font-weight: 600; }
+
+/* Scenarios mini-collapsible inside the analysis */
+.scenarios-collapsible {
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: var(--bg-elev);
+  border: 1px solid var(--rule-soft);
+  border-radius: 6px;
+}
+.scenarios-head {
+  display: flex; justify-content: space-between; align-items: center;
+  cursor: pointer;
+  font-family: var(--display); font-size: 13px; font-weight: 500;
+  color: var(--ink-soft);
+  user-select: none;
+}
+.scenarios-head:hover { color: var(--ink); }
+.scenarios-collapsible.expanded .scenarios-head { color: var(--ink); }
+
 .collapsible-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 18px;
@@ -1441,12 +1663,10 @@ const CONDITION_TYPES = [
   { value: "ma_touch",           label: "Price touches Moving Average", default: { period: 200, tolerance_pct: 1.5 } },
   { value: "near_52w_high",      label: "Within X% of 52-week high", default: { threshold_pct: 3 } },
   { value: "near_52w_low",       label: "Within X% of 52-week low", default: { threshold_pct: 5 } },
-  { value: "macd_bullish_cross", label: "MACD bullish crossover (recent)", default: { within_days: 3 } },
-  { value: "macd_bearish_cross", label: "MACD bearish crossover (recent)", default: { within_days: 3 } },
   { value: "drop_from_peak",     label: "Drops X% from 90-day peak", default: { threshold_pct: 10 } },
   { value: "price_above",        label: "Price rises above level", default: { threshold: 0 } },
   { value: "price_below",        label: "Price drops below level", default: { threshold: 0 } },
-  // New strategy-derived conditions
+  // Strategy-derived conditions
   { value: "ma_cross_bullish",   label: "Golden cross (MA50 > MA200, recent)", default: { within_days: 3 } },
   { value: "ma_cross_bearish",   label: "Death cross (MA50 < MA200, recent)", default: { within_days: 3 } },
   { value: "breakout_high",      label: "Closed at N-day high (breakout)", default: { period: 50 } },
@@ -1478,12 +1698,13 @@ const state = {
   chart: null,
   theme: localStorage.getItem("theme") || "day",
   lastScanAt: null,
-  // bot simulator: 7 strategies in parallel
-  bot: { dip: null, trend: null, composite: null, golden: null, meanrev: null, dca: null, bh: null },
+  // bot simulator: 9 strategies in parallel
+  bot: { dip: null, trend: null, composite: null, portfolio: null, golden: null, adaptive: null, meanrev: null, dca: null, bh: null },
   botRunning: false,
-  botChartVisible: { dip: true, bh: true, composite: true, trend: false, golden: false, meanrev: false, dca: false },
+  botChartVisible: { dip: true, bh: true, composite: true, portfolio: true, trend: false, golden: false, adaptive: false, meanrev: false, dca: false },
   ohlcvCache: {}, // symbol -> { ohlcv, fetched_at }
   expandedAnalyses: {}, // key -> bool; "portfolio" or symbol
+  showWatchouts: localStorage.getItem("showWatchouts") === "1", // opt-in
 };
 document.documentElement.setAttribute("data-theme", state.theme);
 
@@ -1543,8 +1764,6 @@ function describeCondition(c) {
     case "ma_touch": return `MA${c.period || 200} touch (±${c.tolerance_pct || 1.5}%)`;
     case "near_52w_high": return `Within ${c.threshold_pct || 3}% of 52w high`;
     case "near_52w_low": return `Within ${c.threshold_pct || 5}% of 52w low`;
-    case "macd_bullish_cross": return `MACD bull cross (${c.within_days || 3}d)`;
-    case "macd_bearish_cross": return `MACD bear cross (${c.within_days || 3}d)`;
     case "drop_from_peak": return `${c.threshold_pct || 10}% off 90d peak`;
     case "price_above": return `Price > $${c.threshold}`;
     case "price_below": return `Price < $${c.threshold}`;
@@ -2087,7 +2306,7 @@ async function computeClientSnapshot(symbol, conditions) {
   const dropFromPeak90 = peak90 ? ((cur - peak90) / peak90) * 100 : null;
 
   // MACD
-  const macd = computeMACD(closes);
+  // MACD removed (no reliable data signal)
 
   // Evaluate conditions
   const triggers = [];
@@ -2124,16 +2343,6 @@ async function computeClientSnapshot(symbol, conditions) {
       case "drop_from_peak":
         if (dropFromPeak90 != null && dropFromPeak90 <= -(c.threshold_pct || 10)) {
           fired = true; detail = `${dropFromPeak90.toFixed(2)}% off 90d peak`;
-        }
-        break;
-      case "macd_bullish_cross":
-        if (macd && macd.lastCrossover === "bullish" && macd.daysSinceCross <= (c.within_days || 3)) {
-          fired = true; detail = `bullish cross ${macd.daysSinceCross}d ago`;
-        }
-        break;
-      case "macd_bearish_cross":
-        if (macd && macd.lastCrossover === "bearish" && macd.daysSinceCross <= (c.within_days || 3)) {
-          fired = true; detail = `bearish cross ${macd.daysSinceCross}d ago`;
         }
         break;
       case "price_above":
@@ -2236,7 +2445,6 @@ async function computeClientSnapshot(symbol, conditions) {
     trend, pct_from_52w_high: pctFrom52wHigh,
     pct_from_52w_low: pctFrom52wLow,
     drop_from_peak_90d: dropFromPeak90,
-    macd_crossover: macd?.lastCrossover || "none",
     triggers, setup_score: score,
   };
 }
@@ -2380,6 +2588,156 @@ function setView(v) {
 
 // ----- Portfolio
 // ============================================================================
+// DAILY PORTFOLIO SCAN — synthesized "what to do today" actions.
+// Rule-based so it works in backtest. AI analyses are used as a conviction modifier.
+// ============================================================================
+function computeDailyScan() {
+  const actions = [];
+
+  for (const h of state.holdings) {
+    if (h.asset_class === "cash") continue;
+    const cur = state.prices[h.symbol]?.current_price;
+    const data = state.prices[h.symbol];
+    if (!cur || !data) continue;
+
+    const hm = holdingMetrics(h);
+    const analysis = state.analyses[h.symbol];
+    const stance = (analysis?.stance || "").toLowerCase();
+    const conv = (analysis?.conviction || "").toLowerCase();
+
+    // Compute fresh indicators
+    let rsi = null, dropFromPeak = null;
+    if (data.ohlcv && data.ohlcv.length >= 30) {
+      const closes = data.ohlcv.map(d => d.c);
+      const highs = data.ohlcv.map(d => d.h);
+      rsi = computeRSI(closes, 14);
+      const slice90 = highs.slice(-90);
+      if (slice90.length) {
+        const peak = Math.max(...slice90);
+        dropFromPeak = peak > 0 ? ((cur - peak) / peak) * 100 : 0;
+      }
+    }
+
+    // Rule 1: TRIM — held position up >25%, OR analysis says trim/sell, OR RSI>75
+    if (hm.pnlPct != null && hm.pnlPct >= 25 && conv !== "low") {
+      actions.push({
+        symbol: h.symbol, kind: "trim",
+        text: `Trim 20-30% of ${h.symbol} on strength above current $${fmtUSD(cur)}`,
+        why: `+${hm.pnlPct.toFixed(1)}% from cost — partial profit-taking locks in gain without exiting thesis`,
+        confidence: hm.pnlPct >= 50 ? "high" : "medium",
+        sortKey: -hm.pnlPct, // largest gain first
+      });
+    } else if (rsi != null && rsi > 75) {
+      actions.push({
+        symbol: h.symbol, kind: "trim",
+        text: `Trim 10-15% of ${h.symbol} on RSI extreme`,
+        why: `RSI ${rsi.toFixed(0)} indicates short-term overbought — historical reversion likely`,
+        confidence: rsi > 80 ? "high" : "medium",
+        sortKey: -rsi,
+      });
+    } else if (stance.includes("sell") || stance.includes("trim") || stance.includes("reduce")) {
+      actions.push({
+        symbol: h.symbol, kind: "trim",
+        text: analysis?.recommended_action || `Trim ${h.symbol} per analysis`,
+        why: analysis?.headline || `App stance: ${stance.toUpperCase()}`,
+        confidence: analysis?.confidence || "medium",
+        sortKey: -100,
+      });
+    }
+
+    // Rule 2: ADD — held position down with RSI oversold, OR analysis says buy/accumulate
+    if (rsi != null && rsi < 35 && dropFromPeak != null && dropFromPeak <= -7) {
+      actions.push({
+        symbol: h.symbol, kind: "add",
+        text: `Add 5-10% to ${h.symbol} on weakness at $${fmtUSD(cur)}`,
+        why: `RSI ${rsi.toFixed(0)} oversold + ${dropFromPeak.toFixed(1)}% off 90d peak — historically a productive add zone`,
+        confidence: rsi < 30 ? "high" : "medium",
+        sortKey: rsi,
+      });
+    } else if (stance.includes("buy") || stance.includes("accumulate") || stance.includes("add")) {
+      actions.push({
+        symbol: h.symbol, kind: "add",
+        text: analysis?.recommended_action || `Add to ${h.symbol} per analysis`,
+        why: analysis?.headline || `App stance: ${stance.toUpperCase()}`,
+        confidence: analysis?.confidence || "medium",
+        sortKey: -90,
+      });
+    }
+  }
+
+  // Also surface watchlist setups that aren't held (potential new positions)
+  for (const w of (state.watchlist || [])) {
+    const held = state.holdings.some(h => h.symbol === w.symbol && h.asset_class !== "cash");
+    if (held) continue;
+    const snap = state.watchlistSnapshot[w.symbol];
+    if (!snap || !snap.triggers || snap.triggers.length === 0) continue;
+    const cur = snap.current_price;
+    const setup = snap.setup_score || 0;
+    if (setup < 40) continue;
+    actions.push({
+      symbol: w.symbol, kind: "open",
+      text: `Open small starter position in ${w.symbol} at $${fmtUSD(cur)}`,
+      why: `Multiple conditions firing (${snap.triggers.length}) · setup score ${setup}`,
+      confidence: setup >= 70 ? "high" : "medium",
+      sortKey: -setup,
+    });
+  }
+
+  // Sort: highest priority first (most negative sortKey)
+  actions.sort((a, b) => {
+    const order = { trim: 0, add: 1, open: 2 };
+    if (order[a.kind] !== order[b.kind]) return order[a.kind] - order[b.kind];
+    return a.sortKey - b.sortKey;
+  });
+
+  return actions.slice(0, 5); // cap at 5
+}
+
+function renderDailyScan() {
+  const actions = computeDailyScan();
+  if (actions.length === 0) {
+    return `
+      <div class="scan-card">
+        <div class="scan-head">
+          <h3>Today's Plan</h3>
+          <span class="scan-pill" style="background:var(--bg-elev);color:var(--ink-muted);">No actions</span>
+        </div>
+        <div class="scan-empty">Nothing actionable today. Hold positions, watch the watchlist.</div>
+      </div>
+    `;
+  }
+  const iconFor = k => k === "trim" ? "↓" : k === "add" ? "↑" : "+";
+  const colorFor = k => k === "trim" ? "var(--red)" : k === "add" ? "var(--green)" : "var(--gold)";
+
+  return `
+    <div class="scan-card">
+      <div class="scan-head">
+        <h3>Today's Plan</h3>
+        <span class="scan-pill">${actions.length} action${actions.length === 1 ? "" : "s"}</span>
+      </div>
+      <div class="scan-list">
+        ${actions.map(a => `
+          <div class="scan-item" data-act="open-asset" data-symbol="${escAttr(a.symbol)}">
+            <div class="scan-icon" style="color:${colorFor(a.kind)};">${iconFor(a.kind)}</div>
+            <div class="scan-body">
+              <div class="scan-action">${escAttr(a.text)}</div>
+              <div class="scan-why">${escAttr(a.why)}</div>
+              <div class="scan-pills">
+                <span class="scan-sym">${escAttr(a.symbol)}</span>
+                <span class="scan-kind ${a.kind}">${a.kind.toUpperCase()}</span>
+                <span class="scan-conf ${escAttr(a.confidence)}">${escAttr(a.confidence)} conf</span>
+              </div>
+            </div>
+            <button class="scan-log" data-act="log-trade" data-symbol="${escAttr(a.symbol)}" onclick="event.stopPropagation();" title="Log this trade">Log</button>
+          </div>
+        `).join("")}
+      </div>
+      <div class="scan-footer">Rule-based · Tap an item to view that asset</div>
+    </div>
+  `;
+}
+
+// ============================================================================
 // DAILY WATCHOUTS — observational warnings on currently-held positions only.
 // Mixes 3 signal sources:
 //   1) Drawdown alerts:    position down > X% from cost basis
@@ -2457,6 +2815,7 @@ function describeTriggerCondition(trigger) {
 }
 
 function renderWatchouts() {
+  if (!state.showWatchouts) return "";
   const items = computeWatchouts();
   if (items.length === 0) return "";
 
@@ -2567,6 +2926,8 @@ function renderPortfolio() {
       <div class="alloc-strip">${allocSegs}</div>
       <div class="alloc-legend">${allocLegend}</div>
     </div>
+
+    ${renderDailyScan()}
 
     ${renderWatchouts()}
 
@@ -2699,6 +3060,7 @@ function renderWatchlist() {
         <p>Add tickers you'd consider buying. The app watches them and surfaces setups when conditions trigger.</p>
         <button class="btn" data-act="add-watch">Add to Watchlist</button>
       </div>
+      ${renderDiscoverIdeas()}
     `;
     return;
   }
@@ -2755,6 +3117,7 @@ function renderWatchlist() {
       <button class="btn-ghost" data-act="add-watch" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
     </div>
     <div class="holdings">${rows}</div>
+    ${renderDiscoverIdeas()}
   `;
 
   // Lazy snapshot fetch if missing
@@ -2773,6 +3136,114 @@ function renderWatchlist() {
 function openWatchItem(symbol) {
   state.selectedSymbol = symbol;
   renderWatchDetail(symbol);
+}
+
+// ============================================================================
+// DISCOVER IDEAS — surface CURATED_PICKS, group by theme. Single-tap to add.
+// ============================================================================
+function renderDiscoverIdeas() {
+  const expanded = !!state.expandedAnalyses["discover"];
+  const inWatchlist = new Set(state.watchlist.map(w => w.symbol));
+  const held = new Set(state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol));
+
+  // Group by theme
+  const byTheme = {};
+  for (const p of CURATED_PICKS) {
+    if (!byTheme[p.theme]) byTheme[p.theme] = [];
+    byTheme[p.theme].push(p);
+  }
+  const themes = Object.keys(byTheme).sort((a, b) => byTheme[b].length - byTheme[a].length);
+
+  const summary = `${CURATED_PICKS.length} ideas · ${themes.length} themes · sourced from credible analysts`;
+
+  if (!expanded) {
+    return `
+      <div class="discover-card collapsed" data-act="toggle-analysis" data-key="discover">
+        <div class="discover-head">
+          <div>
+            <h3>Discover Ideas</h3>
+            <div class="discover-sub">${summary}</div>
+          </div>
+          <div class="collapsible-chev">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const themeBlocks = themes.map(theme => {
+    const picks = byTheme[theme];
+    const items = picks.map(p => {
+      const onList = inWatchlist.has(p.symbol);
+      const owned = held.has(p.symbol);
+      return `
+        <div class="discover-item">
+          <div class="discover-item-head">
+            <div>
+              <span class="discover-sym">${escAttr(p.symbol)}</span>
+              <span class="discover-name">${escAttr(p.name)}</span>
+            </div>
+            ${owned ? `<span class="discover-tag held">Held</span>`
+              : onList ? `<span class="discover-tag onlist">On Watchlist</span>`
+              : `<button class="btn btn-sm" data-act="add-curated" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">+ Watch</button>`}
+          </div>
+          <div class="discover-thesis">${escAttr(p.thesis)}</div>
+          <div class="discover-source">
+            <span class="discover-src">${escAttr(p.source)}</span>
+            <span class="discover-date">${escAttr(p.date)}</span>
+          </div>
+        </div>
+      `;
+    }).join("");
+    return `
+      <div class="discover-theme-block">
+        <div class="discover-theme-head">${escAttr(theme)}</div>
+        ${items}
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="discover-card expanded">
+      <div class="discover-head" data-act="toggle-analysis" data-key="discover" style="cursor:pointer;">
+        <div>
+          <h3>Discover Ideas</h3>
+          <div class="discover-sub">${summary}</div>
+        </div>
+        <div class="collapsible-chev" style="transform:rotate(180deg);">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+      </div>
+      <div class="discover-disclaimer">Research from credible sources. Not advice — you decide. Snapshot updated when this build was deployed.</div>
+      ${themeBlocks}
+    </div>
+  `;
+}
+
+async function addCuratedToWatchlist(symbol, name) {
+  if (!symbol) return;
+  // Default condition for curated ideas: drop-from-peak 10% (entry on weakness)
+  const conditions = [
+    { id: cryptoRandomId(), type: "drop_from_peak", threshold_pct: 10 },
+  ];
+  try {
+    await db.collection("users").doc(state.uid).collection("watchlist").doc(symbol).set({
+      symbol,
+      name: name || symbol,
+      conditions,
+      asset_class: guessAssetClass(symbol),
+      added_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await loadWatchlist();
+    toast(`${symbol} added to watchlist`);
+    renderWatchlist();
+  } catch (e) {
+    toast(`Failed to add: ${e.message || e}`, 3000, "error");
+  }
+}
+function cryptoRandomId() {
+  return "c" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
 function renderWatchDetail(symbol) {
@@ -3030,6 +3501,17 @@ function renderAiCard(symbol, a) {
   };
 
   const expanded = !!state.expandedAnalyses[symbol];
+  const scenariosExpanded = !!state.expandedAnalyses[symbol + "_scenarios"];
+
+  // Build the prominent recommended action line.
+  // Prefer the new `recommended_action` field; fall back to action.what; fall back to stance+headline.
+  const recommendedAction = a.recommended_action || a.action?.what || a.headline || `${stance} based on current setup`;
+  // Single inversion condition — the one thing that would flip this view
+  const inversion = a.inversion_condition
+    || a.action?.invalidation
+    || (scenarios.bear_trigger?.condition && stance.toLowerCase().includes("buy") ? scenarios.bear_trigger.condition : null)
+    || (scenarios.bull_trigger?.condition && stance.toLowerCase().includes("sell") ? scenarios.bull_trigger.condition : null)
+    || null;
 
   return `<div class="ai-card">
     <div class="stance-hero collapsible-head" data-act="toggle-analysis" data-key="${escAttr(symbol)}" style="cursor:pointer;">
@@ -3049,15 +3531,17 @@ function renderAiCard(symbol, a) {
       </div>
     </div>
     ${expanded ? `
-    ${(action.what || action.price_zone) ? `
-    <div class="action-block">
-      <h4>Action</h4>
-      <div class="action-what">${escAttr(action.what || "—")}</div>
+    <div class="recommended-action-banner ${stanceToClass(stance)}">
+      <div class="rab-lbl">Action for today</div>
+      <div class="rab-text">${escAttr(recommendedAction)}</div>
+      ${inversion ? `<div class="rab-inv">Flip this view if: <strong>${escAttr(inversion)}</strong></div>` : ""}
+    </div>
+    ${(action.price_zone || action.timeframe) ? `
+    <div class="action-block" style="margin-top:0;">
       <div class="action-meta">
-        <div class="action-meta-cell"><div class="lbl">Price Zone</div><div class="val">${escAttr(action.price_zone || "—")}</div></div>
-        <div class="action-meta-cell"><div class="lbl">Timeframe</div><div class="val">${escAttr(action.timeframe || "—")}</div></div>
+        ${action.price_zone ? `<div class="action-meta-cell"><div class="lbl">Price Zone</div><div class="val">${escAttr(action.price_zone)}</div></div>` : ""}
+        ${action.timeframe ? `<div class="action-meta-cell"><div class="lbl">Timeframe</div><div class="val">${escAttr(action.timeframe)}</div></div>` : ""}
       </div>
-      ${action.invalidation ? `<div class="invalidation-row"><strong>Invalidation</strong>${escAttr(action.invalidation)}</div>` : ""}
     </div>` : ""}
     <div class="horizon-strip">
       ${horizonCell("Short", "short_term")}
@@ -3072,10 +3556,26 @@ function renderAiCard(symbol, a) {
           <div class="confluence-row"><span class="confluence-score">${escAttr(a.confluence.score || "—")}</span></div>
           <p>${escAttr(a.confluence.summary || "")}</p>
         </div>` : ""}
-      ${(scenarios.bull_trigger || scenarios.bear_trigger || scenarios.base_case) ? `
+      ${a.ta_summary ? `<div class="ai-section"><h4>Technical Read</h4><p>${escAttr(a.ta_summary)}</p></div>` : ""}
+      ${a.sentiment_summary ? `<div class="ai-section"><h4>Sentiment</h4><p>${escAttr(a.sentiment_summary)}</p></div>` : ""}
+      ${a.key_risks?.length ? `
+        <div class="ai-section risks">
+          <h4>Key Risks</h4>
+          <ul>${a.key_risks.map(r => `<li>${escAttr(r)}</li>`).join("")}</ul>
+        </div>` : ""}
+      ${a.position_context ? `
         <div class="ai-section">
-          <h4>Scenarios</h4>
-          <div class="scenarios-grid">
+          <h4>For Your Position</h4>
+          <div class="position-context-block">${escAttr(a.position_context)}</div>
+        </div>` : ""}
+      ${(scenarios.bull_trigger || scenarios.bear_trigger || scenarios.base_case) ? `
+        <div class="scenarios-collapsible ${scenariosExpanded ? 'expanded' : ''}">
+          <div class="scenarios-head" data-act="toggle-analysis" data-key="${escAttr(symbol)}_scenarios">
+            <span>Scenarios & Triggers</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform:${scenariosExpanded ? 'rotate(180deg)' : 'rotate(0)'};transition:transform .2s;"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          ${scenariosExpanded ? `
+          <div class="scenarios-grid" style="margin-top:10px;">
             ${scenarios.bull_trigger ? `
               <div class="scenario bull">
                 <div class="scn-lbl">Bull Trigger</div>
@@ -3094,18 +3594,7 @@ function renderAiCard(symbol, a) {
                 <div class="scn-cond">${escAttr(scenarios.base_case)}</div>
               </div>` : ""}
           </div>
-        </div>` : ""}
-      ${a.ta_summary ? `<div class="ai-section"><h4>Technical Read</h4><p>${escAttr(a.ta_summary)}</p></div>` : ""}
-      ${a.sentiment_summary ? `<div class="ai-section"><h4>Sentiment</h4><p>${escAttr(a.sentiment_summary)}</p></div>` : ""}
-      ${a.key_risks?.length ? `
-        <div class="ai-section risks">
-          <h4>Key Risks</h4>
-          <ul>${a.key_risks.map(r => `<li>${escAttr(r)}</li>`).join("")}</ul>
-        </div>` : ""}
-      ${a.position_context ? `
-        <div class="ai-section">
-          <h4>For Your Position</h4>
-          <div class="position-context-block">${escAttr(a.position_context)}</div>
+          ` : ""}
         </div>` : ""}
       ${a.counter_argument ? `
         <div class="counter-arg">
@@ -3124,7 +3613,10 @@ function renderAiCard(symbol, a) {
     </div>
     <div class="ai-stamp">Generated ${fmtRel(a.generated_at)} · This is a tool, not advice. You decide.</div>
     ` : `
-    <div class="ai-stamp" style="padding: 10px 20px 14px; border-top: 1px solid var(--rule-soft);">Tap to expand · ${fmtRel(a.generated_at)}</div>
+    <div class="recommended-action-banner ${stanceToClass(stance)} compact" data-act="toggle-analysis" data-key="${escAttr(symbol)}" style="cursor:pointer;">
+      <div class="rab-text">${escAttr(recommendedAction)}</div>
+    </div>
+    <div class="ai-stamp" style="padding: 10px 20px 14px;">Tap to expand · ${fmtRel(a.generated_at)}</div>
     `}
   </div>`;
 }
@@ -3587,31 +4079,66 @@ function trendSignal(closes, highs, idx, hasPosition, entryPrice, position, _tim
   return null;
 }
 
-// ----- Golden Cross (loosened): MA50 > MA200 AND price near MA50 -----
-// Original "cross within 3d" version produced 0 trades over 2 years on the
-// test universe — too rare to be useful. This version fires whenever the
-// uptrend is intact (MA50 > MA200) AND the price has pulled back to within
-// 3% of MA50 (a normal support level during uptrends).
-// Exit: MA50 < MA200 (death cross) OR -10% stop loss
-function goldenCrossSignal(closes, highs, idx, hasPosition, entryPrice, _position, _times) {
-  if (idx < 200) return null;
+// ----- Dual Momentum (Antonacci) — rotates monthly into the best-performing symbol -----
+// Entry: hold the symbol with the highest 12-month total return, but only if that
+//        return is positive (absolute momentum filter). Otherwise hold cash.
+// Exit:  rebalance monthly. Sell whatever no longer qualifies as top-momentum.
+// This is a *cross-symbol* strategy. We approximate it per-symbol by:
+//   Buy:  this symbol's 12-month return > 0 AND > (universe median by ~10%)
+//   Sell: this symbol's 12-month return turned negative OR fell below universe median
+function goldenCrossSignal(closes, highs, idx, hasPosition, entryPrice, position, _times) {
+  if (idx < 252) return null;
   const cur = closes[idx];
-  const upTo = closes.slice(0, idx + 1);
-  const ma50  = computeMA(upTo, 50);
-  const ma200 = computeMA(upTo, 200);
-  if (ma50 == null || ma200 == null) return null;
+  // 12-month return for THIS symbol
+  const past = closes[idx - 252];
+  const ret12m = past > 0 ? ((cur - past) / past) * 100 : 0;
+  // Monthly rebalance check: only act once per ~21 sessions
+  const lastRebalanceIdx = position?._lastRebalIdx || 0;
+  if (hasPosition && (idx - lastRebalanceIdx) < 21) return null;
 
   if (hasPosition) {
-    if (ma50 < ma200) return { side: "sell", reason: "Death cross (MA50 < MA200)" };
-    if (cur <= entryPrice * 0.90) return { side: "sell", reason: `-10% stop` };
+    // Absolute momentum: if return turned negative, exit
+    if (ret12m <= 0) return { side: "sell", reason: `12m return ${ret12m.toFixed(1)}% — absolute momentum lost` };
+    // Otherwise stay (relative momentum check requires cross-symbol context we don't have here)
     return null;
   }
-  // Entry: uptrend established + price near MA50 support
-  if (ma50 > ma200) {
-    const distFromMa50 = Math.abs((cur - ma50) / ma50);
-    if (distFromMa50 <= 0.03) {
-      return { side: "buy", reason: `Uptrend + ${(distFromMa50 * 100).toFixed(1)}% from MA50` };
-    }
+  // Entry: 12m return must be strongly positive (we approximate "top of universe" with absolute threshold)
+  if (ret12m >= 10) {
+    return { side: "buy", reason: `12m momentum +${ret12m.toFixed(1)}%` };
+  }
+  return null;
+}
+
+// ----- Adaptive Asset Allocation -----
+// Entry: positive 6-month momentum AND volatility below recent average
+// Exit:  6-month return turns negative OR volatility spikes above 1.5× recent avg
+// Position sizing in the backtest engine is volatility-targeted (smaller for volatile assets)
+function adaptiveSignal(closes, highs, idx, hasPosition, entryPrice, _position, _times) {
+  if (idx < 126) return null; // need ~6 months
+  const cur = closes[idx];
+  const past6m = closes[idx - 126];
+  const ret6m = past6m > 0 ? ((cur - past6m) / past6m) * 100 : 0;
+
+  // Realized volatility over last 30 sessions vs last 90
+  const window30 = closes.slice(idx - 29, idx + 1);
+  const window90 = closes.slice(idx - 89, idx + 1);
+  const vol = (w) => {
+    if (w.length < 2) return 0;
+    const rets = []; for (let i = 1; i < w.length; i++) rets.push((w[i] / w[i-1]) - 1);
+    const m = rets.reduce((a,b)=>a+b,0) / rets.length;
+    const v = rets.reduce((s,r)=>s+(r-m)**2,0) / rets.length;
+    return Math.sqrt(v);
+  };
+  const vol30 = vol(window30), vol90 = vol(window90);
+
+  if (hasPosition) {
+    if (ret6m <= 0) return { side: "sell", reason: `6m return ${ret6m.toFixed(1)}% — momentum gone` };
+    if (vol90 > 0 && vol30 > vol90 * 1.5) return { side: "sell", reason: `Vol spike (${(vol30*100).toFixed(1)}% vs ${(vol90*100).toFixed(1)}% avg)` };
+    return null;
+  }
+  // Entry: positive 6m return + vol not elevated
+  if (ret6m >= 5 && (vol90 === 0 || vol30 <= vol90 * 1.2)) {
+    return { side: "buy", reason: `6m +${ret6m.toFixed(1)}%, vol in range` };
   }
   return null;
 }
@@ -3655,6 +4182,38 @@ function meanReversionSignal(closes, highs, idx, hasPosition, entryPrice, positi
 // directly — the backtest engine handles it via mode "dca".
 function dcaSignal() { return null; }
 
+// ----- Portfolio Bot — paper-trades the daily-scan logic in rule form -----
+// This is a backtest-compatible version of computeDailyScan, evaluated per symbol.
+// Buy: oversold (RSI<35) + significant drawdown from 90d peak (-7%+) — exact
+//      same logic the live scan uses for "ADD" recommendations
+// Sell: held position up significantly OR overbought OR -8% stop loss
+function portfolioBotSignal(closes, highs, idx, hasPosition, entryPrice, _position, _times) {
+  if (idx < 90) return null;
+  const cur = closes[idx];
+  const upToIdx = closes.slice(0, idx + 1);
+  const rsi = computeRSI(upToIdx, 14);
+  if (rsi == null) return null;
+  const slice90 = highs.slice(idx - 89, idx + 1);
+  const peak = Math.max(...slice90);
+  const dropFromPeak = peak > 0 ? ((cur - peak) / peak) * 100 : 0;
+
+  if (hasPosition) {
+    const pnlPct = ((cur - entryPrice) / entryPrice) * 100;
+    // Trim/exit on big gain (matches scan "TRIM at +25%" rule)
+    if (pnlPct >= 25) return { side: "sell", reason: `+${pnlPct.toFixed(1)}% — scan TRIM rule` };
+    // Overbought exit
+    if (rsi > 75) return { side: "sell", reason: `RSI ${rsi.toFixed(0)} overbought` };
+    // Stop loss
+    if (pnlPct <= -8) return { side: "sell", reason: `${pnlPct.toFixed(1)}% stop` };
+    return null;
+  }
+  // Buy: matches scan "ADD" rule (oversold + drawdown)
+  if (rsi < 35 && dropFromPeak <= -7) {
+    return { side: "buy", reason: `Scan ADD: RSI ${rsi.toFixed(0)} + ${dropFromPeak.toFixed(1)}% off peak` };
+  }
+  return null;
+}
+
 // ----- App Composite: Trend OR Dip Buyer (whichever fires) -----
 // The reasoning: Trend Follower captures bull-market breakouts, Dip Buyer
 // captures corrections. Each is in the market only ~25% of the time alone.
@@ -3691,7 +4250,15 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
 
   const universeSymbols = Object.keys(symbolOhlcv);
   // For B&H: deploy cash equally across all symbols
-  const bhSliceUSD = mode === "bh" ? startCapital / Math.max(1, universeSymbols.length) : null;
+  // For B&H: conviction-weighted slice across the universe
+  const bhTotalWeight = mode === "bh" ? getUniverseConvictionTotal(universeSymbols) : 0;
+  const bhSliceFor = (sym) => {
+    if (mode !== "bh" || bhTotalWeight === 0) return null;
+    return startCapital * (getConvictionWeight(sym) / bhTotalWeight);
+  };
+
+  // For DCA: per-cycle slice scaled by conviction
+  const DCA_BASE = 100; // base $ per cycle per symbol (will be scaled by conviction)
 
   // Build a unified date timeline (union of all symbols' dates), trimmed to lookbackDays
   const allDates = new Set();
@@ -3716,10 +4283,10 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
     }
   }
 
-  // For DCA: how many sessions between buys, and per-symbol slice
-  const DCA_INTERVAL = 14;       // sessions
-  const DCA_PER_SYMBOL = 100;    // USD per symbol per cycle
+  // For DCA: cycle every 14 sessions, slice scaled per symbol by conviction
+  const DCA_INTERVAL = 14;
   let dcaSessionCounter = 0;
+  const dcaSliceFor = (sym) => DCA_BASE * getConvictionWeight(sym); // $100/$200/$300 per cycle
 
   for (const t of dates) {
     let positionsValue = 0;
@@ -3782,8 +4349,8 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
         let sizeUSD;
         if (mode === "bh") {
           if (hasPos) continue;
-          sizeUSD = bhSliceUSD;
-          if (sim.cash < sizeUSD || sizeUSD < 100) continue;
+          sizeUSD = bhSliceFor(sym);
+          if (!sizeUSD || sim.cash < sizeUSD || sizeUSD < 50) continue;
           const txCost = sizeUSD * BOT_TX_COST_PCT;
           const investAmount = sizeUSD - txCost;
           const qty = investAmount / cur;
@@ -3795,7 +4362,7 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
           sim.cash -= sizeUSD;
           sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
         } else if (mode === "dca") {
-          sizeUSD = DCA_PER_SYMBOL;
+          sizeUSD = dcaSliceFor(sym);
           if (sim.cash < sizeUSD) continue;
           const txCost = sizeUSD * BOT_TX_COST_PCT;
           const investAmount = sizeUSD - txCost;
@@ -3865,16 +4432,70 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
 // `mode` = "active" | "bh" | "dca" — controls sizing in backtestStrategy.
 // The order here drives display order in the bot view.
 const BOT_STRATEGIES = [
-  { key: "dip",       label: "Dip Buyer",       tag: "DIP",     fn: appSignal,           mode: "active", color: "#b08d3c", desc: "RSI<35 + drop from peak" },
-  { key: "trend",     label: "Trend Follower",  tag: "TREND",   fn: trendSignal,         mode: "active", color: "#4a7a4a", desc: "50-day high breakout" },
-  { key: "composite", label: "App Composite",   tag: "COMP",    fn: compositeSignal,     mode: "active", color: "#c25a3a", desc: "Trend OR Dip — best of both" },
-  { key: "golden",    label: "Golden Cross",    tag: "GOLDEN",  fn: goldenCrossSignal,   mode: "active", color: "#a13d2d", desc: "MA50>MA200 + pullback to MA50" },
-  { key: "meanrev",   label: "Mean Reversion",  tag: "MEAN",    fn: meanReversionSignal, mode: "active", color: "#7a5cb0", desc: "Lower Bollinger Band" },
-  { key: "dca",       label: "Dollar-Cost Avg", tag: "DCA",     fn: dcaSignal,           mode: "dca",    color: "#5c8aa1", desc: "Buy $100 per symbol every 2 weeks" },
-  { key: "bh",        label: "Buy & Hold",      tag: "B&H",     fn: bhSignal,            mode: "bh",     color: "#4a4639", desc: "Equal-weight, never sells" },
+  { key: "dip",       label: "Dip Buyer",       tag: "DIP",      fn: appSignal,           mode: "active",    color: "#b08d3c", desc: "RSI<35 + drop from peak" },
+  { key: "trend",     label: "Trend Follower",  tag: "TREND",    fn: trendSignal,         mode: "active",    color: "#4a7a4a", desc: "50-day high breakout" },
+  { key: "composite", label: "App Composite",   tag: "COMP",     fn: compositeSignal,     mode: "active",    color: "#c25a3a", desc: "Trend OR Dip — best of both" },
+  { key: "portfolio", label: "Portfolio Bot",   tag: "PORTF",    fn: portfolioBotSignal,  mode: "active",    color: "#7a4a4a", desc: "Executes daily scan recommendations" },
+  { key: "golden",    label: "Dual Momentum",   tag: "DUAL",     fn: goldenCrossSignal,   mode: "active",    color: "#a13d2d", desc: "12-month absolute momentum (Antonacci)" },
+  { key: "adaptive",  label: "Adaptive AA",     tag: "ADAPT",    fn: adaptiveSignal,      mode: "active",    color: "#8a6a9c", desc: "6m momentum + volatility filter" },
+  { key: "meanrev",   label: "Mean Reversion",  tag: "MEAN",     fn: meanReversionSignal, mode: "active",    color: "#7a5cb0", desc: "Lower Bollinger Band" },
+  { key: "dca",       label: "Dollar-Cost Avg", tag: "DCA",      fn: dcaSignal,           mode: "dca",       color: "#5c8aa1", desc: "Buy $100 per symbol every 2 weeks · conviction-weighted" },
+  { key: "bh",        label: "Buy & Hold",      tag: "B&H",      fn: bhSignal,            mode: "bh",        color: "#4a4639", desc: "Conviction-weighted, never sells" },
 ];
 
 function getStrategy(key) { return BOT_STRATEGIES.find(s => s.key === key); }
+
+// ============================================================================
+// CURATED PICKS — sourced from credible analyst reports & research firms
+// All picks include source + date. This is research, NOT advice — you decide.
+// Snapshot taken from sources published Dec 2025 - Feb 2026.
+// ============================================================================
+const CURATED_PICKS = [
+  // High-conviction individual stocks
+  { symbol: "BN",    name: "Brookfield Corp",         theme: "AI Infrastructure + Real Estate",  source: "Motley Fool",     date: "Jan 2026", thesis: "AI infrastructure fund (up to $100B AUM target), wealth solutions growth, real estate recovery. 25% est. annual earnings growth over 5 years." },
+  { symbol: "META",  name: "Meta Platforms",          theme: "AI Applications",                  source: "Motley Fool",     date: "Jan 2026", thesis: "Personal AI superintelligence vision, billions of daily AI chatbot users, growing AI glasses demand. Reinvesting heavily in moat." },
+  { symbol: "NEE",   name: "NextEra Energy",          theme: "AI Power Demand",                  source: "Motley Fool",     date: "Jan 2026", thesis: "Partner of choice for AI data center power deals (Meta, Google). Clean energy + grid build-out beneficiary." },
+  { symbol: "KMI",   name: "Kinder Morgan",           theme: "Natural Gas for AI",               source: "Motley Fool",     date: "Jan 2026", thesis: "$20B+ in gas infra capex, 28 bcf/day gas demand growth by 2030 (~25%). 4%+ dividend with growth runway." },
+  { symbol: "AMZN",  name: "Amazon",                  theme: "AI Cloud + AWS",                   source: "RBC Capital",     date: "Jan 2026", thesis: "Best-in-class AWS AI ROIC, compelling product/capacity acceleration cycle. AWS growth expected to accelerate." },
+  { symbol: "MSFT",  name: "Microsoft",               theme: "Large-cap Software/AI",            source: "Morgan Stanley",  date: "Jan 2026", thesis: "Robust mid-teens top-line growth, room for margin expansion. $650 PT. Top pick in large-cap software." },
+  { symbol: "MU",    name: "Micron",                  theme: "Semis (Memory)",                   source: "TipRanks/RBC",    date: "Jan 2026", thesis: "DRAM + NAND bit shipments +20% in 2026 from AI demand. Stock trades at <6x next-12mo EPS." },
+  { symbol: "MRK",   name: "Merck",                   theme: "Healthcare Value",                 source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Attractive valuation + clinical catalysts. Safe haven from expensive tech multiples." },
+  { symbol: "VRTX",  name: "Vertex Pharma",           theme: "Healthcare Value",                 source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Attractive valuation, clinical catalysts. Defensive healthcare with growth visibility." },
+  { symbol: "CEG",   name: "Constellation Energy",    theme: "Nuclear Power for AI",             source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Pure-play nuclear utility, AI data-center power contracts. Multi-decade visibility from hyperscaler deals." },
+  { symbol: "BA",    name: "Boeing",                  theme: "Industrial Cyclical",              source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Production stability catalyst, recovery from 2024-25 issues. Balanced barbell to high-growth tech." },
+  { symbol: "SPOT",  name: "Spotify",                 theme: "High-quality Cyclical",            source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Audio platform monetization curve, pricing power, healthy free cash flow trajectory." },
+  { symbol: "DG",    name: "Dollar General",          theme: "K-shaped Consumer",                source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Higher-than-expected tax refund cycle as tailwind for lower-income shoppers." },
+  { symbol: "NKE",   name: "Nike",                    theme: "Recovery Story",                   source: "BTIG",            date: "Jan 2026", thesis: "$100 PT (~57% upside from Dec 2025). Product pipeline, 2026 World Cup catalyst, insider buying." },
+  { symbol: "XYZ",   name: "Block (Square)",          theme: "Fintech Growth",                   source: "BTIG",            date: "Jan 2026", thesis: "$90 PT (~38% upside). Most compelling large-cap fintech, profitable mid-teens growth Cash App + Square." },
+  { symbol: "LVMUY", name: "LVMH (ADR)",              theme: "Luxury / Europe Rotation",         source: "Kiplinger",       date: "Dec 2025", thesis: "French luxury conglomerate, 75 elite brands (Dior, Tiffany, Dom Perignon). International rotation play." },
+  { symbol: "ROP",   name: "Roper Technologies",      theme: "Niche Software",                   source: "Truist/Kiplinger",date: "Dec 2025", thesis: "Diversified niche software (education, transport, healthcare). Off March highs — re-entry zone." },
+
+  // ETFs (sector / thematic)
+  { symbol: "URA",   name: "Global X Uranium ETF",    theme: "Nuclear Power for AI",             source: "Global X Themes", date: "Feb 2026", thesis: "Dominant nuclear ETF as corporates pivot to clean firm power. 6+ GW corporate clean firm announcements in 2025." },
+  { symbol: "SMH",   name: "VanEck Semiconductors",   theme: "AI Picks & Shovels",               source: "WalletInvestor",  date: "Feb 2026", thesis: "Premier semi vehicle. TSMC + chip designers as 'picks and shovels' of AI revolution." },
+  { symbol: "XLU",   name: "Utilities Sector",        theme: "AI Power Demand",                  source: "WalletInvestor",  date: "Feb 2026", thesis: "Defensive growth + AI power play. Multi-year up-cycle from data center electricity demand." },
+  { symbol: "BAI",   name: "BlackRock AI ETF",        theme: "AI Infrastructure (active)",       source: "etf.com",         date: "Feb 2026", thesis: "Largest thematic ETF ($13.7B AUM), 38% 3-month return. Actively managed AI infra exposure." },
+  { symbol: "CHAT",  name: "Roundhill Generative AI", theme: "Generative AI (active)",           source: "Roundhill",       date: "Feb 2026", thesis: "Actively managed, proprietary AI exposure scoring. 0.75% ER. Targeted gen-AI play." },
+  { symbol: "CIBR",  name: "First Trust Cybersec",    theme: "Cybersecurity",                    source: "etf.com",         date: "Feb 2026", thesis: "$11B+ AUM cyber leader. CrowdStrike, Broadcom holdings. Beneficiary of AI-driven threat landscape." },
+  { symbol: "GRID",  name: "First Trust Grid Infra",  theme: "Electrification",                  source: "etf.com",         date: "Feb 2026", thesis: "16.8% quarterly return. Grid modernization for AI data centers + electrification transition." },
+  { symbol: "IGM",   name: "iShares Expanded Tech",   theme: "Broad NA Tech",                    source: "etf.com",         date: "Feb 2026", thesis: "Cost-effective ($9.71B AUM, 0.39% ER) diversified NA tech exposure beyond S&P 500 tech." },
+  { symbol: "ARGT",  name: "Global X Argentina",      theme: "EM Rotation",                      source: "Kiplinger",       date: "Dec 2025", thesis: "Diversified play on Milei's reforms post-midterm victory. Riskier but contrarian EM exposure." },
+];
+
+// Conviction-based weight for a symbol. Used to size B&H and DCA positions.
+// "high" = 3, "medium" = 2, "low" = 1, no analysis = 1 (treat as average).
+// Returns the symbol's weight; caller divides by total weight of universe.
+function getConvictionWeight(symbol) {
+  const a = state.analyses?.[symbol];
+  const conv = (a?.conviction || "").toLowerCase();
+  if (conv === "high") return 3;
+  if (conv === "medium") return 2;
+  if (conv === "low") return 1;
+  return 1;
+}
+function getUniverseConvictionTotal(symbols) {
+  return symbols.reduce((sum, s) => sum + getConvictionWeight(s), 0);
+}
 
 async function runBacktest() {
   const universe = botUniverse();
@@ -3945,13 +4566,14 @@ async function runForwardStep() {
   }
 
   // DCA cadence: count sessions since this strategy's start, buy every 14
-  // We use equity points as a session counter proxy (one push per step)
   const dcaSim = state.bot.dca;
-  const isDcaDay = ((dcaSim.equity?.length || 0) % 14 === 0); // every 14 steps including the very first
-  const DCA_PER_SYMBOL = 100;
+  const isDcaDay = ((dcaSim.equity?.length || 0) % 14 === 0);
+  const DCA_BASE = 100;
+  const dcaSliceFor = (sym) => DCA_BASE * getConvictionWeight(sym);
 
-  // B&H slice
-  const bhSliceUSD = BOT_STARTING_CAPITAL / universe.length;
+  // B&H: conviction-weighted slice
+  const bhTotalWeight = getUniverseConvictionTotal(universe);
+  const bhSliceFor = (sym) => bhTotalWeight > 0 ? BOT_STARTING_CAPITAL * (getConvictionWeight(sym) / bhTotalWeight) : 0;
 
   for (const sym of Object.keys(symData)) {
     const data = symData[sym];
@@ -4010,9 +4632,9 @@ async function runForwardStep() {
         let sizeUSD;
         if (strat.mode === "bh") {
           if (hasPos) continue;
-          sizeUSD = bhSliceUSD;
+          sizeUSD = bhSliceFor(sym);
         } else if (strat.mode === "dca") {
-          sizeUSD = DCA_PER_SYMBOL;
+          sizeUSD = dcaSliceFor(sym);
           if (sim.cash < sizeUSD) continue;
           const txCost = sizeUSD * BOT_TX_COST_PCT;
           const investAmount = sizeUSD - txCost;
@@ -4396,6 +5018,12 @@ function toggleAnalysis(key) {
   }
 }
 
+function toggleWatchouts() {
+  state.showWatchouts = !state.showWatchouts;
+  localStorage.setItem("showWatchouts", state.showWatchouts ? "1" : "0");
+  renderCurrentView();
+}
+
 function renderSettings() {
   $("#topbarTitle").textContent = "Settings";
   const view = $("#view");
@@ -4421,6 +5049,13 @@ function renderSettings() {
       <div class="setting-row">
         <div><div class="lbl">Change PIN</div><div class="sub">Reset your local lock</div></div>
         <button class="btn btn-secondary btn-sm" data-act="reset-pin">Change</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="lbl">Daily Watchouts</div>
+          <div class="sub">Show drawdown/profit alerts on Portfolio. Off by default.</div>
+        </div>
+        <div class="toggle ${state.showWatchouts ? 'on' : ''}" data-act="toggle-watchouts"></div>
       </div>
     </div>
     <div class="settings-group">
@@ -5181,6 +5816,8 @@ document.addEventListener("click", (e) => {
       case "auth-migrate-no":        handleMigrate(false); break;
       case "sign-out":               signOutUser(); break;
       case "delete-journal":         deleteJournalEntry(target.dataset.id); break;
+      case "add-curated":            addCuratedToWatchlist(target.dataset.symbol, target.dataset.name); break;
+      case "toggle-watchouts":       toggleWatchouts(); break;
     }
   } catch (err) {
     showError("Action failed: " + err.message);
