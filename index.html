@@ -3414,13 +3414,34 @@ function renderPortfolio() {
 
 function renderOpportunityPulse() {
   if (!state.triggers || state.triggers.length === 0) return "";
-  const list = state.triggers.slice(0, 6);
+
+  // Build exclusion sets:
+  //   1) symbols you already hold (Opp Pulse is for NEW ideas, not your existing book)
+  //   2) symbols already surfaced in Today's Buys & Adds card (don't show same symbol twice)
+  const heldSymbols = new Set(state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol));
+  const scanActions = computeDailyScan();
+  const scanSymbols = new Set(scanActions.map(a => a.symbol));
+
+  // Filter triggers:
+  //   - drop anything we hold
+  //   - drop anything already in the daily scan (it's there with sizing)
+  //   - drop anything missing critical data (no price or no RSI — would render as "$—  RSI —")
+  const filtered = state.triggers.filter(t => {
+    if (heldSymbols.has(t.symbol)) return false;
+    if (scanSymbols.has(t.symbol)) return false;
+    if (t.current_price == null || t.rsi14 == null) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) return "";
+
+  const list = filtered.slice(0, 6);
   const items = list.map(t => `
     <div class="opp-row" data-act="open-trigger" data-symbol="${escAttr(t.symbol)}" data-trigger-id="${escAttr(t.id)}">
       <div class="opp-main">
         <div class="opp-sym">${escAttr(t.symbol)}</div>
         <div class="opp-cond">${escAttr(t.label || t.type)}</div>
-        <div class="opp-meta">$${fmtUSD(t.current_price)} · RSI ${t.rsi14 != null ? t.rsi14 : '—'} · ${t.trend === 'above_200ma' ? 'above 200MA' : 'below 200MA'}</div>
+        <div class="opp-meta">$${fmtUSD(t.current_price)} · RSI ${t.rsi14} · ${t.trend === 'above_200ma' ? 'above 200MA' : 'below 200MA'}</div>
       </div>
       <div class="opp-arrow">›</div>
     </div>
@@ -3432,7 +3453,7 @@ function renderOpportunityPulse() {
           <div class="opp-pulse-eyebrow">Watchlist Triggers</div>
           <div class="ttl">Setups worth a look</div>
         </div>
-        <span class="count">${state.triggers.length} new</span>
+        <span class="count">${filtered.length} new</span>
       </div>
       ${items}
     </div>
