@@ -377,6 +377,13 @@ body {
   border-radius: 5px;
   font-family: var(--mono); font-size: 11px;
 }
+.watch-suggest-strip.contradicts {
+  background: rgba(176,141,60,0.10);
+  border-color: var(--gold);
+}
+.watch-suggest-strip.contradicts .wss-action {
+  color: var(--gold);
+}
 .wss-action {
   font-family: var(--display); font-weight: 500; font-size: 12.5px;
   color: var(--green); flex: 1; min-width: 0;
@@ -756,6 +763,16 @@ body {
 .ai-stamp {
   font-family: var(--mono); font-size: 9.5px; color: var(--ink-muted);
   letter-spacing: 0.04em; padding: 0 20px 14px; line-height: 1.5;
+}
+.ai-sanity-note {
+  margin: 0 20px 14px;
+  padding: 8px 12px;
+  background: rgba(176,141,60,0.10);
+  border: 1px solid var(--gold);
+  border-radius: 5px;
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--gold);
+  line-height: 1.5;
 }
 
 .empty-ai { text-align: center; padding: 30px 20px; color: var(--ink-muted); font-size: 13px; }
@@ -1175,9 +1192,14 @@ body {
   border-top: 1px solid var(--rule-soft);
 }
 .discover-item-head {
-  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
   margin-bottom: 6px;
 }
+.discover-actions-row {
+  display: flex; gap: 6px; align-items: center;
+  flex-shrink: 0;
+}
+.discover-actions-row .btn { white-space: nowrap; }
 .discover-sym {
   font-family: var(--display); font-size: 14px; font-weight: 600;
   margin-right: 6px;
@@ -3576,21 +3598,34 @@ function renderWatchlist() {
     const trendClass = snap?.trend === "above_200ma" ? "above" : "below";
 
     // Suggested entry strip — only when a condition has actually fired
+    // BUT: suppress when the daily scan is telling us to TRIM this same symbol.
+    // The user's mental model is "if I'm told to trim it, don't also tell me to buy."
     let suggestStrip = "";
     if (hasTrigger && snap?.current_price) {
       const heldHere = state.holdings.some(h => h.symbol === w.symbol && h.asset_class !== "cash");
-      const kind = heldHere ? "add" : "open";
-      const setup = snap.setup_score || 0;
-      const strength = setup >= 70 ? 1.5 : 1.0;
-      const size = suggestBuySize(w.symbol, kind, strength);
-      if (size.dollars > 0) {
+      // Check if the symbol is being recommended for TRIM in today's scan
+      const scanContradicts = (computeDailyScan() || []).some(a => a.symbol === w.symbol && a.kind === "trim");
+      if (scanContradicts) {
         suggestStrip = `
-          <div class="watch-suggest-strip">
-            <span class="wss-action">${kind === "add" ? "Add" : "Enter"} ~$${fmtUSD(size.dollars, 0)} (~${size.pct.toFixed(1)}%)</span>
-            <span class="wss-price">at $${fmtUSD(snap.current_price)}</span>
-            <button class="wss-log" data-act="log-trade" data-symbol="${escAttr(w.symbol)}" onclick="event.stopPropagation();">Log</button>
+          <div class="watch-suggest-strip contradicts">
+            <span class="wss-action">Daily scan suggests TRIM</span>
+            <span class="wss-price">Review the scan card before buying more</span>
           </div>
         `;
+      } else {
+        const kind = heldHere ? "add" : "open";
+        const setup = snap.setup_score || 0;
+        const strength = setup >= 70 ? 1.5 : 1.0;
+        const size = suggestBuySize(w.symbol, kind, strength);
+        if (size.dollars > 0) {
+          suggestStrip = `
+            <div class="watch-suggest-strip">
+              <span class="wss-action">${kind === "add" ? "Add" : "Enter"} ~$${fmtUSD(size.dollars, 0)} (~${size.pct.toFixed(1)}%)</span>
+              <span class="wss-price">at $${fmtUSD(snap.current_price)}</span>
+              <button class="wss-log" data-act="log-trade" data-symbol="${escAttr(w.symbol)}" onclick="event.stopPropagation();">Log</button>
+            </div>
+          `;
+        }
       }
     }
 
@@ -3736,6 +3771,27 @@ function renderDiscoverIdeas() {
       const onList = inWatchlist.has(p.symbol);
       const owned = held.has(p.symbol);
       const dynamicBadge = p._dynamic ? `<span class="discover-fresh-badge">new</span>` : "";
+      // Action buttons: always show Analyze; Watch only if not held/listed
+      let actionButtons;
+      if (owned) {
+        actionButtons = `
+          <div class="discover-actions-row">
+            <span class="discover-tag held">Held</span>
+            <button class="btn btn-secondary btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Analyze</button>
+          </div>`;
+      } else if (onList) {
+        actionButtons = `
+          <div class="discover-actions-row">
+            <span class="discover-tag onlist">On Watchlist</span>
+            <button class="btn btn-secondary btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Analyze</button>
+          </div>`;
+      } else {
+        actionButtons = `
+          <div class="discover-actions-row">
+            <button class="btn btn-sm" data-act="add-curated" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">+ Watch</button>
+            <button class="btn btn-secondary btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Analyze</button>
+          </div>`;
+      }
       return `
         <div class="discover-item">
           <div class="discover-item-head">
@@ -3744,9 +3800,7 @@ function renderDiscoverIdeas() {
               <span class="discover-name">${escAttr(p.name)}</span>
               ${dynamicBadge}
             </div>
-            ${owned ? `<span class="discover-tag held">Held</span>`
-              : onList ? `<span class="discover-tag onlist">On Watchlist</span>`
-              : `<button class="btn btn-sm" data-act="add-curated" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">+ Watch</button>`}
+            ${actionButtons}
           </div>
           <div class="discover-thesis">${escAttr(p.thesis)}</div>
           <div class="discover-source">
@@ -3917,6 +3971,24 @@ async function addCuratedToWatchlist(symbol, name) {
   } catch (e) {
     toast(`Failed to add: ${e.message || e}`, 3000, "error");
   }
+}
+
+// Analyze a Discover Ideas pick directly without adding to watchlist.
+// Navigates to the asset detail view and kicks off analysis.
+async function analyzeFromDiscover(symbol, name) {
+  if (!symbol) return;
+  toast(`Loading ${symbol}…`, 1500);
+  // Switch to markets view, then render asset detail (renderAssetDetail handles unknown symbols)
+  state.currentView = "markets";
+  state.selectedSymbol = symbol;
+  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === "markets"));
+  await renderAssetDetail(symbol);
+  // After view is rendered, trigger the analysis (with sanity check)
+  setTimeout(() => {
+    runAnalysis(symbol).catch(e => {
+      toast(`Analysis failed: ${(e.message || e).slice(0, 100)}`, 3000, "error");
+    });
+  }, 300);
 }
 function cryptoRandomId() {
   return "c" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -4339,6 +4411,7 @@ function renderAiCard(symbol, a) {
       <button class="btn btn-secondary btn-sm" data-act="log-trade" data-symbol="${escAttr(symbol)}">Log Trade</button>
     </div>
     <div class="ai-stamp">Generated ${fmtRel(a.generated_at)} · This is a tool, not advice. You decide.</div>
+    ${a.data_sanity_note ? `<div class="ai-sanity-note">⚠ ${escAttr(a.data_sanity_note)}</div>` : ""}
     ` : `
     <div class="recommended-action-banner ${stanceToClass(stance)} compact" data-act="toggle-analysis" data-key="${escAttr(symbol)}" style="cursor:pointer;">
       <div class="rab-text">${escAttr(recommendedAction)}</div>
@@ -4543,6 +4616,10 @@ async function runAnalysis(symbol) {
         ...j.analysis, symbol,
         generated_at: new Date().toISOString(),
         current_price: j.current_price,
+        // Record the sanity-check signal so the analysis card can show it
+        data_sanity_note: preCheck && preCheck.severity !== "none"
+          ? `Data sanity: ${preCheck.severity}. ${preCheck.issues.map(i => i.msg).join(" ")}`.slice(0, 240)
+          : null,
       };
       toast("Analysis complete");
       renderAssetDetail(symbol);
@@ -6892,6 +6969,7 @@ document.addEventListener("click", (e) => {
       case "sign-out":               signOutUser(); break;
       case "delete-journal":         deleteJournalEntry(target.dataset.id); break;
       case "add-curated":            addCuratedToWatchlist(target.dataset.symbol, target.dataset.name); break;
+      case "analyze-from-discover":  analyzeFromDiscover(target.dataset.symbol, target.dataset.name); break;
       case "toggle-watchouts":       toggleWatchouts(); break;
       case "refresh-discover":       refreshDiscover(); break;
       case "clear-discover":         clearDiscoverDynamic(); break;
