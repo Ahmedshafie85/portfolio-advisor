@@ -1170,6 +1170,57 @@ body {
   background: var(--bg-elev);
   border-top: 1px solid var(--rule-soft);
 }
+
+/* Discover search + theme filter */
+.discover-search-bar {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 18px;
+  border-top: 1px solid var(--rule-soft);
+}
+.discover-search-bar input {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--bg); border: 1px solid var(--rule); border-radius: 6px;
+  font-family: var(--sans); font-size: 13px; color: var(--ink);
+  -webkit-appearance: none;
+}
+.discover-search-bar input:focus { outline: none; border-color: var(--ink); }
+.discover-clear-btn {
+  background: transparent; border: 1px solid var(--rule); border-radius: 6px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em;
+  padding: 7px 11px; color: var(--ink-muted);
+  cursor: pointer; text-transform: uppercase;
+  white-space: nowrap;
+}
+.discover-clear-btn:hover { color: var(--ink); border-color: var(--ink); }
+.discover-theme-pills {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 0 18px 12px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.discover-theme-pill {
+  background: var(--bg-elev); border: 1px solid var(--rule-soft);
+  border-radius: 14px;
+  padding: 5px 11px;
+  font-family: var(--sans); font-size: 11.5px;
+  color: var(--ink-soft); cursor: pointer;
+  white-space: nowrap;
+  transition: all .12s;
+}
+.discover-theme-pill:hover { border-color: var(--ink-soft); color: var(--ink); }
+.discover-theme-pill.active {
+  background: var(--ink); color: var(--bg); border-color: var(--ink);
+}
+.theme-pill-count {
+  font-family: var(--mono); font-size: 9.5px;
+  opacity: 0.7; margin-left: 3px;
+}
+.discover-no-results {
+  padding: 24px 18px; text-align: center;
+  font-family: var(--mono); font-size: 12px; color: var(--ink-muted);
+  font-style: italic;
+}
+.discover-no-results strong { color: var(--ink); font-style: normal; }
 .discover-fresh-badge {
   display: inline-block;
   margin-left: 6px;
@@ -1788,10 +1839,10 @@ const state = {
   chart: null,
   theme: localStorage.getItem("theme") || "day",
   lastScanAt: null,
-  // bot simulator: 11 strategies in parallel
-  bot: { dip: null, trend: null, composite: null, portfolio: null, golden: null, adaptive: null, meanrev: null, dca: null, valueavg: null, regime: null, bh: null },
+  // bot simulator: 6 strategies in parallel (cut from 11 in May 2026 cleanup)
+  bot: { trend: null, portfolio: null, dca: null, valueavg: null, regime: null, bh: null },
   botRunning: false,
-  botChartVisible: { dip: true, bh: true, composite: true, portfolio: true, valueavg: true, regime: true, trend: false, golden: false, adaptive: false, meanrev: false, dca: false },
+  botChartVisible: { trend: true, portfolio: true, dca: true, valueavg: true, regime: true, bh: true },
   ohlcvCache: {}, // symbol -> { ohlcv, fetched_at }
   expandedAnalyses: {}, // key -> bool; "portfolio" or symbol
   showWatchouts: localStorage.getItem("showWatchouts") === "1", // opt-in
@@ -1800,6 +1851,8 @@ const state = {
   discoverDynamic: null,        // array of {symbol, name, theme, source, date, thesis} from live refresh
   discoverDynamicFetchedAt: null,
   discoverRefreshing: false,
+  discoverSearch: "",            // user's filter text
+  discoverThemeFilter: null,     // selected theme, or null for "all"
 };
 document.documentElement.setAttribute("data-theme", state.theme);
 
@@ -2889,7 +2942,11 @@ function computeDailyScan() {
     }
 
     // Rule 2: TRIM — secondary. Only on big gains or extreme overbought.
-    if (hm.pnlPct != null && hm.pnlPct >= 40 && conv !== "low") {
+    // SUPPRESSED when asset is currently in a pullback (>10% off 90d peak):
+    // contradicting "add on weakness" with "trim on strength" in the same card is confusing.
+    // If the asset is far below its peak, the right action is ADD (which fires above), not TRIM.
+    const inPullback = (dropFromPeak != null && dropFromPeak <= -10);
+    if (!inPullback && hm.pnlPct != null && hm.pnlPct >= 40 && conv !== "low") {
       actions.push({
         symbol: h.symbol, kind: "trim",
         text: `Trim 20-30% of ${h.symbol} on strength above $${fmtUSD(cur)}`,
@@ -2897,7 +2954,7 @@ function computeDailyScan() {
         confidence: hm.pnlPct >= 70 ? "high" : "medium",
         sortKey: -hm.pnlPct,
       });
-    } else if (rsi != null && rsi > 80) {
+    } else if (!inPullback && rsi != null && rsi > 80) {
       actions.push({
         symbol: h.symbol, kind: "trim",
         text: `Trim 10-15% of ${h.symbol} on RSI extreme`,
@@ -2906,6 +2963,7 @@ function computeDailyScan() {
         sortKey: -rsi,
       });
     } else if (stance.includes("sell") || stance.includes("trim") || stance.includes("reduce")) {
+      // Analysis-based trim CAN fire even in a pullback because the AI has its own logic
       actions.push({
         symbol: h.symbol, kind: "trim",
         text: analysis?.recommended_action || `Trim ${h.symbol} per analysis`,
@@ -2948,15 +3006,20 @@ function computeDailyScan() {
     }
   }
 
+  // Dedup pass: if a symbol has both ADD/OPEN and TRIM, keep only the buy.
+  // The buy is the higher-priority action — trimming and adding the same symbol simultaneously is contradictory.
+  const buySymbols = new Set(actions.filter(a => a.kind === "add" || a.kind === "open").map(a => a.symbol));
+  const deduped = actions.filter(a => !(a.kind === "trim" && buySymbols.has(a.symbol)));
+
   // Sort: ADDS first (priority — buying matters more than selling),
   // then OPENS (new ideas), then TRIMS (secondary). Within a kind, highest signal strength first.
-  actions.sort((a, b) => {
+  deduped.sort((a, b) => {
     const order = { add: 0, open: 1, trim: 2 };
     if (order[a.kind] !== order[b.kind]) return order[a.kind] - order[b.kind];
     return a.sortKey - b.sortKey;
   });
 
-  return actions.slice(0, 5); // cap at 5
+  return deduped.slice(0, 5); // cap at 5
 }
 
 function renderDailyScan() {
@@ -3430,9 +3493,32 @@ function renderDiscoverIdeas() {
     merged.push(p);
   }
 
-  // Group by theme
-  const byTheme = {};
+  // Group by theme (BEFORE filter — themes list is the full universe of themes)
+  const byThemeAll = {};
   for (const p of merged) {
+    if (!byThemeAll[p.theme]) byThemeAll[p.theme] = [];
+    byThemeAll[p.theme].push(p);
+  }
+  const allThemes = Object.keys(byThemeAll).sort((a, b) => byThemeAll[b].length - byThemeAll[a].length);
+
+  // Apply search + theme filter
+  const search = (state.discoverSearch || "").trim().toLowerCase();
+  const themeFilter = state.discoverThemeFilter;
+  const filtered = merged.filter(p => {
+    if (themeFilter && p.theme !== themeFilter) return false;
+    if (!search) return true;
+    return (
+      p.symbol.toLowerCase().includes(search) ||
+      (p.name || "").toLowerCase().includes(search) ||
+      (p.thesis || "").toLowerCase().includes(search) ||
+      (p.theme || "").toLowerCase().includes(search) ||
+      (p.source || "").toLowerCase().includes(search)
+    );
+  });
+
+  // Group filtered results by theme for display
+  const byTheme = {};
+  for (const p of filtered) {
     if (!byTheme[p.theme]) byTheme[p.theme] = [];
     byTheme[p.theme].push(p);
   }
@@ -3441,7 +3527,12 @@ function renderDiscoverIdeas() {
   const freshLabel = state.discoverDynamicFetchedAt
     ? `Fresh: ${fmtRel(state.discoverDynamicFetchedAt)}`
     : "Static snapshot (Dec 2025 – May 2026)";
-  const summary = `${merged.length} ideas · ${themes.length} themes · ${freshLabel}`;
+
+  // Summary shows filter context if any filter is active
+  const filterActive = !!(search || themeFilter);
+  const summary = filterActive
+    ? `${filtered.length} of ${merged.length} ideas · ${freshLabel}`
+    : `${merged.length} ideas · ${allThemes.length} themes · ${freshLabel}`;
 
   if (!expanded) {
     return `
@@ -3495,6 +3586,15 @@ function renderDiscoverIdeas() {
     `;
   }).join("");
 
+  // Build theme filter pills (always show ALL themes, current selection highlighted)
+  const themePills = allThemes.map(t => {
+    const isActive = themeFilter === t;
+    return `<button class="discover-theme-pill ${isActive ? 'active' : ''}" data-act="filter-theme" data-theme="${escAttr(t)}">${escAttr(t)} <span class="theme-pill-count">${byThemeAll[t].length}</span></button>`;
+  }).join("");
+
+  // Empty-state if filters return nothing
+  const noResults = filtered.length === 0 && (search || themeFilter);
+
   return `
     <div class="discover-card expanded">
       <div class="discover-head" data-act="toggle-analysis" data-key="discover" style="cursor:pointer;">
@@ -3510,8 +3610,17 @@ function renderDiscoverIdeas() {
         <button class="btn btn-sm" data-act="refresh-discover" ${state.discoverRefreshing ? "disabled" : ""}>${refreshBtnLabel}</button>
         ${state.discoverDynamicFetchedAt ? `<button class="btn btn-secondary btn-sm" data-act="clear-discover">Reset to static</button>` : ""}
       </div>
+      <div class="discover-search-bar">
+        <input type="text" id="discoverSearch" placeholder="Search symbol, name, thesis, source..." value="${escAttr(search)}" autocomplete="off" />
+        ${(search || themeFilter) ? `<button class="discover-clear-btn" data-act="clear-discover-filters">Clear filters</button>` : ""}
+      </div>
+      <div class="discover-theme-pills">
+        ${themePills}
+      </div>
       <div class="discover-disclaimer">Research from credible sources. Not advice — you decide. Tap Refresh to fetch fresh ideas via AI (requires worker support).</div>
-      ${themeBlocks}
+      ${noResults
+        ? `<div class="discover-no-results">No ideas match your search${themeFilter ? ` in <strong>${escAttr(themeFilter)}</strong>` : ""}. Try a different keyword or clear the filter.</div>`
+        : themeBlocks}
     </div>
   `;
 }
@@ -3572,6 +3681,43 @@ function clearDiscoverDynamic() {
   state.discoverDynamicFetchedAt = null;
   renderCurrentView();
 }
+
+function toggleDiscoverThemeFilter(theme) {
+  // Tap the active theme to clear it; tap a different theme to switch
+  if (state.discoverThemeFilter === theme) {
+    state.discoverThemeFilter = null;
+  } else {
+    state.discoverThemeFilter = theme;
+  }
+  renderCurrentView();
+}
+
+function clearDiscoverFilters() {
+  state.discoverSearch = "";
+  state.discoverThemeFilter = null;
+  renderCurrentView();
+}
+
+// Hooked up after every renderCurrentView via an input event listener on body (delegation).
+// Debounced so we don't re-render on every keystroke.
+let _discoverSearchTimer = null;
+document.addEventListener("input", e => {
+  if (e.target && e.target.id === "discoverSearch") {
+    clearTimeout(_discoverSearchTimer);
+    _discoverSearchTimer = setTimeout(() => {
+      state.discoverSearch = e.target.value;
+      // Re-render but keep focus on input
+      renderCurrentView();
+      const newInput = document.getElementById("discoverSearch");
+      if (newInput) {
+        newInput.focus();
+        // Move cursor to end
+        const len = newInput.value.length;
+        newInput.setSelectionRange(len, len);
+      }
+    }, 220);
+  }
+});
 
 async function addCuratedToWatchlist(symbol, name) {
   if (!symbol) return;
@@ -4970,18 +5116,17 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
 // Strategy registry: all six strategies + how to run them.
 // `mode` = "active" | "bh" | "dca" — controls sizing in backtestStrategy.
 // The order here drives display order in the bot view.
+// Strategy registry: 6 strategies after cleanup.
+// Cuts (May 2026): Dip Buyer, App Composite, Mean Reversion, Dual Momentum, Adaptive AA
+// — they either underperformed materially or were redundant with kept strategies.
+// `mode` controls sizing/cadence; `fn` is the signal function.
 const BOT_STRATEGIES = [
-  { key: "dip",       label: "Dip Buyer",       tag: "DIP",      fn: appSignal,           mode: "active",    color: "#b08d3c", desc: "RSI<35 + drop from peak" },
-  { key: "trend",     label: "Trend Follower",  tag: "TREND",    fn: trendSignal,         mode: "active",    color: "#4a7a4a", desc: "50-day high breakout" },
-  { key: "composite", label: "App Composite",   tag: "COMP",     fn: compositeSignal,     mode: "active",    color: "#c25a3a", desc: "Trend OR Dip — best of both" },
-  { key: "portfolio", label: "Portfolio Bot",   tag: "PORTF",    fn: portfolioBotSignal,  mode: "active",    color: "#7a4a4a", desc: "Daily scan rules + AI analysis stances (forward mode)" },
-  { key: "golden",    label: "Dual Momentum",   tag: "DUAL",     fn: goldenCrossSignal,   mode: "active",    color: "#a13d2d", desc: "12-month absolute momentum (Antonacci)" },
-  { key: "adaptive",  label: "Adaptive AA",     tag: "ADAPT",    fn: adaptiveSignal,      mode: "active",    color: "#8a6a9c", desc: "6m momentum + volatility filter" },
-  { key: "meanrev",   label: "Mean Reversion",  tag: "MEAN",     fn: meanReversionSignal, mode: "active",    color: "#7a5cb0", desc: "Lower Bollinger Band" },
+  { key: "trend",     label: "Trend Follower",  tag: "TREND",    fn: trendSignal,         mode: "active",    color: "#4a7a4a", desc: "50-day high breakout — captures bull runs" },
+  { key: "portfolio", label: "Portfolio Bot",   tag: "PORTF",    fn: portfolioBotSignal,  mode: "active",    color: "#7a4a4a", desc: "Reality-check: paper-trades the daily scan rules" },
   { key: "dca",       label: "Dollar-Cost Avg", tag: "DCA",      fn: dcaSignal,           mode: "dca",       color: "#5c8aa1", desc: "Buy $100 per symbol every 2 weeks · conviction-weighted" },
   { key: "valueavg",  label: "Value Averaging", tag: "VALUE",    fn: valueAvgSignal,      mode: "valueavg",  color: "#3a7c8c", desc: "Edleson: buy more when below target path, less when above" },
   { key: "regime",    label: "Regime Switch",   tag: "REGIME",   fn: regimeSwitchSignal,  mode: "regime",    color: "#8a4a5c", desc: "Faber: B&H when breadth strong, 50% cash when weak" },
-  { key: "bh",        label: "Buy & Hold",      tag: "B&H",      fn: bhSignal,            mode: "bh",        color: "#4a4639", desc: "Conviction-weighted, never sells" },
+  { key: "bh",        label: "Buy & Hold",      tag: "B&H",      fn: bhSignal,            mode: "bh",        color: "#4a4639", desc: "Conviction-weighted, never sells — gold-standard baseline" },
 ];
 
 function getStrategy(key) { return BOT_STRATEGIES.find(s => s.key === key); }
@@ -6409,6 +6554,8 @@ document.addEventListener("click", (e) => {
       case "toggle-watchouts":       toggleWatchouts(); break;
       case "refresh-discover":       refreshDiscover(); break;
       case "clear-discover":         clearDiscoverDynamic(); break;
+      case "filter-theme":           toggleDiscoverThemeFilter(target.dataset.theme); break;
+      case "clear-discover-filters": clearDiscoverFilters(); break;
       case "dismiss-breakout-prompt": dismissBreakoutPrompt(); break;
       case "add-breakout-conditions": addBreakoutConditionsToHeld(); break;
     }
