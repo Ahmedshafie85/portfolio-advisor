@@ -1206,6 +1206,54 @@ body {
 }
 .breakout-prompt-dismiss:hover { color: var(--red); }
 
+/* ===== BUY SUGGESTION CARD (watchlist detail) ===== */
+.buy-suggest-card {
+  margin: 12px 20px;
+  background: var(--bg-card);
+  border: 2px solid var(--green);
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+}
+.buy-suggest-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--green);
+}
+.buy-suggest-head {
+  display: flex; justify-content: space-between; align-items: start; gap: 12px;
+  padding: 16px 18px 8px;
+}
+.buy-suggest-eyebrow {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.10em;
+  color: var(--green); text-transform: uppercase; margin-bottom: 6px;
+  font-weight: 600;
+}
+.buy-suggest-action {
+  font-family: var(--display); font-size: 17px; font-weight: 500;
+  line-height: 1.3; color: var(--ink); margin-bottom: 4px;
+}
+.buy-suggest-meta {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-muted);
+  line-height: 1.4;
+}
+.buy-suggest-why {
+  padding: 0 18px 8px;
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft);
+  line-height: 1.45;
+}
+.buy-suggest-disclaimer {
+  padding: 8px 18px;
+  background: var(--bg-elev);
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted);
+  line-height: 1.5;
+  border-top: 1px solid var(--rule-soft);
+}
+.buy-suggest-actions {
+  display: flex; gap: 8px;
+  padding: 10px 18px 14px;
+  border-top: 1px solid var(--rule-soft);
+}
+
 /* ===== DAILY PORTFOLIO SCAN ===== */
 .scan-card {
   margin: 14px 20px;
@@ -1740,10 +1788,10 @@ const state = {
   chart: null,
   theme: localStorage.getItem("theme") || "day",
   lastScanAt: null,
-  // bot simulator: 9 strategies in parallel
-  bot: { dip: null, trend: null, composite: null, portfolio: null, golden: null, adaptive: null, meanrev: null, dca: null, bh: null },
+  // bot simulator: 11 strategies in parallel
+  bot: { dip: null, trend: null, composite: null, portfolio: null, golden: null, adaptive: null, meanrev: null, dca: null, valueavg: null, regime: null, bh: null },
   botRunning: false,
-  botChartVisible: { dip: true, bh: true, composite: true, portfolio: true, trend: false, golden: false, adaptive: false, meanrev: false, dca: false },
+  botChartVisible: { dip: true, bh: true, composite: true, portfolio: true, valueavg: true, regime: true, trend: false, golden: false, adaptive: false, meanrev: false, dca: false },
   ohlcvCache: {}, // symbol -> { ohlcv, fetched_at }
   expandedAnalyses: {}, // key -> bool; "portfolio" or symbol
   showWatchouts: localStorage.getItem("showWatchouts") === "1", // opt-in
@@ -2734,7 +2782,43 @@ function dismissBreakoutPrompt() {
 // ============================================================================
 // DAILY PORTFOLIO SCAN — synthesized "what to do today" actions.
 // Rule-based so it works in backtest. AI analyses are used as a conviction modifier.
+// Sizing: each suggested ADD/OPEN includes a $ amount derived from portfolio total,
+// conviction, and signal strength. Sizes are SUGGESTIONS — you decide.
 // ============================================================================
+function computeTotalPortfolioValue() {
+  let total = 0;
+  for (const h of state.holdings) {
+    if (h.asset_class === "cash") { total += h.quantity || 0; continue; }
+    const cur = state.prices[h.symbol]?.current_price;
+    if (cur) total += (h.quantity || 0) * cur;
+  }
+  return total;
+}
+function getCashAvailable() {
+  const cashH = state.holdings.find(h => h.asset_class === "cash" && h.symbol === "CASH");
+  return cashH?.quantity || 0;
+}
+// Suggested buy size for a symbol:
+//   base = 2% of portfolio for new entries, 1% for adds to existing
+//   * conviction multiplier (high=1.5x, medium=1x, low=0.5x)
+//   * signal-strength bump (-15% off peak = bigger size, etc.)
+// Capped at 50% of available cash to prevent over-allocation in any single trade.
+function suggestBuySize(symbol, kind, signalStrength = 1.0) {
+  const total = computeTotalPortfolioValue();
+  const cash = getCashAvailable();
+  if (total <= 0 || cash <= 0) return { dollars: 0, pct: 0 };
+  const a = state.analyses?.[symbol];
+  const conv = (a?.conviction || "").toLowerCase();
+  const convMult = conv === "high" ? 1.5 : conv === "low" ? 0.5 : 1.0;
+  const basePct = kind === "open" ? 0.02 : 0.01; // 2% for new, 1% for add
+  let pct = basePct * convMult * signalStrength;
+  let dollars = total * pct;
+  // Cap at 50% of available cash so we don't accidentally deploy everything in one buy
+  if (dollars > cash * 0.5) dollars = cash * 0.5;
+  if (dollars < 50) return { dollars: 0, pct: 0 }; // too small to bother
+  return { dollars, pct: (dollars / total) * 100 };
+}
+
 function computeDailyScan() {
   const actions = [];
 
@@ -2762,9 +2846,49 @@ function computeDailyScan() {
       }
     }
 
-    // Rule 1: TRIM — held position up >40% (raised from 25%), OR analysis says trim/sell, OR RSI>80
-    // Bull-market tuning: don't tell the user to trim winners too early. The 25%
-    // threshold was selling out of moves that would have doubled.
+    // Rule 1: ADD — held position with dip or RSI oversold (THIS IS THE LEAD)
+    if (rsi != null && rsi < 40 && hm.pnlPct != null && hm.pnlPct > -12) {
+      const strength = rsi < 30 ? 1.5 : 1.0;
+      const size = suggestBuySize(h.symbol, "add", strength);
+      if (size.dollars > 0) {
+        actions.push({
+          symbol: h.symbol, kind: "add",
+          text: `Add ~$${fmtUSD(size.dollars, 0)} of ${h.symbol} (~${size.pct.toFixed(1)}% of portfolio) at $${fmtUSD(cur)}`,
+          why: `RSI ${rsi.toFixed(0)} oversold — productive add zone if thesis intact`,
+          confidence: rsi < 30 ? "high" : "medium",
+          sortKey: rsi,
+          buySize: size,
+        });
+      }
+    } else if (dropFromPeak != null && dropFromPeak <= -10 && hm.pnlPct != null && hm.pnlPct > -12) {
+      const strength = dropFromPeak <= -15 ? 1.5 : 1.0;
+      const size = suggestBuySize(h.symbol, "add", strength);
+      if (size.dollars > 0) {
+        actions.push({
+          symbol: h.symbol, kind: "add",
+          text: `Add ~$${fmtUSD(size.dollars, 0)} of ${h.symbol} (~${size.pct.toFixed(1)}% of portfolio) at $${fmtUSD(cur)}`,
+          why: `${dropFromPeak.toFixed(1)}% off 90d peak — normal pullback, not a breakdown`,
+          confidence: dropFromPeak <= -15 ? "high" : "medium",
+          sortKey: dropFromPeak,
+          buySize: size,
+        });
+      }
+    } else if (stance.includes("buy") || stance.includes("accumulate") || stance.includes("add")) {
+      const strength = conv === "high" ? 1.3 : 1.0;
+      const size = suggestBuySize(h.symbol, "add", strength);
+      if (size.dollars > 0) {
+        actions.push({
+          symbol: h.symbol, kind: "add",
+          text: `Add ~$${fmtUSD(size.dollars, 0)} of ${h.symbol} (~${size.pct.toFixed(1)}% of portfolio) per analysis`,
+          why: analysis?.headline || `App stance: ${stance.toUpperCase()}`,
+          confidence: analysis?.confidence || "medium",
+          sortKey: -90,
+          buySize: size,
+        });
+      }
+    }
+
+    // Rule 2: TRIM — secondary. Only on big gains or extreme overbought.
     if (hm.pnlPct != null && hm.pnlPct >= 40 && conv !== "low") {
       actions.push({
         symbol: h.symbol, kind: "trim",
@@ -2790,35 +2914,6 @@ function computeDailyScan() {
         sortKey: -100,
       });
     }
-
-    // Rule 2: ADD — EITHER RSI oversold (<40) OR significant drop from peak (>=10%).
-    // Was AND with stricter thresholds (RSI<35 AND drop<=-7%) — too rarely fired
-    // in bull markets, meaning held positions weren't getting added to during normal pullbacks.
-    if (rsi != null && rsi < 40 && hm.pnlPct != null && hm.pnlPct > -12) {
-      actions.push({
-        symbol: h.symbol, kind: "add",
-        text: `Add 5-10% to ${h.symbol} on weakness at $${fmtUSD(cur)}`,
-        why: `RSI ${rsi.toFixed(0)} oversold — productive add zone if thesis intact`,
-        confidence: rsi < 30 ? "high" : "medium",
-        sortKey: rsi,
-      });
-    } else if (dropFromPeak != null && dropFromPeak <= -10 && hm.pnlPct != null && hm.pnlPct > -12) {
-      actions.push({
-        symbol: h.symbol, kind: "add",
-        text: `Add 5-10% to ${h.symbol} on pullback at $${fmtUSD(cur)}`,
-        why: `${dropFromPeak.toFixed(1)}% off 90d peak — normal pullback, not a breakdown`,
-        confidence: dropFromPeak <= -15 ? "high" : "medium",
-        sortKey: dropFromPeak,
-      });
-    } else if (stance.includes("buy") || stance.includes("accumulate") || stance.includes("add")) {
-      actions.push({
-        symbol: h.symbol, kind: "add",
-        text: analysis?.recommended_action || `Add to ${h.symbol} per analysis`,
-        why: analysis?.headline || `App stance: ${stance.toUpperCase()}`,
-        confidence: analysis?.confidence || "medium",
-        sortKey: -90,
-      });
-    }
   }
 
   // Also surface watchlist setups that aren't held (potential new positions)
@@ -2830,18 +2925,33 @@ function computeDailyScan() {
     const cur = snap.current_price;
     const setup = snap.setup_score || 0;
     if (setup < 40) continue;
-    actions.push({
-      symbol: w.symbol, kind: "open",
-      text: `Open small starter position in ${w.symbol} at $${fmtUSD(cur)}`,
-      why: `Multiple conditions firing (${snap.triggers.length}) · setup score ${setup}`,
-      confidence: setup >= 70 ? "high" : "medium",
-      sortKey: -setup,
-    });
+    const strength = setup >= 70 ? 1.5 : 1.0;
+    const size = suggestBuySize(w.symbol, "open", strength);
+    if (size.dollars > 0) {
+      actions.push({
+        symbol: w.symbol, kind: "open",
+        text: `Open ~$${fmtUSD(size.dollars, 0)} position in ${w.symbol} (~${size.pct.toFixed(1)}% of portfolio) at $${fmtUSD(cur)}`,
+        why: `${snap.triggers.length} condition${snap.triggers.length === 1 ? "" : "s"} firing · setup score ${setup}`,
+        confidence: setup >= 70 ? "high" : "medium",
+        sortKey: -setup,
+        buySize: size,
+      });
+    } else {
+      // Still show without dollar amount if portfolio is empty/cash is 0
+      actions.push({
+        symbol: w.symbol, kind: "open",
+        text: `New setup on ${w.symbol} at $${fmtUSD(cur)} — consider opening starter position`,
+        why: `${snap.triggers.length} condition${snap.triggers.length === 1 ? "" : "s"} firing · setup score ${setup}`,
+        confidence: setup >= 70 ? "high" : "medium",
+        sortKey: -setup,
+      });
+    }
   }
 
-  // Sort: highest priority first (most negative sortKey)
+  // Sort: ADDS first (priority — buying matters more than selling),
+  // then OPENS (new ideas), then TRIMS (secondary). Within a kind, highest signal strength first.
   actions.sort((a, b) => {
-    const order = { trim: 0, add: 1, open: 2 };
+    const order = { add: 0, open: 1, trim: 2 };
     if (order[a.kind] !== order[b.kind]) return order[a.kind] - order[b.kind];
     return a.sortKey - b.sortKey;
   });
@@ -2855,10 +2965,10 @@ function renderDailyScan() {
     return `
       <div class="scan-card">
         <div class="scan-head">
-          <h3>Today's Plan</h3>
-          <span class="scan-pill" style="background:var(--bg-elev);color:var(--ink-muted);">No actions</span>
+          <h3>Today's Buys & Adds</h3>
+          <span class="scan-pill" style="background:var(--bg-elev);color:var(--ink-muted);">No setups</span>
         </div>
-        <div class="scan-empty">Nothing actionable today. Hold positions, watch the watchlist.</div>
+        <div class="scan-empty">No actionable buy setups today. Hold positions, wait for weakness.</div>
       </div>
     `;
   }
@@ -2868,8 +2978,8 @@ function renderDailyScan() {
   return `
     <div class="scan-card">
       <div class="scan-head">
-        <h3>Today's Plan</h3>
-        <span class="scan-pill">${actions.length} action${actions.length === 1 ? "" : "s"}</span>
+        <h3>Today's Buys & Adds</h3>
+        <span class="scan-pill">${actions.length} idea${actions.length === 1 ? "" : "s"}</span>
       </div>
       <div class="scan-list">
         ${actions.map(a => `
@@ -3505,6 +3615,55 @@ function renderWatchDetail(symbol) {
     `;
   }).join("");
 
+  // Build a buy-suggestion card if any conditions have fired
+  let buyCard = "";
+  if (snap?.triggers?.length > 0) {
+    const heldHere = state.holdings.some(h => h.symbol === symbol && h.asset_class !== "cash");
+    const kind = heldHere ? "add" : "open";
+    const firedConditions = snap.triggers.map(t => describeCondition({ type: t.condition_type || "", ...t })).join(", ");
+    const setup = snap.setup_score || 0;
+    const strength = setup >= 70 ? 1.5 : 1.0;
+    const size = suggestBuySize(symbol, kind, strength);
+    const cur = snap?.current_price;
+    const portfolioTotal = computeTotalPortfolioValue();
+    const cashAvail = getCashAvailable();
+    if (size.dollars > 0 && cur) {
+      const sharesEstimate = size.dollars / cur;
+      buyCard = `
+        <div class="buy-suggest-card">
+          <div class="buy-suggest-head">
+            <div>
+              <div class="buy-suggest-eyebrow">${snap.triggers.length} condition${snap.triggers.length === 1 ? "" : "s"} firing · ${kind === "add" ? "you hold this" : "new entry"}</div>
+              <div class="buy-suggest-action">Consider ${kind === "add" ? "adding" : "buying"} ~$${fmtUSD(size.dollars, 0)} of ${symbol}</div>
+              <div class="buy-suggest-meta">≈ ${sharesEstimate < 1 ? sharesEstimate.toFixed(4) : sharesEstimate.toFixed(2)} units at $${fmtUSD(cur)} · ${size.pct.toFixed(1)}% of $${fmtUSD(portfolioTotal, 0)} portfolio</div>
+            </div>
+            <span class="scan-conf ${setup >= 70 ? "high" : "medium"}">${setup >= 70 ? "high" : "med"} conf</span>
+          </div>
+          <div class="buy-suggest-why">Fired: ${escAttr(firedConditions)}</div>
+          <div class="buy-suggest-disclaimer">Cash available: $${fmtUSD(cashAvail, 0)}. Size is a suggestion based on your portfolio % — adjust as you see fit. <strong>Not advice.</strong></div>
+          <div class="buy-suggest-actions">
+            <button class="btn btn-sm" data-act="log-trade" data-symbol="${escAttr(symbol)}">Log Trade</button>
+            <button class="btn btn-secondary btn-sm" data-act="open-asset-from-watch" data-symbol="${escAttr(symbol)}">View Chart First</button>
+          </div>
+        </div>
+      `;
+    } else if (cur) {
+      // Triggers fired but no sizable buy (e.g. zero cash) — still show alert
+      buyCard = `
+        <div class="buy-suggest-card">
+          <div class="buy-suggest-head">
+            <div>
+              <div class="buy-suggest-eyebrow">${snap.triggers.length} condition${snap.triggers.length === 1 ? "" : "s"} firing</div>
+              <div class="buy-suggest-action">Setup forming on ${symbol} at $${fmtUSD(cur)}</div>
+              <div class="buy-suggest-meta">${cashAvail < 50 ? "Insufficient cash to suggest a size" : "Setup score " + setup}</div>
+            </div>
+          </div>
+          <div class="buy-suggest-why">Fired: ${escAttr(firedConditions)}</div>
+        </div>
+      `;
+    }
+  }
+
   view.innerHTML = `
     <div class="detail-head">
       <button class="detail-back" data-act="back-watch">← Watchlist</button>
@@ -3513,6 +3672,8 @@ function renderWatchDetail(symbol) {
       <div class="detail-price">${snap?.current_price != null ? '$' + fmtUSD(snap.current_price) : '—'}</div>
       <div class="detail-change ${(snap?.day_change_pct || 0) >= 0 ? 'pos' : 'neg'}">${snap?.day_change_pct != null ? fmtPct(snap.day_change_pct) + ' today' : '—'}</div>
     </div>
+
+    ${buyCard}
 
     <div class="ind-strip">
       <div class="ind-cell"><div class="label">RSI 14</div><div class="val ${snap?.rsi14 < 35 ? 'warn' : ''}">${snap?.rsi14 != null ? snap.rsi14 : '—'}</div></div>
@@ -4423,6 +4584,8 @@ function meanReversionSignal(closes, highs, idx, hasPosition, entryPrice, positi
 // Buys $100 of each universe symbol every 14 sessions. Doesn't use this signal fn
 // directly — the backtest engine handles it via mode "dca".
 function dcaSignal() { return null; }
+function valueAvgSignal() { return null; } // handled in engine like DCA
+function regimeSwitchSignal() { return null; } // handled in engine
 
 // ----- Portfolio Bot — paper-trades the daily-scan logic, TUNED for bull markets -----
 // v2 (May 2026): The original Portfolio Bot lost money on the 2-year backtest
@@ -4550,10 +4713,63 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
   let dcaSessionCounter = 0;
   const dcaSliceFor = (sym) => DCA_BASE * getConvictionWeight(sym); // $100/$200/$300 per cycle
 
+  // For Value-Averaging: each cycle, target grows by a fixed amount.
+  // Target = (cycleIdx * targetIncrement) * convictionWeight / totalConvWeight
+  // Buys are sized to bring actual symbol value up to target. Above target → smaller buys or skip.
+  // Edleson's method beats DCA by buying more on dips, less on rallies, automatically.
+  const valueAvgTotalWeight = mode === "valueavg" ? getUniverseConvictionTotal(universeSymbols) : 0;
+  const VALUE_AVG_CYCLE_INCREMENT = startCapital / 60; // spread starting capital over 60 cycles (~2 years bi-weekly)
+  let valueAvgCycleIdx = 0;
+  const valueAvgTargetFor = (sym, cycleN) => {
+    if (mode !== "valueavg" || valueAvgTotalWeight === 0) return 0;
+    const symWeight = getConvictionWeight(sym) / valueAvgTotalWeight;
+    return cycleN * VALUE_AVG_CYCLE_INCREMENT * symWeight;
+  };
+
+  // For Regime-Switch (Faber tactical): check breadth monthly (21 sessions).
+  // breadth = % of universe symbols above their 200-day MA on this date.
+  // breadth >= 60%: be 100% equity (like B&H)
+  // breadth <= 40%: hold only 50% equity, 50% cash
+  // 40-60%: hold current allocation (no action)
+  // Rebalancing happens on regime-check days only.
+  const REGIME_CHECK_INTERVAL = 21; // sessions ≈ monthly
+  const regimeTotalWeight = mode === "regime" ? getUniverseConvictionTotal(universeSymbols) : 0;
+  const regimeFullSliceFor = (sym) => {
+    if (mode !== "regime" || regimeTotalWeight === 0) return 0;
+    return startCapital * (getConvictionWeight(sym) / regimeTotalWeight);
+  };
+  // Compute breadth for the current date — % of symbols with cur > 200d MA
+  function computeBreadth(t) {
+    let above = 0, total = 0;
+    for (const sym of universeSymbols) {
+      const idx = indexed[sym].byT[t];
+      if (idx == null || idx < 200) continue;
+      const ma200 = computeMA(indexed[sym].closes.slice(0, idx + 1), 200);
+      if (ma200 == null) continue;
+      total++;
+      if (indexed[sym].closes[idx] > ma200) above++;
+    }
+    return total === 0 ? 0.5 : above / total;
+  }
+
+  let regimeMode = "neutral"; // "risk-on" | "neutral" | "risk-off"
+  let lastRegimeCheckIdx = -REGIME_CHECK_INTERVAL;
+
   for (const t of dates) {
     let positionsValue = 0;
     dcaSessionCounter++;
     const isDcaDay = (mode === "dca") && (dcaSessionCounter % DCA_INTERVAL === 1);
+    const isValueAvgDay = (mode === "valueavg") && (dcaSessionCounter % DCA_INTERVAL === 1);
+    if (isValueAvgDay) valueAvgCycleIdx++;
+    // Regime check: do this once per ~21 sessions
+    const regimeDayIdx = dcaSessionCounter;
+    const isRegimeCheckDay = (mode === "regime") && ((regimeDayIdx - lastRegimeCheckIdx) >= REGIME_CHECK_INTERVAL);
+    if (isRegimeCheckDay) {
+      lastRegimeCheckIdx = regimeDayIdx;
+      const breadth = computeBreadth(t);
+      const newMode = breadth >= 0.60 ? "risk-on" : (breadth <= 0.40 ? "risk-off" : regimeMode);
+      regimeMode = newMode;
+    }
 
     for (const sym of universeSymbols) {
       const idx = indexed[sym].byT[t];
@@ -4587,16 +4803,49 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
         if (isDcaDay && sim.cash >= sliceForThis) {
           sig = { side: "buy", reason: `DCA cycle ${Math.ceil(dcaSessionCounter / DCA_INTERVAL)}` };
         }
+      } else if (mode === "valueavg") {
+        // Value Averaging: compute target value for this symbol, compare to actual.
+        // If actual < target, buy enough to catch up. If actual > target by a lot, sell excess.
+        if (isValueAvgDay) {
+          const target = valueAvgTargetFor(sym, valueAvgCycleIdx);
+          const actual = hasPos ? (position.qty * cur) : 0;
+          const gap = target - actual;
+          if (gap > 50 && sim.cash >= gap) {
+            // Buy to fill the gap. Note: we mark size in the reason for the engine to pick up.
+            sig = { side: "buy", reason: `VA cycle ${valueAvgCycleIdx} (gap +$${gap.toFixed(0)})`, _vaSize: gap };
+          } else if (gap < -200 && hasPos) {
+            // Sell down the excess (sell ~half the gap to avoid being too jumpy)
+            const sellPortion = Math.min(0.5, Math.abs(gap) / actual);
+            sig = { side: "sell", reason: `VA cycle ${valueAvgCycleIdx} (excess $${(-gap).toFixed(0)})`, _vaSellPortion: sellPortion };
+          }
+        }
+      } else if (mode === "regime") {
+        // Regime-switch: only act on check days
+        if (isRegimeCheckDay) {
+          const fullSlice = regimeFullSliceFor(sym);
+          const targetMultiplier = regimeMode === "risk-off" ? 0.5 : 1.0; // 50% in risk-off, 100% otherwise
+          const targetValue = fullSlice * targetMultiplier;
+          const actual = hasPos ? (position.qty * cur) : 0;
+          const gap = targetValue - actual;
+          if (gap > 100 && sim.cash >= gap) {
+            sig = { side: "buy", reason: `Regime ${regimeMode}: enter/add`, _vaSize: gap };
+          } else if (gap < -100 && hasPos) {
+            const sellPortion = Math.min(1.0, Math.abs(gap) / actual);
+            sig = { side: "sell", reason: `Regime ${regimeMode}: trim to ${(targetMultiplier*100).toFixed(0)}%`, _vaSellPortion: sellPortion };
+          }
+        }
       } else {
         sig = strategyFn(closes, highs, idx, hasPos, entryPrice, position, times);
       }
 
       if (sig?.side === "sell" && hasPos) {
         const pos = sim.positions[sym];
-        const grossProceeds = pos.qty * cur;
+        // For Value-Avg and Regime modes, support PARTIAL sells via _vaSellPortion
+        const sellQty = sig._vaSellPortion ? pos.qty * sig._vaSellPortion : pos.qty;
+        const grossProceeds = sellQty * cur;
         const txCost = grossProceeds * BOT_TX_COST_PCT;
         const proceeds = grossProceeds - txCost;
-        const pnl = proceeds - (pos.qty * pos.entryPrice);
+        const pnl = proceeds - (sellQty * pos.entryPrice);
         const pnlPct = ((cur / pos.entryPrice) - 1) * 100;
         sim.cash += proceeds;
         sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
@@ -4604,10 +4853,15 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
           symbol: sym,
           entryDate: pos.entryDate, exitDate: new Date(t).toISOString().slice(0,10),
           entryPrice: pos.entryPrice, exitPrice: cur,
-          qty: pos.qty, pnl, pnlPct,
+          qty: sellQty, pnl, pnlPct,
           entryReason: pos.entryReason, exitReason: sig.reason,
         });
-        delete sim.positions[sym];
+        if (sig._vaSellPortion && sig._vaSellPortion < 0.999) {
+          // Partial sell: reduce qty but keep position open at same avg cost
+          pos.qty -= sellQty;
+        } else {
+          delete sim.positions[sym];
+        }
       } else if (sig?.side === "buy") {
         let sizeUSD;
         if (mode === "bh") {
@@ -4641,6 +4895,28 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
               entryDate: new Date(t).toISOString().slice(0,10),
               entryPrice: cur, qty: addQty, entryReason: sig.reason,
               _entryIdx: idx,
+            };
+          }
+          sim.cash -= sizeUSD;
+          sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
+        } else if (mode === "valueavg" || mode === "regime") {
+          // Value-Avg / Regime: size determined by sig._vaSize (gap to target)
+          sizeUSD = sig._vaSize || 0;
+          if (sizeUSD < 50 || sim.cash < sizeUSD) continue;
+          const txCost = sizeUSD * BOT_TX_COST_PCT;
+          const investAmount = sizeUSD - txCost;
+          const addQty = investAmount / cur;
+          if (hasPos) {
+            const pos = sim.positions[sym];
+            const newQty = pos.qty + addQty;
+            const newCost = (pos.qty * pos.entryPrice) + investAmount;
+            pos.qty = newQty;
+            pos.entryPrice = newCost / newQty;
+          } else {
+            sim.positions[sym] = {
+              entryDate: new Date(t).toISOString().slice(0,10),
+              entryPrice: cur, qty: addQty, entryReason: sig.reason,
+              peakSinceEntry: cur, daysHeld: 0, _entryIdx: idx,
             };
           }
           sim.cash -= sizeUSD;
@@ -4703,6 +4979,8 @@ const BOT_STRATEGIES = [
   { key: "adaptive",  label: "Adaptive AA",     tag: "ADAPT",    fn: adaptiveSignal,      mode: "active",    color: "#8a6a9c", desc: "6m momentum + volatility filter" },
   { key: "meanrev",   label: "Mean Reversion",  tag: "MEAN",     fn: meanReversionSignal, mode: "active",    color: "#7a5cb0", desc: "Lower Bollinger Band" },
   { key: "dca",       label: "Dollar-Cost Avg", tag: "DCA",      fn: dcaSignal,           mode: "dca",       color: "#5c8aa1", desc: "Buy $100 per symbol every 2 weeks · conviction-weighted" },
+  { key: "valueavg",  label: "Value Averaging", tag: "VALUE",    fn: valueAvgSignal,      mode: "valueavg",  color: "#3a7c8c", desc: "Edleson: buy more when below target path, less when above" },
+  { key: "regime",    label: "Regime Switch",   tag: "REGIME",   fn: regimeSwitchSignal,  mode: "regime",    color: "#8a4a5c", desc: "Faber: B&H when breadth strong, 50% cash when weak" },
   { key: "bh",        label: "Buy & Hold",      tag: "B&H",      fn: bhSignal,            mode: "bh",        color: "#4a4639", desc: "Conviction-weighted, never sells" },
 ];
 
