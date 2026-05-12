@@ -192,7 +192,7 @@ body {
 .holding-icon[data-class="metal"]  { background: var(--bg); border-color: var(--gold); color: var(--gold); }
 .holding-icon[data-class="etf"]    { background: var(--bg); border-color: var(--ink-soft); color: var(--ink-soft); }
 .holding-icon[data-class="cash"]   { background: var(--bg); border-color: var(--ink-muted); color: var(--ink-muted); }
-.holding-main { flex: 1; min-width: 0; }
+.holding-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .holding-symbol { font-family: var(--display); font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
 .holding-name {
   font-size: 11.5px; color: var(--ink-muted); margin-top: 1px;
@@ -205,17 +205,23 @@ body {
 .holding-pnl.neg { color: var(--red); }
 .holding-pnl.flat { color: var(--ink-muted); }
 .holding-stance {
-  position: absolute; top: 16px; right: 14px;
-  font-family: var(--mono); font-size: 8.5px; font-weight: 600;
+  font-family: var(--mono); font-size: 9px; font-weight: 600;
   padding: 2px 6px; border-radius: 3px; letter-spacing: 0.1em;
   display: none;
+  margin-top: 3px;
+  align-self: flex-start;
 }
 .holding-stance.show { display: inline-block; }
-.holding-stance.ACCUMULATE { background: rgba(74,122,74,0.15); color: var(--green); }
-.holding-stance.HOLD       { background: var(--bg-elev); color: var(--ink-soft); }
-.holding-stance.TRIM       { background: rgba(176,141,60,0.15); color: var(--gold); }
-.holding-stance.EXIT       { background: rgba(161,61,45,0.15); color: var(--red); }
-.holding-stance.AVOID      { background: rgba(161,61,45,0.10); color: var(--red-soft); }
+.holding-stance.ACCUMULATE,
+.holding-stance.BUY,
+.holding-stance.ADD       { background: rgba(74,122,74,0.15); color: var(--green); }
+.holding-stance.HOLD,
+.holding-stance.NEUTRAL,
+.holding-stance.WAIT      { background: var(--bg-elev); color: var(--ink-soft); }
+.holding-stance.TRIM      { background: rgba(176,141,60,0.15); color: var(--gold); }
+.holding-stance.SELL,
+.holding-stance.EXIT      { background: rgba(161,61,45,0.15); color: var(--red); }
+.holding-stance.AVOID     { background: rgba(161,61,45,0.10); color: var(--red-soft); }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -354,6 +360,33 @@ body {
   background: rgba(176,141,60,0.18); color: var(--gold);
   border: 1px solid var(--gold);
 }
+
+/* Suggested entry strip — shown at bottom of watch row when conditions fire */
+.watch-suggest-strip {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 8px;
+  padding: 8px 11px;
+  background: rgba(74,122,74,0.10);
+  border: 1px solid var(--green);
+  border-radius: 5px;
+  font-family: var(--mono); font-size: 11px;
+}
+.wss-action {
+  font-family: var(--display); font-weight: 500; font-size: 12.5px;
+  color: var(--green); flex: 1; min-width: 0;
+}
+.wss-price {
+  color: var(--ink-soft); font-size: 10.5px; white-space: nowrap;
+}
+.wss-log {
+  background: var(--green); color: var(--bg); border: none;
+  padding: 4px 10px; border-radius: 4px;
+  font-family: var(--sans); font-size: 10.5px; font-weight: 500;
+  letter-spacing: 0.04em; cursor: pointer;
+  flex-shrink: 0;
+}
+.wss-log:hover { opacity: 0.85; }
 
 .watch-detail-actions {
   display: flex; gap: 8px; flex-wrap: wrap;
@@ -1257,6 +1290,21 @@ body {
 }
 .breakout-prompt-dismiss:hover { color: var(--red); }
 
+/* ===== STRATEGY TIER HEADERS (bot tab) ===== */
+.strategy-tier-header {
+  margin: 22px 20px 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.strategy-tier-label {
+  font-family: var(--display); font-size: 16px; font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.strategy-tier-hint {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-muted);
+  margin-top: 3px; letter-spacing: 0.02em;
+}
+
 /* ===== BUY SUGGESTION CARD (watchlist detail) ===== */
 .buy-suggest-card {
   margin: 12px 20px;
@@ -1337,6 +1385,32 @@ body {
   padding: 14px 18px 22px;
   font-family: var(--mono); font-size: 12px; color: var(--ink-muted);
   text-align: center; font-style: italic;
+}
+.scan-deployment-summary {
+  padding: 10px 18px;
+  background: var(--bg-elev);
+  border-top: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.scan-deployment-summary.low { background: rgba(74,122,74,0.06); }
+.scan-deployment-summary.medium { background: rgba(176,141,60,0.06); }
+.scan-deployment-summary.high { background: rgba(161,61,45,0.06); }
+.sds-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+}
+.sds-label {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em;
+  color: var(--ink-muted); text-transform: uppercase;
+}
+.sds-value {
+  font-family: var(--display); font-size: 13px; font-weight: 500;
+  color: var(--ink);
+  text-align: right;
+}
+.sds-note {
+  margin-top: 4px;
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted);
+  font-style: italic;
 }
 .scan-list { padding: 0; }
 .scan-item {
@@ -1839,10 +1913,10 @@ const state = {
   chart: null,
   theme: localStorage.getItem("theme") || "day",
   lastScanAt: null,
-  // bot simulator: 6 strategies in parallel (cut from 11 in May 2026 cleanup)
-  bot: { trend: null, portfolio: null, dca: null, valueavg: null, regime: null, bh: null },
+  // bot simulator: 7 strategies in parallel (tier-organized May 2026)
+  bot: { bh: null, dca: null, valueavg: null, trend: null, dip: null, regime: null, portfolio: null },
   botRunning: false,
-  botChartVisible: { trend: true, portfolio: true, dca: true, valueavg: true, regime: true, bh: true },
+  botChartVisible: { bh: true, dca: true, valueavg: true, trend: true, dip: true, regime: true, portfolio: true },
   ohlcvCache: {}, // symbol -> { ohlcv, fetched_at }
   expandedAnalyses: {}, // key -> bool; "portfolio" or symbol
   showWatchouts: localStorage.getItem("showWatchouts") === "1", // opt-in
@@ -3019,7 +3093,46 @@ function computeDailyScan() {
     return a.sortKey - b.sortKey;
   });
 
-  return deduped.slice(0, 5); // cap at 5
+  const top = deduped.slice(0, 5);
+
+  // ===== Portfolio-aware sizing =====
+  // Compute total recommended cash deployment across all buy/open suggestions.
+  // If total exceeds 50% of available cash, scale every suggestion down proportionally
+  // so the cumulative deployment stays under 50% of cash. This prevents 5 ADD signals
+  // all firing at full size and exhausting your cash budget in one card.
+  const cashAvail = getCashAvailable();
+  const portfolioTotal = computeTotalPortfolioValue();
+  const DEPLOYMENT_CAP_PCT = 0.50; // hard cap: don't recommend deploying more than 50% of cash per scan
+  const buyActions = top.filter(a => (a.kind === "add" || a.kind === "open") && a.buySize?.dollars > 0);
+  const totalSuggested = buyActions.reduce((sum, a) => sum + a.buySize.dollars, 0);
+  const maxDeployment = cashAvail * DEPLOYMENT_CAP_PCT;
+  let scaleFactor = 1;
+  if (totalSuggested > maxDeployment && totalSuggested > 0) {
+    scaleFactor = maxDeployment / totalSuggested;
+    // Apply scale to each buy action's size
+    for (const a of buyActions) {
+      const newDollars = a.buySize.dollars * scaleFactor;
+      const newPct = portfolioTotal > 0 ? (newDollars / portfolioTotal) * 100 : 0;
+      a.buySize = { dollars: newDollars, pct: newPct };
+      // Rewrite the text with the new dollar amount
+      // Find the original number after "~$" and replace, or rebuild
+      a.text = a.text.replace(/~\$[\d,]+/, `~$${fmtUSD(newDollars, 0)}`);
+      a.text = a.text.replace(/~[\d.]+%/, `~${newPct.toFixed(1)}%`);
+    }
+  }
+  const finalTotalDeployment = buyActions.reduce((sum, a) => sum + a.buySize.dollars, 0);
+
+  // Attach metadata to the result so renderDailyScan can show the summary header
+  top._summary = {
+    cashAvail,
+    totalDeployment: finalTotalDeployment,
+    deploymentPct: cashAvail > 0 ? (finalTotalDeployment / cashAvail) * 100 : 0,
+    scaledDown: scaleFactor < 1,
+    buyCount: buyActions.length,
+    trimCount: top.filter(a => a.kind === "trim").length,
+  };
+
+  return top;
 }
 
 function renderDailyScan() {
@@ -3038,12 +3151,31 @@ function renderDailyScan() {
   const iconFor = k => k === "trim" ? "↓" : k === "add" ? "↑" : "+";
   const colorFor = k => k === "trim" ? "var(--red)" : k === "add" ? "var(--green)" : "var(--gold)";
 
+  const summary = actions._summary;
+  let summaryHeader = "";
+  if (summary && summary.totalDeployment > 0) {
+    const depPctDisplay = summary.deploymentPct.toFixed(0);
+    let toneClass = "medium";
+    if (summary.deploymentPct < 15) toneClass = "low";
+    else if (summary.deploymentPct >= 40) toneClass = "high";
+    summaryHeader = `
+      <div class="scan-deployment-summary ${toneClass}">
+        <div class="sds-row">
+          <span class="sds-label">Total suggested deployment</span>
+          <span class="sds-value">$${fmtUSD(summary.totalDeployment, 0)} of $${fmtUSD(summary.cashAvail, 0)} cash (${depPctDisplay}%)</span>
+        </div>
+        ${summary.scaledDown ? `<div class="sds-note">Scaled down to stay under 50% of available cash per scan</div>` : ""}
+      </div>
+    `;
+  }
+
   return `
     <div class="scan-card">
       <div class="scan-head">
         <h3>Today's Buys & Adds</h3>
         <span class="scan-pill">${actions.length} idea${actions.length === 1 ? "" : "s"}</span>
       </div>
+      ${summaryHeader}
       <div class="scan-list">
         ${actions.map(a => `
           <div class="scan-item" data-act="open-asset" data-symbol="${escAttr(a.symbol)}">
@@ -3228,12 +3360,12 @@ function renderPortfolio() {
         <div class="holding-main">
           <div class="holding-symbol">${escAttr(h.symbol)}</div>
           <div class="holding-name">${escAttr(h.name || '')}</div>
+          ${stanceBadge}
         </div>
         <div class="holding-right">
           <div class="holding-value">${hm.value != null ? '$' + fmtUSD(hm.value, 0) : '—'}</div>
           <div class="holding-pnl ${pnlClass}">${pnlText}</div>
         </div>
-        ${stanceBadge}
       </div>`;
     }).join("");
   }
@@ -3417,6 +3549,25 @@ function renderWatchlist() {
     const rsiClass = snap?.rsi14 < 35 ? "warn" : snap?.rsi14 > 70 ? "over" : "";
     const trendClass = snap?.trend === "above_200ma" ? "above" : "below";
 
+    // Suggested entry strip — only when a condition has actually fired
+    let suggestStrip = "";
+    if (hasTrigger && snap?.current_price) {
+      const heldHere = state.holdings.some(h => h.symbol === w.symbol && h.asset_class !== "cash");
+      const kind = heldHere ? "add" : "open";
+      const setup = snap.setup_score || 0;
+      const strength = setup >= 70 ? 1.5 : 1.0;
+      const size = suggestBuySize(w.symbol, kind, strength);
+      if (size.dollars > 0) {
+        suggestStrip = `
+          <div class="watch-suggest-strip">
+            <span class="wss-action">${kind === "add" ? "Add" : "Enter"} ~$${fmtUSD(size.dollars, 0)} (~${size.pct.toFixed(1)}%)</span>
+            <span class="wss-price">at $${fmtUSD(snap.current_price)}</span>
+            <button class="wss-log" data-act="log-trade" data-symbol="${escAttr(w.symbol)}" onclick="event.stopPropagation();">Log</button>
+          </div>
+        `;
+      }
+    }
+
     return `
       <div class="watch-row ${hasTrigger ? 'has-trigger' : ''}" data-act="open-watch" data-symbol="${escAttr(w.symbol)}">
         <div class="watch-head">
@@ -3434,6 +3585,7 @@ function renderWatchlist() {
           <span>${snap?.pct_from_52w_high != null ? snap.pct_from_52w_high.toFixed(1) + '% from 52w high' : ''}</span>
         </div>
         ${condPills ? `<div class="watch-cond-pills">${condPills}</div>` : ""}
+        ${suggestStrip}
       </div>
     `;
   }).join("");
@@ -5116,17 +5268,37 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
 // Strategy registry: all six strategies + how to run them.
 // `mode` = "active" | "bh" | "dca" — controls sizing in backtestStrategy.
 // The order here drives display order in the bot view.
-// Strategy registry: 6 strategies after cleanup.
-// Cuts (May 2026): Dip Buyer, App Composite, Mean Reversion, Dual Momentum, Adaptive AA
-// — they either underperformed materially or were redundant with kept strategies.
-// `mode` controls sizing/cadence; `fn` is the signal function.
+// Strategy registry: 7 strategies organized in 3 tiers (May 2026 cleanup).
+//
+// TIER 1 — PASSIVE / CORE (proven baseline, always invested):
+//   bh        Buy & Hold — gold standard, hard to beat
+//   dca       Dollar-Cost Avg — leader in most backtests
+//   valueavg  Value Averaging — Edleson's enhanced DCA
+//
+// TIER 2 — ACTIVE / TACTICAL (each captures a specific regime):
+//   trend     Trend Follower — captures bull runs (breakout signal)
+//   dip       Dip Buyer — captures mean-reversion (RSI + drop)
+//   regime    Regime Switch — Faber tactical, only B&H-beating evidence over decades
+//
+// TIER 3 — REALITY CHECK:
+//   portfolio Portfolio Bot — paper-trades the daily scan rules
+//
+// CUT (architectural/redundant, NOT performance-based):
+//   composite   App Composite — Trend OR Dip, didn't beat either parent cleanly
+//   meanrev     Mean Reversion — duplicates Dip Buyer w/ higher tx cost
+//   golden      Dual Momentum — requires cross-asset rotation we can't model per-symbol
+//   adaptive    Adaptive AA — needs volatility-target sizing we don't have
 const BOT_STRATEGIES = [
-  { key: "trend",     label: "Trend Follower",  tag: "TREND",    fn: trendSignal,         mode: "active",    color: "#4a7a4a", desc: "50-day high breakout — captures bull runs" },
-  { key: "portfolio", label: "Portfolio Bot",   tag: "PORTF",    fn: portfolioBotSignal,  mode: "active",    color: "#7a4a4a", desc: "Reality-check: paper-trades the daily scan rules" },
-  { key: "dca",       label: "Dollar-Cost Avg", tag: "DCA",      fn: dcaSignal,           mode: "dca",       color: "#5c8aa1", desc: "Buy $100 per symbol every 2 weeks · conviction-weighted" },
-  { key: "valueavg",  label: "Value Averaging", tag: "VALUE",    fn: valueAvgSignal,      mode: "valueavg",  color: "#3a7c8c", desc: "Edleson: buy more when below target path, less when above" },
-  { key: "regime",    label: "Regime Switch",   tag: "REGIME",   fn: regimeSwitchSignal,  mode: "regime",    color: "#8a4a5c", desc: "Faber: B&H when breadth strong, 50% cash when weak" },
-  { key: "bh",        label: "Buy & Hold",      tag: "B&H",      fn: bhSignal,            mode: "bh",        color: "#4a4639", desc: "Conviction-weighted, never sells — gold-standard baseline" },
+  // Tier 1: Passive
+  { key: "bh",        label: "Buy & Hold",      tag: "B&H",      tier: "passive",   fn: bhSignal,            mode: "bh",        color: "#4a4639", desc: "Conviction-weighted, never sells — gold-standard baseline" },
+  { key: "dca",       label: "Dollar-Cost Avg", tag: "DCA",      tier: "passive",   fn: dcaSignal,           mode: "dca",       color: "#5c8aa1", desc: "Buy $100 per symbol every 2 weeks · conviction-weighted" },
+  { key: "valueavg",  label: "Value Averaging", tag: "VALUE",    tier: "passive",   fn: valueAvgSignal,      mode: "valueavg",  color: "#3a7c8c", desc: "Edleson: buy more when below target path, less when above" },
+  // Tier 2: Active
+  { key: "trend",     label: "Trend Follower",  tag: "TREND",    tier: "active",    fn: trendSignal,         mode: "active",    color: "#4a7a4a", desc: "50-day high breakout — captures bull runs" },
+  { key: "dip",       label: "Dip Buyer",       tag: "DIP",      tier: "active",    fn: appSignal,           mode: "active",    color: "#b08d3c", desc: "RSI<35 + drop from peak — captures mean reversion" },
+  { key: "regime",    label: "Regime Switch",   tag: "REGIME",   tier: "active",    fn: regimeSwitchSignal,  mode: "regime",    color: "#8a4a5c", desc: "Faber: B&H when breadth strong, 50% cash when weak" },
+  // Tier 3: Reality check
+  { key: "portfolio", label: "Portfolio Bot",   tag: "PORTF",    tier: "check",     fn: portfolioBotSignal,  mode: "active",    color: "#7a4a4a", desc: "Reality-check: paper-trades the daily scan rules" },
 ];
 
 function getStrategy(key) { return BOT_STRATEGIES.find(s => s.key === key); }
@@ -5707,11 +5879,29 @@ function renderBot() {
       </div>
     `;
   } else {
-    const cards = BOT_STRATEGIES.filter(s => state.bot[s.key]).map(s => renderStrategyCard(s.key)).join("");
+    // Group cards by tier for visual organization
+    const tiers = [
+      { key: "passive",  label: "Passive / Core",     hint: "Always invested. Proven baselines." },
+      { key: "active",   label: "Active / Tactical",  hint: "Each captures a specific regime." },
+      { key: "check",    label: "Reality Check",      hint: "Paper-trades the daily scan." },
+    ];
+    const cardsByTier = tiers.map(tier => {
+      const stratsInTier = BOT_STRATEGIES.filter(s => (s.tier || "active") === tier.key && state.bot[s.key]);
+      if (stratsInTier.length === 0) return "";
+      const cards = stratsInTier.map(s => renderStrategyCard(s.key)).join("");
+      return `
+        <div class="strategy-tier-header">
+          <div class="strategy-tier-label">${escAttr(tier.label)}</div>
+          <div class="strategy-tier-hint">${escAttr(tier.hint)}</div>
+        </div>
+        ${cards}
+      `;
+    }).join("");
+
     const needsRerun = BOT_STRATEGIES.some(s => state.bot[s.key] && !state.bot[s.key].deploymentCount && !state.bot[s.key].equityPeak);
     const rerunNotice = needsRerun ? `
       <div style="margin:12px 20px;padding:10px 14px;background:rgba(176,141,60,0.10);border:1px solid var(--gold);border-radius:8px;font-size:12px;color:var(--ink-soft);font-family:var(--mono);">
-        New metrics available (Avg Deploy, Max Drawdown, Tx Cost Drag, App Composite). Re-run the backtest to populate them.
+        Strategy lineup updated. Reset and re-run the backtest to populate the new strategies with metrics.
       </div>` : "";
     body = `
       <div class="bot-hero">
@@ -5722,7 +5912,7 @@ function renderBot() {
       </div>
       ${rerunNotice}
       ${renderLeaderboard()}
-      ${cards}
+      ${cardsByTier}
     `;
   }
 
