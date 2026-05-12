@@ -4697,16 +4697,37 @@ async function runDataSanityCheck(symbol, priceData) {
     recommendation = "Proceed with caution. The AI will note the anomaly but the analysis remains useful.";
   }
 
-  return { severity, issues, recommendation, symbol };
+  // Include price context so the modal can show actual values for verification
+  const lastOhlcv = priceData.ohlcv && priceData.ohlcv.length > 0
+    ? priceData.ohlcv[priceData.ohlcv.length - 1]?.c
+    : null;
+  const priceContext = {
+    current: priceData.current_price,
+    prev: priceData.prev_close,
+    lastOhlcv,
+  };
+
+  return { severity, issues, recommendation, symbol, priceContext };
 }
 
 function confirmDataAnomaly(symbol, preCheck) {
   return new Promise(resolve => {
     const issuesHtml = preCheck.issues.map(i => `<li>${escAttr(i.msg)}</li>`).join("");
+    // Show the actual prices so user can compare to broker
+    const priceComparison = preCheck.priceContext ? `
+      <div style="margin-bottom:14px;padding:10px 12px;background:var(--bg-elev);border:1px solid var(--rule);border-radius:6px;font-family:var(--mono);font-size:11px;line-height:1.6;">
+        <div style="font-size:9.5px;letter-spacing:0.10em;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px;">What the worker sees</div>
+        <div>Current price: <strong style="color:var(--ink);">$${fmtUSD(preCheck.priceContext.current)}</strong></div>
+        <div>Previous close: <strong style="color:var(--ink);">$${fmtUSD(preCheck.priceContext.prev)}</strong></div>
+        <div>Last OHLCV close: <strong style="color:var(--ink);">$${preCheck.priceContext.lastOhlcv != null ? fmtUSD(preCheck.priceContext.lastOhlcv) : "—"}</strong></div>
+        <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--rule-soft);font-size:10.5px;color:var(--ink-muted);">Open your broker (IBKR/Yahoo) and compare. If the worker's current price matches your broker, proceed. If it doesn't, cancel.</div>
+      </div>
+    ` : "";
     openModal(`
       <div class="modal-head"><h3>⚠ Data Sanity Check</h3></div>
       <div style="padding: 0 0 12px;">
         <div style="font-family:var(--mono);font-size:11px;color:var(--ink-muted);margin-bottom:10px;letter-spacing:0.04em;">${escAttr(symbol)} · severity: ${preCheck.severity.toUpperCase()}</div>
+        ${priceComparison}
         <ul style="font-family:var(--sans);font-size:13px;line-height:1.5;color:var(--ink);margin:0 0 14px 18px;">
           ${issuesHtml}
         </ul>
