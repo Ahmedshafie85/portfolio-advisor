@@ -1146,6 +1146,117 @@ body {
 .bot-empty .display { font-family: var(--display); font-size: 22px; display: block; margin-bottom: 8px; }
 .bot-empty p { color: var(--ink-muted); font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
 
+/* ===== ETF LEADERBOARD ===== */
+.leaderboard-card {
+  margin: 12px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.leaderboard-head {
+  padding: 14px 18px 10px;
+}
+.leaderboard-head h3 {
+  font-family: var(--display); font-size: 17px; font-weight: 500;
+  letter-spacing: -0.01em; margin: 0;
+}
+.leaderboard-sub {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-muted);
+  margin-top: 4px; letter-spacing: 0.02em;
+}
+.lb-controls {
+  padding: 0 18px 10px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.lb-control-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 6px;
+}
+.lb-control-label {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.08em; color: var(--ink-muted);
+  text-transform: uppercase;
+  width: 70px; flex-shrink: 0;
+}
+.lb-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.lb-tf-pill, .lb-sort-pill {
+  background: var(--bg-elev);
+  border: 1px solid var(--rule-soft);
+  border-radius: 14px;
+  padding: 4px 11px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.lb-tf-pill.active, .lb-sort-pill.active {
+  background: var(--ink); color: var(--bg); border-color: var(--ink);
+}
+.lb-actions-row {
+  margin-top: 8px;
+  display: flex; gap: 8px;
+}
+.lb-disclaimer {
+  padding: 10px 18px;
+  background: rgba(176,141,60,0.08);
+  border-bottom: 1px solid var(--rule-soft);
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+.lb-disclaimer strong {
+  font-weight: 600;
+  color: var(--gold);
+}
+.lb-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.lb-row:last-child { border-bottom: none; }
+.lb-rank {
+  font-family: var(--display); font-size: 16px; font-weight: 600;
+  color: var(--ink-muted);
+  width: 22px; flex-shrink: 0;
+  padding-top: 2px;
+}
+.lb-main { flex: 1; min-width: 0; }
+.lb-symline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.lb-sym {
+  font-family: var(--display); font-size: 14px; font-weight: 600;
+}
+.lb-cat {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ink-muted);
+  padding: 2px 6px; background: var(--bg-elev); border-radius: 3px;
+}
+.lb-tag {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em;
+  padding: 2px 6px; border-radius: 3px; text-transform: uppercase;
+}
+.lb-tag.held   { background: rgba(74,122,74,0.15); color: var(--green); }
+.lb-tag.onlist { background: rgba(176,141,60,0.15); color: var(--gold); }
+.lb-name {
+  font-family: var(--sans); font-size: 11.5px; color: var(--ink-soft);
+  margin-top: 2px; line-height: 1.3;
+}
+.lb-stats {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  margin-top: 4px;
+  font-family: var(--mono); font-size: 10.5px;
+}
+.lb-stat.pos { color: var(--green); }
+.lb-stat.neg { color: var(--red); }
+.lb-stat.warn { color: var(--red); }
+.lb-stat.med { color: var(--gold); }
+.lb-stat.ok  { color: var(--ink-soft); }
+.lb-actions {
+  display: flex; flex-direction: column; gap: 5px;
+  flex-shrink: 0;
+}
+.lb-actions .btn { white-space: nowrap; padding: 5px 10px; font-size: 10.5px; }
+
 /* ===== DISCOVER IDEAS (curated research) ===== */
 .discover-card {
   margin: 18px 20px 24px;
@@ -1954,6 +2065,12 @@ const state = {
   discoverRefreshing: false,
   discoverSearch: "",            // user's filter text
   discoverThemeFilter: null,     // selected theme, or null for "all"
+  // ETF Leaderboard state — performance-ranked ETFs
+  etfLeaderboard: null,          // array of {symbol, name, category, return3m, return1y, return3y, maxDD1y, trend200ma}
+  etfLeaderboardFetchedAt: null,
+  etfLeaderboardLoading: false,
+  etfLeaderboardTimeframe: "1y", // "3m" | "1y" | "3y"
+  etfLeaderboardSort: "return",  // "return" | "drawdown" | "trend"
 };
 document.documentElement.setAttribute("data-theme", state.theme);
 
@@ -3571,6 +3688,7 @@ function renderWatchlist() {
         <p>Add tickers you'd consider buying. The app watches them and surfaces setups when conditions trigger.</p>
         <button class="btn" data-act="add-watch">Add to Watchlist</button>
       </div>
+      ${renderEtfLeaderboard()}
       ${renderDiscoverIdeas()}
     `;
     return;
@@ -3661,6 +3779,7 @@ function renderWatchlist() {
       <button class="btn-ghost" data-act="add-watch" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
     </div>
     <div class="holdings">${rows}</div>
+    ${renderEtfLeaderboard()}
     ${renderDiscoverIdeas()}
   `;
 
@@ -3929,6 +4048,200 @@ function clearDiscoverFilters() {
   state.discoverThemeFilter = null;
   renderCurrentView();
 }
+
+// ============================================================================
+// ETF LEADERBOARD
+// Fetches batch performance metrics from worker, ranks ETFs by return over
+// the selected timeframe. Renders alongside (not inside) Discover Ideas.
+// CRITICAL FRAMING: this list shows what HAS done well, not what WILL. Past
+// performance shows momentum; mean reversion is the dominant long-term force.
+// We deliberately show drawdown next to return so risk is visible, and we
+// keep the disclaimer prominent.
+// ============================================================================
+const LEADERBOARD_CACHE_MS = 1000 * 60 * 30; // 30-minute soft refresh
+
+async function fetchEtfLeaderboard(forceRefresh) {
+  // Cache check
+  if (!forceRefresh && state.etfLeaderboard && state.etfLeaderboardFetchedAt) {
+    const age = Date.now() - new Date(state.etfLeaderboardFetchedAt).getTime();
+    if (age < LEADERBOARD_CACHE_MS) return; // use cached
+  }
+  if (state.etfLeaderboardLoading) return;
+  state.etfLeaderboardLoading = true;
+  renderCurrentView();
+  try {
+    const res = await fetch(`${WORKER_URL}/etf-leaderboard`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        symbols: ETF_UNIVERSE.map(e => e.symbol),
+        timeframe: state.etfLeaderboardTimeframe,
+      }),
+    });
+    if (!res.ok) {
+      if (res.status === 404) {
+        toast("Worker doesn't support /etf-leaderboard yet — deploy worker v1.4", 4000, "error");
+      } else {
+        toast(`Leaderboard fetch failed: ${res.status}`, 3000, "error");
+      }
+      state.etfLeaderboardLoading = false;
+      renderCurrentView();
+      return;
+    }
+    const j = await res.json();
+    // Merge worker results with universe metadata
+    const merged = (j.results || []).map(r => {
+      const meta = ETF_UNIVERSE.find(e => e.symbol === r.symbol);
+      return {
+        symbol: r.symbol,
+        name: meta?.name || r.symbol,
+        category: meta?.category || "Other",
+        return_pct: r.return_pct,
+        max_drawdown_pct: r.max_drawdown_pct,
+        trend_200ma: r.trend_200ma,
+        current_price: r.current_price,
+        error: r.error || null,
+      };
+    });
+    state.etfLeaderboard = merged;
+    state.etfLeaderboardFetchedAt = new Date().toISOString();
+  } catch (e) {
+    toast(`Leaderboard failed: ${(e.message || e).slice(0, 100)}`, 3000, "error");
+  }
+  state.etfLeaderboardLoading = false;
+  renderCurrentView();
+}
+
+function setLeaderboardTimeframe(tf) {
+  if (state.etfLeaderboardTimeframe === tf) return;
+  state.etfLeaderboardTimeframe = tf;
+  // Timeframe change invalidates the cached data
+  state.etfLeaderboard = null;
+  state.etfLeaderboardFetchedAt = null;
+  fetchEtfLeaderboard(true);
+}
+
+function setLeaderboardSort(sort) {
+  state.etfLeaderboardSort = sort;
+  renderCurrentView();
+}
+
+function renderEtfLeaderboard() {
+  const tf = state.etfLeaderboardTimeframe;
+  const tfLabel = tf === "3m" ? "3-month" : tf === "1y" ? "1-year" : "3-year";
+
+  if (state.etfLeaderboardLoading && !state.etfLeaderboard) {
+    return `
+      <div class="leaderboard-card">
+        <div class="leaderboard-head">
+          <h3>Top Performing ETFs</h3>
+          <div class="leaderboard-sub">Fetching ${tfLabel} returns across ${ETF_UNIVERSE.length} ETFs…</div>
+        </div>
+        <div style="padding: 30px 20px; text-align: center; color: var(--ink-muted);">
+          <span class="spinner"></span>
+        </div>
+      </div>
+    `;
+  }
+
+  const data = state.etfLeaderboard || [];
+  const valid = data.filter(d => !d.error && d.return_pct != null);
+
+  // Sort
+  let sorted;
+  if (state.etfLeaderboardSort === "drawdown") {
+    sorted = [...valid].sort((a, b) => (b.max_drawdown_pct || -999) - (a.max_drawdown_pct || -999)); // least negative first
+  } else if (state.etfLeaderboardSort === "trend") {
+    sorted = [...valid].sort((a, b) => {
+      const aAbove = a.trend_200ma === "above_200ma" ? 1 : 0;
+      const bAbove = b.trend_200ma === "above_200ma" ? 1 : 0;
+      if (aAbove !== bAbove) return bAbove - aAbove;
+      return b.return_pct - a.return_pct;
+    });
+  } else {
+    sorted = [...valid].sort((a, b) => b.return_pct - a.return_pct);
+  }
+  const top10 = sorted.slice(0, 10);
+
+  const held = new Set(state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol));
+  const watched = new Set(state.watchlist.map(w => w.symbol));
+
+  const tfPill = (key, label) => `<button class="lb-tf-pill ${tf === key ? 'active' : ''}" data-act="lb-tf" data-tf="${key}">${label}</button>`;
+  const sortPill = (key, label) => `<button class="lb-sort-pill ${state.etfLeaderboardSort === key ? 'active' : ''}" data-act="lb-sort" data-sort="${key}">${label}</button>`;
+
+  const ageLabel = state.etfLeaderboardFetchedAt
+    ? `Updated ${fmtRel(state.etfLeaderboardFetchedAt)}`
+    : "";
+
+  const rows = top10.length === 0
+    ? `<div style="padding: 24px 18px; text-align: center; color: var(--ink-muted); font-family: var(--mono); font-size: 12px;">No data loaded yet. Tap "Refresh leaderboard" to fetch performance for ${ETF_UNIVERSE.length} ETFs.</div>`
+    : top10.map((d, i) => {
+        const owned = held.has(d.symbol);
+        const onList = watched.has(d.symbol);
+        const retClass = d.return_pct >= 0 ? "pos" : "neg";
+        const ddClass = d.max_drawdown_pct <= -20 ? "warn" : d.max_drawdown_pct <= -10 ? "med" : "ok";
+        return `
+          <div class="lb-row">
+            <div class="lb-rank">${i + 1}</div>
+            <div class="lb-main">
+              <div class="lb-symline">
+                <span class="lb-sym">${escAttr(d.symbol)}</span>
+                <span class="lb-cat">${escAttr(d.category)}</span>
+                ${owned ? `<span class="lb-tag held">held</span>` : ""}
+                ${onList ? `<span class="lb-tag onlist">watched</span>` : ""}
+              </div>
+              <div class="lb-name">${escAttr(d.name)}</div>
+              <div class="lb-stats">
+                <span class="lb-stat ${retClass}">${d.return_pct >= 0 ? "+" : ""}${d.return_pct.toFixed(1)}% ${tfLabel} return</span>
+                <span class="lb-stat ${ddClass}">${d.max_drawdown_pct != null ? d.max_drawdown_pct.toFixed(1) + "% max DD" : ""}</span>
+                ${d.trend_200ma ? `<span class="lb-stat ${d.trend_200ma === 'above_200ma' ? 'pos' : 'neg'}">${d.trend_200ma === 'above_200ma' ? '↑' : '↓'} 200MA</span>` : ""}
+              </div>
+            </div>
+            <div class="lb-actions">
+              <button class="btn btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">Analyze</button>
+              ${!owned && !onList ? `<button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">+ Watch</button>` : ""}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+  return `
+    <div class="leaderboard-card">
+      <div class="leaderboard-head">
+        <h3>Top Performing ETFs</h3>
+        <div class="leaderboard-sub">Ranked by ${tfLabel} return · ${valid.length}/${ETF_UNIVERSE.length} ETFs · ${ageLabel}</div>
+      </div>
+      <div class="lb-controls">
+        <div class="lb-control-row">
+          <span class="lb-control-label">Timeframe</span>
+          <div class="lb-pills">
+            ${tfPill("3m", "3M")}
+            ${tfPill("1y", "1Y")}
+            ${tfPill("3y", "3Y")}
+          </div>
+        </div>
+        <div class="lb-control-row">
+          <span class="lb-control-label">Rank by</span>
+          <div class="lb-pills">
+            ${sortPill("return", "Return")}
+            ${sortPill("drawdown", "Risk")}
+            ${sortPill("trend", "Trend")}
+          </div>
+        </div>
+        <div class="lb-actions-row">
+          <button class="btn btn-sm" data-act="refresh-leaderboard" ${state.etfLeaderboardLoading ? "disabled" : ""}>
+            ${state.etfLeaderboardLoading ? "Loading…" : (state.etfLeaderboard ? "Refresh leaderboard" : "Load leaderboard")}
+          </button>
+        </div>
+      </div>
+      <div class="lb-disclaimer">
+        <strong>Past performance ≠ future returns.</strong> Top performers tend to revert. Last year's #1 is rarely next year's #1. Use this for awareness of what's moved, not as a buy list.
+      </div>
+      ${rows}
+    </div>
+  `;
+}
+
 
 // Hooked up after every renderCurrentView via an input event listener on body (delegation).
 // Debounced so we don't re-render on every keystroke.
@@ -5623,7 +5936,87 @@ const CURATED_PICKS = [
   { symbol: "EEM",   name: "iShares MSCI Emerging Markets", theme: "Emerging Markets",           source: "USNews",          date: "Feb 2026", thesis: "Stretched US valuations driving capital into EM ETFs. Broad EM exposure (India, Brazil, EM-Asia)." },
 ];
 
-// Conviction-based weight for a symbol. Used to size B&H and DCA positions.
+// ============================================================================
+// ETF LEADERBOARD UNIVERSE
+// 60 widely-held ETFs across asset classes for objective performance ranking.
+// Chosen for liquidity (AUM > $500M typically) and category diversity:
+// US broad, US sector, US factor, international, EM, bond, commodity, thematic.
+// Symbols use Yahoo Finance ticker format.
+// ============================================================================
+const ETF_UNIVERSE = [
+  // US broad market
+  { symbol: "VTI",   name: "Vanguard Total Stock Market",       category: "US Broad" },
+  { symbol: "VOO",   name: "Vanguard S&P 500",                  category: "US Broad" },
+  { symbol: "SPY",   name: "SPDR S&P 500",                      category: "US Broad" },
+  { symbol: "QQQ",   name: "Invesco QQQ (Nasdaq 100)",          category: "US Broad" },
+  { symbol: "IWM",   name: "iShares Russell 2000 (Small Cap)",  category: "US Broad" },
+  { symbol: "DIA",   name: "SPDR Dow Jones",                    category: "US Broad" },
+  // US factor / smart beta
+  { symbol: "MTUM",  name: "iShares MSCI USA Momentum",         category: "Factor" },
+  { symbol: "QUAL",  name: "iShares MSCI USA Quality",          category: "Factor" },
+  { symbol: "VLUE",  name: "iShares MSCI USA Value",            category: "Factor" },
+  { symbol: "SPMO",  name: "Invesco S&P 500 Momentum",          category: "Factor" },
+  { symbol: "SCHD",  name: "Schwab US Dividend Equity",         category: "Dividend" },
+  { symbol: "VYM",   name: "Vanguard High Dividend",            category: "Dividend" },
+  { symbol: "VIG",   name: "Vanguard Dividend Appreciation",    category: "Dividend" },
+  // US sectors
+  { symbol: "XLK",   name: "Technology Select Sector",          category: "US Sector" },
+  { symbol: "XLF",   name: "Financial Select Sector",           category: "US Sector" },
+  { symbol: "XLE",   name: "Energy Select Sector",              category: "US Sector" },
+  { symbol: "XLV",   name: "Health Care Select Sector",         category: "US Sector" },
+  { symbol: "XLY",   name: "Consumer Discretionary",            category: "US Sector" },
+  { symbol: "XLI",   name: "Industrials Select Sector",         category: "US Sector" },
+  { symbol: "XLU",   name: "Utilities Select Sector",           category: "US Sector" },
+  { symbol: "XLP",   name: "Consumer Staples",                  category: "US Sector" },
+  { symbol: "XLB",   name: "Materials Select Sector",           category: "US Sector" },
+  { symbol: "XLRE",  name: "Real Estate Select Sector",         category: "US Sector" },
+  { symbol: "XLC",   name: "Communication Services",            category: "US Sector" },
+  // Thematic
+  { symbol: "SMH",   name: "VanEck Semiconductors",             category: "Thematic" },
+  { symbol: "SOXX",  name: "iShares Semiconductor",             category: "Thematic" },
+  { symbol: "BOTZ",  name: "Global X Robotics & AI",            category: "Thematic" },
+  { symbol: "AIQ",   name: "Global X AI & Tech",                category: "Thematic" },
+  { symbol: "CIBR",  name: "First Trust Cybersecurity",         category: "Thematic" },
+  { symbol: "URA",   name: "Global X Uranium",                  category: "Thematic" },
+  { symbol: "ICLN",  name: "iShares Global Clean Energy",       category: "Thematic" },
+  { symbol: "TAN",   name: "Invesco Solar",                     category: "Thematic" },
+  { symbol: "ITA",   name: "iShares US Aerospace & Defense",    category: "Thematic" },
+  { symbol: "JETS",  name: "US Global Jets (Airlines)",         category: "Thematic" },
+  { symbol: "ARKK",  name: "ARK Innovation",                    category: "Thematic" },
+  // International
+  { symbol: "VEA",   name: "Vanguard FTSE Developed Markets",   category: "International" },
+  { symbol: "EFA",   name: "iShares MSCI EAFE",                 category: "International" },
+  { symbol: "VXUS",  name: "Vanguard Total Intl Stock",         category: "International" },
+  { symbol: "IEFA",  name: "iShares Core MSCI EAFE",            category: "International" },
+  { symbol: "EWJ",   name: "iShares MSCI Japan",                category: "International" },
+  { symbol: "EWG",   name: "iShares MSCI Germany",              category: "International" },
+  { symbol: "EWU",   name: "iShares MSCI United Kingdom",       category: "International" },
+  { symbol: "INDA",  name: "iShares MSCI India",                category: "International" },
+  { symbol: "MCHI",  name: "iShares MSCI China",                category: "International" },
+  // Emerging markets
+  { symbol: "VWO",   name: "Vanguard FTSE Emerging Markets",    category: "EM" },
+  { symbol: "EEM",   name: "iShares MSCI Emerging Markets",     category: "EM" },
+  { symbol: "ARGT",  name: "Global X Argentina",                category: "EM" },
+  { symbol: "EWZ",   name: "iShares MSCI Brazil",               category: "EM" },
+  // Bonds
+  { symbol: "AGG",   name: "iShares Core US Aggregate Bond",    category: "Bond" },
+  { symbol: "BND",   name: "Vanguard Total Bond Market",        category: "Bond" },
+  { symbol: "TLT",   name: "iShares 20+ Year Treasury",         category: "Bond" },
+  { symbol: "IEF",   name: "iShares 7-10 Year Treasury",        category: "Bond" },
+  { symbol: "HYG",   name: "iShares iBoxx High Yield",          category: "Bond" },
+  { symbol: "TIP",   name: "iShares TIPS",                      category: "Bond" },
+  // Commodities / precious metals
+  { symbol: "GLD",   name: "SPDR Gold Trust",                   category: "Commodities" },
+  { symbol: "SLV",   name: "iShares Silver Trust",              category: "Commodities" },
+  { symbol: "GDX",   name: "VanEck Gold Miners",                category: "Commodities" },
+  { symbol: "USO",   name: "United States Oil Fund",            category: "Commodities" },
+  { symbol: "DBC",   name: "Invesco DB Commodity Index",        category: "Commodities" },
+  // Crypto-linked (proxy via ETFs)
+  { symbol: "IBIT",  name: "iShares Bitcoin Trust",             category: "Crypto-linked" },
+  { symbol: "BITO",  name: "ProShares Bitcoin Strategy",        category: "Crypto-linked" },
+];
+
+
 // "high" = 3, "medium" = 2, "low" = 1, no analysis = 1 (treat as average).
 // Returns the symbol's weight; caller divides by total weight of universe.
 function getConvictionWeight(symbol) {
@@ -6996,6 +7389,9 @@ document.addEventListener("click", (e) => {
       case "clear-discover":         clearDiscoverDynamic(); break;
       case "filter-theme":           toggleDiscoverThemeFilter(target.dataset.theme); break;
       case "clear-discover-filters": clearDiscoverFilters(); break;
+      case "refresh-leaderboard":    fetchEtfLeaderboard(true); break;
+      case "lb-tf":                  setLeaderboardTimeframe(target.dataset.tf); break;
+      case "lb-sort":                setLeaderboardSort(target.dataset.sort); break;
       case "dismiss-breakout-prompt": dismissBreakoutPrompt(); break;
       case "add-breakout-conditions": addBreakoutConditionsToHeld(); break;
     }
