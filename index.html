@@ -3042,6 +3042,28 @@ async function loadInitialData() {
 async function loadHoldingsFromFirestore() {
   const snap = await db.collection("users").doc(state.uid).collection("holdings").get();
   state.holdings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  // DIAGNOSTIC: dump cash holdings to console so we can see EXACTLY what
+  // shape Firestore returned. If cash is broken on screen, open DevTools
+  // console and check the output of this line — it tells us if it's a
+  // code issue (logic bug) or a data issue (Firestore record malformed).
+  const cashHoldings = state.holdings.filter(h =>
+    h.symbol === "CASH" ||
+    (typeof h.asset_class === "string" && h.asset_class.toLowerCase() === "cash")
+  );
+  if (cashHoldings.length === 0) {
+    console.warn("[CASH DIAGNOSTIC] No cash holding found in Firestore.");
+  } else {
+    console.log("[CASH DIAGNOSTIC] Cash holding(s) loaded:", cashHoldings.map(h => ({
+      id: h.id,
+      symbol: h.symbol,
+      asset_class: h.asset_class,
+      asset_class_type: typeof h.asset_class,
+      quantity: h.quantity,
+      quantity_type: typeof h.quantity,
+      avg_cost_total: h.avg_cost_total,
+      name: h.name,
+    })));
+  }
 }
 
 async function seedHoldings() {
@@ -3967,6 +3989,29 @@ async function markTriggerSeen(triggerId) {
 // METRICS
 // ============================================================================
 function holdingMetrics(h) {
+  // Cash is special: h.quantity already IS the USD value. The edit form stores
+  // it that way (single "Amount (USD)" field), and the deployment scan reads it
+  // the same way. Without this branch, cash holdings get value=null because
+  // there's no price feed for "CASH", which silently dropped cash from
+  // totalValue and the allocation donut.
+  //
+  // DEFENSIVE: detect cash via multiple signals so a malformed asset_class field
+  // (e.g. "CASH" uppercase, missing, or "Cash") still gets treated correctly.
+  const isCash = (
+    (typeof h.asset_class === "string" && h.asset_class.toLowerCase() === "cash") ||
+    h.symbol === "CASH" ||
+    h.symbol === "USD"
+  );
+  if (isCash) {
+    const cashValue = Number(h.quantity) || 0;
+    return {
+      current_price: 1,
+      value: cashValue,
+      pnlAbs: 0,
+      pnlPct: 0,
+      dayPct: 0,
+    };
+  }
   const p = state.prices[h.symbol];
   const cur = p?.current_price;
   const value = cur != null ? cur * h.quantity : null;
