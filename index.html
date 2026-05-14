@@ -3783,7 +3783,7 @@ function renderDailyScan() {
                 ${isDone ? `<span class="scan-recency done">✓ DONE</span>` : recencyBadge(a.recency, a.daysActive || 1)}
               </div>
             </div>
-            <div class="scan-actions-col" onclick="event.stopPropagation();">
+            <div class="scan-actions-col">
               ${isDone
                 ? `<button class="scan-log done" disabled title="Logged">✓</button>`
                 : `<button class="scan-log" data-act="log-trade" data-symbol="${escAttr(a.symbol)}" data-rec-key="${escAttr(recKey)}" title="Log this trade">Log</button>`}
@@ -4203,8 +4203,8 @@ function renderWatchlist() {
                 <span class="wss-price">at $${fmtUSD(snap.current_price)}</span>
                 ${isDone
                   ? `<button class="wss-log done" disabled>✓</button>`
-                  : `<button class="wss-log" data-act="log-trade" data-symbol="${escAttr(w.symbol)}" data-rec-key="${escAttr(recKey)}" onclick="event.stopPropagation();">Log</button>`}
-                <button class="wss-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" onclick="event.stopPropagation();" title="Hide this suggestion">×</button>
+                  : `<button class="wss-log" data-act="log-trade" data-symbol="${escAttr(w.symbol)}" data-rec-key="${escAttr(recKey)}">Log</button>`}
+                <button class="wss-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" title="Hide this suggestion">×</button>
               </div>
             `;
           }
