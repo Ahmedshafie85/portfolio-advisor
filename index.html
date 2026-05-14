@@ -321,6 +321,9 @@ body {
   position: relative;
 }
 .watch-row * { pointer-events: none; }
+/* Re-enable pointer events on the suggest-strip buttons so they can receive taps */
+.watch-row .watch-suggest-strip .wss-log,
+.watch-row .watch-suggest-strip .wss-del { pointer-events: auto; }
 .watch-row:hover { background: var(--bg-elev); }
 .watch-row.has-trigger { background: rgba(176,141,60,0.05); }
 .watch-row.has-trigger::before {
@@ -1170,6 +1173,16 @@ body {
   font-family: var(--display); font-weight: 600; font-size: 13px;
   padding: 3px 8px; background: var(--bg-elev); border-radius: 4px;
 }
+.news-live-price {
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft);
+  padding: 3px 6px; background: var(--bg-elev); border-radius: 3px;
+  border: 1px solid var(--rule-soft);
+}
+.news-live-price .news-day {
+  font-size: 10px; margin-left: 4px; padding: 1px 4px; border-radius: 2px;
+}
+.news-live-price .news-day.pos { background: rgba(74,122,74,0.18); color: var(--green); }
+.news-live-price .news-day.neg { background: rgba(161,61,45,0.18); color: var(--red); }
 .news-dir {
   font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em;
   padding: 3px 7px; border-radius: 3px; text-transform: uppercase;
@@ -2318,6 +2331,32 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
+// ----- News persistence (so opportunities survive tab switches and reloads) -----
+// iOS Safari aggressively unloads tabs when you switch apps. Without localStorage
+// the user fetches opportunities, switches to another tab, and comes back to an empty list.
+const NEWS_CACHE_KEY = "newsCache_v1";
+const NEWS_CACHE_TTL_HOURS = 6; // fresh news < 6h old is still useful
+function loadNewsCache() {
+  try {
+    const raw = localStorage.getItem(NEWS_CACHE_KEY);
+    if (!raw) return { items: null, fetchedAt: null };
+    const cache = JSON.parse(raw);
+    if (!cache.fetchedAt) return { items: null, fetchedAt: null };
+    const ageHours = (Date.now() - new Date(cache.fetchedAt).getTime()) / 3600000;
+    if (ageHours > NEWS_CACHE_TTL_HOURS) return { items: null, fetchedAt: null };
+    return { items: Array.isArray(cache.items) ? cache.items : null, fetchedAt: cache.fetchedAt };
+  } catch (e) { return { items: null, fetchedAt: null }; }
+}
+function saveNewsCache() {
+  try {
+    if (state.newsItems == null) return;
+    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify({
+      items: state.newsItems,
+      fetchedAt: state.newsFetchedAt,
+    }));
+  } catch (e) { /* quota or private mode — silently skip */ }
+}
+
 // ----- Recommendation status (per-day "done" / "dismissed" tracking) -----
 // Persisted in localStorage so it survives reloads. Auto-trims entries
 // older than today since recommendations are date-scoped.
@@ -2382,9 +2421,10 @@ const state = {
   expandedAnalyses: {}, // key -> bool; "portfolio" or symbol
   showWatchouts: localStorage.getItem("showWatchouts") === "1", // opt-in
   breakoutPromptDismissed: localStorage.getItem("breakoutPromptDismissed") === "1",
-  // News (big-opportunity filter)
-  newsItems: null,
-  newsFetchedAt: null,
+  // News (big-opportunity filter) — hydrate from localStorage so opportunities
+  // survive iOS tab unloading and page reloads (within TTL window)
+  newsItems: loadNewsCache().items,
+  newsFetchedAt: loadNewsCache().fetchedAt,
   newsLoading: false,
   // Inline chart preview state for Ideas/ETF sections (no analysis call)
   previewChart: { symbol: null, name: null, range: "3M", loading: false, data: null },
@@ -5839,6 +5879,7 @@ async function renderNews() {
         ${n.symbol ? `
         <div class="news-sym-row">
           <span class="news-sym">${escAttr(n.symbol)}</span>
+          ${n.current_price != null ? `<span class="news-live-price">$${fmtUSD(n.current_price)}${n.day_change_pct != null ? ` <span class="news-day ${n.day_change_pct >= 0 ? 'pos' : 'neg'}">${fmtPct(n.day_change_pct)}</span>` : ""}</span>` : ""}
           ${n.direction ? `<span class="news-dir ${dirClass}">${escAttr(n.direction)}</span>` : ""}
           ${owned ? `<span class="news-tag held">held</span>` : ""}
           ${onList ? `<span class="news-tag onlist">watched</span>` : ""}
@@ -5902,6 +5943,7 @@ async function refreshNews() {
     const j = await r.json();
     state.newsItems = Array.isArray(j.opportunities) ? j.opportunities : [];
     state.newsFetchedAt = new Date().toISOString();
+    saveNewsCache();
     toast(`${state.newsItems.length} opportunit${state.newsItems.length === 1 ? "y" : "ies"} found`);
   } catch (e) {
     toast(`News failed: ${e.message || e}`, 3000, "error");
