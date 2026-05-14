@@ -1138,6 +1138,46 @@ body {
   letter-spacing: 0.04em;
 }
 
+/* Debug mode — diagnostic view when zero flags shows up */
+.presurge-card.debug::before {
+  background: var(--ink-muted);
+}
+.presurge-debug-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 6px; padding: 10px 18px;
+  background: var(--bg-elev);
+  border-top: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.pds-cell {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  border-radius: 4px;
+  border: 1px solid var(--rule-soft);
+}
+.pds-lbl {
+  font-family: var(--mono); font-size: 9.5px;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.pds-val {
+  font-family: var(--mono); font-size: 14px; font-weight: 600;
+  color: var(--ink);
+}
+.presurge-debug-hint {
+  padding: 10px 18px;
+  font-size: 11.5px; line-height: 1.5;
+  color: var(--ink-soft);
+  background: var(--bg);
+}
+/* In debug view, rows above threshold get a subtle gold glow so you can spot them */
+.presurge-row.over-thresh .presurge-rank {
+  background: rgba(176,141,60,0.15);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
 /* ===== JOURNAL STRATEGY ROWS (TP + Exit on logged trades) ===== */
 .journal-strategy {
   display: flex; flex-wrap: wrap; gap: 8px;
@@ -2609,8 +2649,10 @@ const state = {
   newsLoading: false,
   // Pre-Surge scanner — composite (squeeze + accumulation + RS) ranking.
   // History is persisted via localStorage in PRESURGE_LOCAL_KEY for track record.
-  preSurge: null,         // array of {symbol, composite, squeeze, accumulation, rs, breakdown, current_price}
-  preSurgeRanAt: null,    // ISO timestamp of last scan
+  preSurge: null,             // array of flagged (composite ≥ 70)
+  preSurgeAllScored: null,    // array of ALL scored symbols ranked desc (debug mode)
+  preSurgeDebug: false,       // when true, render top 10 by composite regardless of threshold
+  preSurgeRanAt: null,        // ISO timestamp of last scan
   preSurgeLoading: false,
   preSurgeProgress: null, // { fetched, total } during scan
   // Inline chart preview state for Ideas/ETF sections (no analysis call)
@@ -3783,17 +3825,21 @@ function getPreSurgeUniverse() {
 }
 
 function computePreSurgeUniverse() {
+  // Returns { flagged, allScored } so the UI can choose:
+  //   - flagged: composite ≥ PRESURGE_THRESHOLD (the "real" signal)
+  //   - allScored: every symbol that produced a score, ranked desc (debug mode)
   // Need SPY benchmark cached for RS. If missing, RS just won't score — composite still useful.
   const benchCloses = state.prices["SPY"]?.ohlcv?.map(d => d.c);
   const universe = getPreSurgeUniverse();
-  const scored = [];
+  const allScored = [];
   for (const sym of universe) {
     if (sym === "SPY") continue; // can't compute RS of SPY vs itself usefully
     const r = computePreSurgeScore(sym, { benchmarkCloses: benchCloses });
-    if (r && r.composite >= PRESURGE_THRESHOLD) scored.push(r);
+    if (r) allScored.push(r);
   }
-  scored.sort((a, b) => b.composite - a.composite);
-  return scored;
+  allScored.sort((a, b) => b.composite - a.composite);
+  const flagged = allScored.filter(r => r.composite >= PRESURGE_THRESHOLD);
+  return { flagged, allScored };
 }
 
 // ============================================================================
@@ -4444,18 +4490,96 @@ function renderPreSurgeCard() {
   }
 
   const flags = cached || [];
+  const allScored = state.preSurgeAllScored || [];
+  const debug = state.preSurgeDebug;
   const recentHistory = getRecentPreSurgeFlags(3, 30, 5);
 
-  // Filter out dismissed entries
+  // Filter out dismissed entries (only applies to flagged view, not debug)
   const visibleFlags = flags.filter(f => {
     const key = recKeyFor(f.symbol, "presurge", "presurge");
     return getRecStatus(key) !== "dismissed";
   });
 
+  // Debug mode: render top 10 by composite score regardless of threshold.
+  // Use this to verify the math is working when zero flags shows up. If the
+  // top 10 are all in the 30-50 range, scoring is fine — market just isn't
+  // presenting strong setups today. If everything's <15, something's wrong.
+  if (debug) {
+    const top = allScored.slice(0, 10);
+    const stats = {
+      total: allScored.length,
+      max: top[0]?.composite || 0,
+      median: top.length ? top[Math.floor(top.length / 2)].composite : 0,
+      with_squeeze: allScored.filter(s => s.squeeze > 0).length,
+      with_accum: allScored.filter(s => s.accumulation > 0).length,
+      with_rs: allScored.filter(s => s.rs > 0).length,
+    };
+    return `
+      <div class="presurge-card debug">
+        <div class="presurge-head">
+          <div>
+            <h3>Pre-Surge · Debug View</h3>
+            <div class="presurge-sub">Top 10 by composite · threshold ignored · ${ranAt ? "scanned " + fmtRel(ranAt) : ""}</div>
+          </div>
+          <button class="btn btn-sm" data-act="toggle-presurge-debug">Exit Debug</button>
+        </div>
+        <div class="presurge-debug-stats">
+          <div class="pds-cell"><span class="pds-lbl">Scored</span><span class="pds-val">${stats.total}</span></div>
+          <div class="pds-cell"><span class="pds-lbl">Top</span><span class="pds-val">${stats.max}</span></div>
+          <div class="pds-cell"><span class="pds-lbl">Median</span><span class="pds-val">${stats.median}</span></div>
+          <div class="pds-cell"><span class="pds-lbl">w/ Squeeze</span><span class="pds-val">${stats.with_squeeze}</span></div>
+          <div class="pds-cell"><span class="pds-lbl">w/ Accum</span><span class="pds-val">${stats.with_accum}</span></div>
+          <div class="pds-cell"><span class="pds-lbl">w/ RS</span><span class="pds-val">${stats.with_rs}</span></div>
+        </div>
+        <div class="presurge-debug-hint">
+          ${stats.total === 0 ? "⚠ No symbols scored — OHLCV data missing. Run Rescan." :
+            stats.max < 20 ? "⚠ Top score very low — market may genuinely have no setups, or check your data freshness." :
+            stats.max >= 40 ? "✓ Scoring is firing normally. Top names just below the 70 threshold are worth a manual look." :
+            "Scoring works. The market just isn't presenting strong setups today — normal in trending markets."}
+        </div>
+        <div class="presurge-list">
+          ${top.length === 0 ? `<div class="presurge-empty-body">No symbols produced a score. Data probably didn't load. Try Rescan.</div>` :
+          top.map(f => {
+            const held = state.holdings.some(h => h.symbol === f.symbol && h.asset_class !== "cash");
+            const watched = state.watchlist.some(w => w.symbol === f.symbol);
+            const aboveThresh = f.composite >= PRESURGE_THRESHOLD;
+            return `
+            <div class="presurge-row ${aboveThresh ? 'over-thresh' : ''}" data-act="open-asset" data-symbol="${escAttr(f.symbol)}">
+              <div class="presurge-rank">${f.composite}</div>
+              <div class="presurge-mid">
+                <div class="presurge-sym-row">
+                  <span class="presurge-sym">${escAttr(f.symbol)}</span>
+                  ${aboveThresh ? `<span class="presurge-tag held" style="background:rgba(176,141,60,0.18);color:var(--gold);border-color:var(--gold);">FLAGGED</span>` : ""}
+                  ${held ? `<span class="presurge-tag held">held</span>` : ""}
+                  ${watched ? `<span class="presurge-tag watched">watched</span>` : ""}
+                  <span class="presurge-price">$${fmtUSD(f.current_price)}</span>
+                </div>
+                <div class="presurge-bars">
+                  ${renderPresurgeBar("Squeeze", f.squeeze, 40, "var(--gold)")}
+                  ${renderPresurgeBar("Accum",   f.accumulation, 30, "var(--green)")}
+                  ${renderPresurgeBar("RS",      f.rs, 30, "var(--ink-soft)")}
+                </div>
+                <div class="presurge-details">
+                  ${f.breakdown.map(b => `<span class="presurge-detail-chip">${escAttr(b.detail)}</span>`).join("")}
+                </div>
+              </div>
+            </div>
+          `;}).join("")}
+        </div>
+        <div class="presurge-footer">Debug mode · all scored symbols visible · normal threshold is composite ≥ 70</div>
+      </div>
+    `;
+  }
+
   let body;
   if (visibleFlags.length === 0) {
+    // Empty state — show a hint about debug mode and the median score
+    const topUnflagged = allScored[0];
+    const hint = topUnflagged
+      ? ` Highest scoring today: ${topUnflagged.symbol} at ${topUnflagged.composite}.`
+      : "";
     body = `<div class="presurge-empty-body">
-      No setups above the threshold today. The market is either trending broadly (no compression) or fragmented (no clean rotation). Patience — these signals are sparse by design.
+      No setups above the threshold today.${hint} Tap <b>Debug</b> to see the top 10 scored symbols regardless of threshold — useful for verifying the scanner is working.
     </div>`;
   } else {
     body = `
@@ -4532,9 +4656,12 @@ function renderPreSurgeCard() {
       <div class="presurge-head">
         <div>
           <h3>Pre-Surge Scanner</h3>
-          <div class="presurge-sub">${visibleFlags.length} flagged · ${ranAt ? "Updated " + fmtRel(ranAt) : "Just now"}</div>
+          <div class="presurge-sub">${visibleFlags.length} flagged${allScored.length > 0 ? ` · ${allScored.length} scored` : ""} · ${ranAt ? "Updated " + fmtRel(ranAt) : "Just now"}</div>
         </div>
-        <button class="btn btn-sm" data-act="run-presurge">Rescan</button>
+        <div style="display:flex;gap:6px;align-items:center;">
+          ${allScored.length > 0 ? `<button class="btn btn-secondary btn-sm" data-act="toggle-presurge-debug">Debug</button>` : ""}
+          <button class="btn btn-sm" data-act="run-presurge">Rescan</button>
+        </div>
       </div>
       ${body}
       ${trackRecord}
@@ -4567,14 +4694,15 @@ async function runPreSurge() {
       // Only re-render every ~5 items to avoid flicker on slow networks
       if (fetched % 5 === 0 || fetched === total) renderCurrentView();
     });
-    const flags = computePreSurgeUniverse();
-    state.preSurge = flags;
+    const { flagged, allScored } = computePreSurgeUniverse();
+    state.preSurge = flagged;
+    state.preSurgeAllScored = allScored;
     state.preSurgeRanAt = new Date().toISOString();
-    const added = recordPreSurgeFlags(flags);
+    const added = recordPreSurgeFlags(flagged);
     state.preSurgeLoading = false;
     state.preSurgeProgress = null;
     renderCurrentView();
-    toast(`${flags.length} pre-surge setup${flags.length === 1 ? "" : "s"} flagged${added > 0 ? ` · ${added} new today` : ""}`);
+    toast(`${flagged.length} pre-surge setup${flagged.length === 1 ? "" : "s"} flagged${added > 0 ? ` · ${added} new today` : ""} · ${allScored.length} scored`);
   } catch (e) {
     state.preSurgeLoading = false;
     state.preSurgeProgress = null;
@@ -9002,6 +9130,7 @@ document.addEventListener("click", (e) => {
       case "rm-cond":                removeCondition(symbol, target.dataset.cid); break;
       case "refresh-news":           refreshNews(); break;
       case "run-presurge":           runPreSurge(); break;
+      case "toggle-presurge-debug":  state.preSurgeDebug = !state.preSurgeDebug; renderCurrentView(); break;
       case "mark-rec-done":          markRecommendationDone(target.dataset.recKey); break;
       case "dismiss-rec":            dismissRecommendation(target.dataset.recKey); break;
       case "preview-chart":          togglePreviewChart(target.dataset.symbol, target.dataset.name); break;
