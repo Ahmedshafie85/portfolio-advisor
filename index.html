@@ -957,6 +957,187 @@ body {
 .journal-del:hover { color: var(--red); border-color: var(--red); }
 .journal-del:active { transform: scale(0.92); }
 
+/* ===== PRE-SURGE SCANNER CARD ===== */
+.presurge-card {
+  margin: 12px 20px 0;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+}
+.presurge-card.empty,
+.presurge-card.loading { padding-bottom: 12px; }
+.presurge-card::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: linear-gradient(180deg, var(--gold), var(--green));
+}
+.presurge-head {
+  display: flex; justify-content: space-between; align-items: start;
+  gap: 12px; padding: 14px 18px 8px;
+}
+.presurge-head h3 {
+  font-family: var(--display); font-size: 15px; font-weight: 500;
+  letter-spacing: -0.005em; margin-bottom: 2px;
+}
+.presurge-sub {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-muted); letter-spacing: 0.04em;
+}
+.presurge-empty-body {
+  padding: 12px 20px 4px;
+  font-size: 12.5px; color: var(--ink-soft);
+  line-height: 1.55;
+}
+.presurge-progress {
+  height: 3px; background: var(--bg-elev);
+  margin: 4px 18px 6px; border-radius: 2px; overflow: hidden;
+}
+.presurge-progress-bar {
+  height: 100%; background: var(--gold);
+  transition: width .25s ease-out;
+}
+.presurge-list {
+  display: flex; flex-direction: column;
+  border-top: 1px solid var(--rule-soft);
+}
+.presurge-row {
+  display: grid; grid-template-columns: 44px 1fr auto;
+  gap: 12px; align-items: start;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--rule-soft);
+  cursor: pointer;
+  transition: background .12s;
+}
+.presurge-row:hover { background: var(--bg-elev); }
+.presurge-row.rec-done { opacity: 0.55; }
+.presurge-row.rec-done .presurge-sym { text-decoration: line-through; }
+.presurge-rank {
+  font-family: var(--display); font-size: 22px; font-weight: 600;
+  line-height: 1; padding-top: 4px;
+  color: var(--ink);
+  background: var(--bg-elev);
+  border-radius: 6px;
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--rule-soft);
+}
+.presurge-mid { min-width: 0; }
+.presurge-sym-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+}
+.presurge-sym {
+  font-family: var(--display); font-size: 15px; font-weight: 600;
+}
+.presurge-tag {
+  font-family: var(--mono); font-size: 9px;
+  padding: 2px 5px; border-radius: 3px;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.presurge-tag.held    { background: rgba(176,141,60,0.15); color: var(--gold); border: 1px solid var(--gold); }
+.presurge-tag.watched { background: rgba(74,122,74,0.12); color: var(--green); border: 1px solid var(--green); }
+.presurge-price {
+  font-family: var(--mono); font-size: 11.5px;
+  color: var(--ink-soft); margin-left: auto;
+}
+.presurge-bars {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-bottom: 8px;
+}
+.presurge-bar-row {
+  display: grid; grid-template-columns: 56px 1fr 42px;
+  gap: 8px; align-items: center;
+}
+.presurge-bar-lbl {
+  font-family: var(--mono); font-size: 10px;
+  color: var(--ink-muted); letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.presurge-bar-track {
+  height: 6px; background: var(--bg-elev);
+  border-radius: 3px; overflow: hidden;
+}
+.presurge-bar-fill {
+  height: 100%; border-radius: 3px;
+  transition: width .25s;
+}
+.presurge-bar-val {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-soft); text-align: right;
+}
+.presurge-details {
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.presurge-detail-chip {
+  font-family: var(--mono); font-size: 10px;
+  color: var(--ink-muted);
+  padding: 2px 6px;
+  background: var(--bg-elev);
+  border-radius: 3px;
+  border: 1px solid var(--rule-soft);
+}
+.presurge-actions {
+  display: flex; flex-direction: column; gap: 6px;
+  align-items: center; justify-content: center;
+}
+.presurge-del {
+  background: transparent; border: none;
+  color: var(--ink-muted); cursor: pointer;
+  width: 26px; height: 26px; border-radius: 50%;
+  font-size: 18px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.presurge-del:hover, .presurge-del:active {
+  background: rgba(161,61,45,0.12); color: var(--red);
+}
+.presurge-track {
+  border-top: 1px solid var(--rule-soft);
+  padding: 12px 18px;
+  background: var(--bg-elev);
+}
+.presurge-track-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 8px;
+}
+.presurge-track-head > span:first-child {
+  font-family: var(--display); font-size: 12px; font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.presurge-track-stats {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-muted);
+}
+.presurge-track-stats .pos { color: var(--green); }
+.presurge-track-stats .neg { color: var(--red); }
+.presurge-track-list {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.presurge-track-row {
+  display: grid; grid-template-columns: 52px 1fr auto auto;
+  gap: 8px; align-items: center;
+  font-family: var(--mono); font-size: 11px;
+  padding: 6px 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.presurge-track-row:hover { background: var(--bg-card); }
+.ptr-sym { font-family: var(--display); font-weight: 600; font-size: 12px; }
+.ptr-age { color: var(--ink-muted); font-size: 10.5px; }
+.ptr-score { color: var(--ink-soft); font-size: 10.5px; }
+.ptr-pnl { font-weight: 600; text-align: right; }
+.ptr-pnl.pos { color: var(--green); }
+.ptr-pnl.neg { color: var(--red); }
+.presurge-footer {
+  padding: 8px 18px;
+  border-top: 1px solid var(--rule-soft);
+  font-family: var(--mono); font-size: 9.5px;
+  color: var(--ink-muted); text-align: center;
+  letter-spacing: 0.04em;
+}
+
 /* ===== JOURNAL STRATEGY ROWS (TP + Exit on logged trades) ===== */
 .journal-strategy {
   display: flex; flex-wrap: wrap; gap: 8px;
@@ -2426,6 +2607,12 @@ const state = {
   newsItems: loadNewsCache().items,
   newsFetchedAt: loadNewsCache().fetchedAt,
   newsLoading: false,
+  // Pre-Surge scanner — composite (squeeze + accumulation + RS) ranking.
+  // History is persisted via localStorage in PRESURGE_LOCAL_KEY for track record.
+  preSurge: null,         // array of {symbol, composite, squeeze, accumulation, rs, breakdown, current_price}
+  preSurgeRanAt: null,    // ISO timestamp of last scan
+  preSurgeLoading: false,
+  preSurgeProgress: null, // { fetched, total } during scan
   // Inline chart preview state for Ideas/ETF sections (no analysis call)
   previewChart: { symbol: null, name: null, range: "3M", loading: false, data: null },
   // Per-day per-recommendation "done" or "dismissed" tracking (localStorage-persisted)
@@ -2889,17 +3076,64 @@ async function loadPortfolioAnalysis() {
 }
 
 async function refreshAllPrices() {
-  const promises = state.holdings.map(h =>
-    fetch(`${WORKER_URL}/price/${encodeURIComponent(h.symbol)}`)
+  // Build full price-fetch set:
+  //   - All non-cash holdings
+  //   - All watchlist symbols
+  //   - SPY (benchmark for Pre-Surge Relative Strength scoring)
+  // Watchlist symbols are usually also fetched by runScan, but having them here
+  // means the Pre-Surge scanner has full OHLCV coverage even before /scan runs.
+  const symbols = new Set();
+  for (const h of state.holdings) if (h.asset_class !== "cash") symbols.add(h.symbol);
+  for (const w of state.watchlist) symbols.add(w.symbol);
+  symbols.add("SPY"); // benchmark
+  const promises = Array.from(symbols).map(sym =>
+    fetch(`${WORKER_URL}/price/${encodeURIComponent(sym)}`)
       .then(r => r.json())
-      .then(p => { state.prices[h.symbol] = p; })
-      .catch(e => console.warn("price fetch failed:", h.symbol, e))
+      .then(p => { state.prices[sym] = p; })
+      .catch(e => console.warn("price fetch failed:", sym, e))
   );
   await Promise.all(promises);
 }
 
+// ----- Lazy data fetcher for Pre-Surge scanner -----
+// The scanner needs OHLCV for the full universe (watchlist + holdings + ETF_UNIVERSE).
+// We don't pre-fetch the entire ETF universe on boot — too heavy. Instead, this
+// function fetches any missing symbols on demand (when the scanner runs), with
+// concurrency limited to 6 to avoid hammering the worker.
+async function ensurePreSurgeData(onProgress) {
+  const universe = getPreSurgeUniverse();
+  const missing = universe.filter(sym => {
+    const p = state.prices[sym];
+    return !p || !p.ohlcv || p.ohlcv.length < 150;
+  });
+  if (missing.length === 0) return { fetched: 0, total: universe.length };
+
+  let fetched = 0;
+  const concurrency = 6;
+  const work = missing.slice();
+  if (onProgress) onProgress(0, missing.length);
+
+  await Promise.all(Array.from({ length: concurrency }, async () => {
+    while (work.length > 0) {
+      const sym = work.shift();
+      if (!sym) break;
+      try {
+        const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(sym)}`);
+        if (r.ok) {
+          const p = await r.json();
+          state.prices[sym] = p;
+        }
+      } catch (e) { /* tolerate failures */ }
+      fetched++;
+      if (onProgress) onProgress(fetched, missing.length);
+    }
+  }));
+  return { fetched, total: universe.length };
+}
+
 async function runScan() {
   if (state.watchlist.length === 0) return;
+
   // Try worker /scan first, fall back to client-side computation
   try {
     const idToken = await auth.currentUser.getIdToken();
@@ -3207,6 +3441,378 @@ function computeMA(closes, period) {
   if (!closes || closes.length < period) return null;
   const slice = closes.slice(-period);
   return slice.reduce((a, b) => a + b, 0) / period;
+}
+
+// ============================================================================
+// PRE-SURGE MATH — leading-indicator helpers for the Pre-Surge scanner
+// Free, fully client-side, uses only data already cached in state.prices.
+// ============================================================================
+
+// On-Balance Volume time series (Granville 1963).
+// Returns array same length as closes; obv[i] = cumulative volume signed by
+// direction of close[i] vs close[i-1]. Flat closes contribute 0.
+function computeOBVSeries(closes, volumes) {
+  if (!closes || !volumes || closes.length !== volumes.length || closes.length < 2) return null;
+  const out = new Array(closes.length);
+  out[0] = 0;
+  for (let i = 1; i < closes.length; i++) {
+    const prev = out[i - 1];
+    const v = volumes[i] || 0;
+    if (closes[i] > closes[i - 1])      out[i] = prev + v;
+    else if (closes[i] < closes[i - 1]) out[i] = prev - v;
+    else                                 out[i] = prev;
+  }
+  return out;
+}
+
+// Linear-regression slope of a numeric series over its full length.
+// Returns slope per-index (i.e. per-bar). Use directly to compare two series.
+// For comparing slope MAGNITUDES across scales, divide by the series mean.
+function linearSlope(series) {
+  if (!series || series.length < 2) return null;
+  const n = series.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += i;
+    sumY += series[i];
+    sumXY += i * series[i];
+    sumXX += i * i;
+  }
+  const denom = n * sumXX - sumX * sumX;
+  if (denom === 0) return 0;
+  return (n * sumXY - sumX * sumY) / denom;
+}
+
+// Slope normalized to series mean — comparable across series of different scales.
+// Returns slope-per-bar as a fraction of the average value (≈ daily % drift).
+function normalizedSlope(series) {
+  if (!series || series.length < 2) return null;
+  const slope = linearSlope(series);
+  if (slope == null) return null;
+  const mean = series.reduce((a, b) => a + b, 0) / series.length;
+  if (Math.abs(mean) < 1e-9) return 0;
+  return slope / Math.abs(mean);
+}
+
+// Bollinger Bandwidth = (upper - lower) / mid. Returns time-series of bandwidth
+// values over the last `lookback` sessions (used for percentile ranking).
+function computeBandwidthSeries(closes, period = 20, stdMult = 2, lookback = 126) {
+  if (!closes || closes.length < period + lookback) return null;
+  const out = [];
+  const start = closes.length - lookback;
+  for (let i = start; i < closes.length; i++) {
+    const slice = closes.slice(i - period + 1, i + 1);
+    if (slice.length < period) { out.push(null); continue; }
+    const mid = slice.reduce((a, b) => a + b, 0) / period;
+    const variance = slice.reduce((s, x) => s + (x - mid) ** 2, 0) / period;
+    const std = Math.sqrt(variance);
+    out.push(mid > 0 ? ((mid + stdMult * std) - (mid - stdMult * std)) / mid : 0);
+  }
+  return out;
+}
+
+// Returns percentile rank of `value` within `series` (lower = tighter = more compressed).
+function percentileRank(series, value) {
+  if (!series || series.length === 0 || value == null) return null;
+  const valid = series.filter(x => x != null && !isNaN(x));
+  if (valid.length === 0) return null;
+  let below = 0;
+  for (const v of valid) if (v < value) below++;
+  return (below / valid.length) * 100;
+}
+
+// Comparative Relative Strength series = price[target] / price[bench].
+// Both arrays must align by index (same trading days). Returns null if misaligned.
+function computeRSSeries(targetCloses, benchCloses) {
+  if (!targetCloses || !benchCloses) return null;
+  const n = Math.min(targetCloses.length, benchCloses.length);
+  if (n < 2) return null;
+  // Use the trailing window so the arrays align even if start dates differ
+  const tSlice = targetCloses.slice(-n);
+  const bSlice = benchCloses.slice(-n);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    if (bSlice[i] > 0) out.push(tSlice[i] / bSlice[i]);
+    else out.push(null);
+  }
+  return out;
+}
+
+// ============================================================================
+// PRE-SURGE COMPOSITE SCORER
+// Three signals, composite 0-100. Threshold ≥70 = flagged.
+//
+// SQUEEZE (0-40): Bollinger Bandwidth percentile vs 6-month history.
+//   - Bandwidth percentile ≤ 5: 25 pts (severe compression)
+//   - Bandwidth percentile ≤ 10: 20 pts (compressed)
+//   - Bandwidth percentile ≤ 20: 12 pts (tight)
+//   - + days-in-squeeze bonus (max 8 pts): 1 pt per session BW < 10th pctile, capped
+//   - + volume-expansion bonus (max 7 pts): today's vol > 1.5× 20d avg AND we're in squeeze
+//
+// ACCUMULATION (0-30): OBV slope vs price slope over 20 sessions.
+//   - normalizedSlope ratio = obvSlope / max(absPriceSlope, smallEpsilon)
+//   - Strong (price flat ±2%, OBV slope > 0): 20-30 pts scaled
+//   - + up-volume vs down-volume ratio bonus (max 5 pts)
+//
+// RELATIVE STRENGTH (0-30): RS line slope vs SPY over 50 sessions.
+//   - Positive RS slope + flat-to-down absolute price: 15-25 pts scaled
+//   - + RS percentile rank vs last 6 months (max 5 pts)
+//
+// Returns { composite, squeeze, accumulation, rs, breakdown } or null if
+// insufficient data.
+// ============================================================================
+function computePreSurgeScore(symbol, opts = {}) {
+  const data = state.prices[symbol];
+  if (!data || !data.ohlcv || data.ohlcv.length < 150) return null;
+
+  // Build aligned closes + volumes arrays — skip any bars with bad data so the
+  // two arrays stay index-aligned (critical for OBV correctness).
+  const closes = [];
+  const volumes = [];
+  for (const d of data.ohlcv) {
+    if (d.c == null || isNaN(d.c)) continue;
+    closes.push(d.c);
+    volumes.push(d.v != null && !isNaN(d.v) ? d.v : 0);
+  }
+  if (closes.length < 150) return null;
+
+  const breakdown = [];
+
+  // ---- SQUEEZE ----
+  let squeezeScore = 0;
+  const bwSeries = computeBandwidthSeries(closes, 20, 2, 126);
+  let bwPctile = null;
+  let daysInSqueeze = 0;
+  let volExpansion = false;
+  if (bwSeries && bwSeries.length > 0) {
+    const curBw = bwSeries[bwSeries.length - 1];
+    // For percentile rank, use the FULL 126-session window
+    bwPctile = percentileRank(bwSeries, curBw);
+    if (bwPctile != null) {
+      if (bwPctile <= 5)       squeezeScore += 25;
+      else if (bwPctile <= 10) squeezeScore += 20;
+      else if (bwPctile <= 20) squeezeScore += 12;
+      // Days-in-squeeze bonus: count trailing sessions where BW was in bottom 10th
+      const threshold10 = (() => {
+        const sorted = bwSeries.filter(x => x != null).slice().sort((a, b) => a - b);
+        return sorted.length ? sorted[Math.floor(sorted.length * 0.10)] : null;
+      })();
+      if (threshold10 != null) {
+        for (let i = bwSeries.length - 1; i >= 0; i--) {
+          if (bwSeries[i] != null && bwSeries[i] <= threshold10) daysInSqueeze++;
+          else break;
+        }
+        squeezeScore += Math.min(8, daysInSqueeze);
+      }
+      // Volume expansion bonus: today's vol > 1.5× 20-day avg, AND we're in squeeze
+      if (bwPctile <= 20 && volumes.length >= 21) {
+        const todayVol = volumes[volumes.length - 1];
+        const avg20 = volumes.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
+        if (avg20 > 0 && todayVol > 1.5 * avg20) {
+          volExpansion = true;
+          squeezeScore += 7;
+        }
+      }
+    }
+  }
+  squeezeScore = Math.min(40, Math.max(0, squeezeScore));
+  breakdown.push({
+    label: "Squeeze",
+    score: squeezeScore,
+    max: 40,
+    detail: bwPctile != null
+      ? `BW pctile ${bwPctile.toFixed(0)}% · ${daysInSqueeze}d in squeeze${volExpansion ? " · vol expansion ✓" : ""}`
+      : "insufficient data",
+  });
+
+  // ---- ACCUMULATION ----
+  let accuScore = 0;
+  let obvDir = null, priceDir = null;
+  if (closes.length >= 20 && volumes.length === closes.length) {
+    const recent20Closes = closes.slice(-20);
+    const recent20Vols   = volumes.slice(-20);
+    const obvSeries = computeOBVSeries(recent20Closes, recent20Vols);
+    if (obvSeries) {
+      const obvSlopeNorm = normalizedSlope(obvSeries);
+      const priceSlopeNorm = normalizedSlope(recent20Closes);
+      if (obvSlopeNorm != null && priceSlopeNorm != null) {
+        obvDir = obvSlopeNorm;
+        priceDir = priceSlopeNorm;
+        // Flat-to-down price AND positive OBV slope = textbook accumulation
+        if (priceSlopeNorm < 0.002 && obvSlopeNorm > 0) {
+          // Scale: stronger OBV climb relative to price flatness = more points
+          const ratio = obvSlopeNorm / Math.max(Math.abs(priceSlopeNorm), 0.0005);
+          if (ratio > 3)      accuScore += 25;
+          else if (ratio > 2) accuScore += 20;
+          else if (ratio > 1) accuScore += 14;
+          else                accuScore += 8;
+        }
+        // Up-day vs down-day volume ratio bonus
+        let upVol = 0, downVol = 0;
+        for (let i = 1; i < recent20Closes.length; i++) {
+          if (recent20Closes[i] > recent20Closes[i - 1]) upVol += recent20Vols[i];
+          else if (recent20Closes[i] < recent20Closes[i - 1]) downVol += recent20Vols[i];
+        }
+        if (downVol > 0 && upVol / downVol > 1.5) accuScore += 5;
+      }
+    }
+  }
+  accuScore = Math.min(30, Math.max(0, accuScore));
+  breakdown.push({
+    label: "Accumulation",
+    score: accuScore,
+    max: 30,
+    detail: (obvDir != null && priceDir != null)
+      ? `OBV ${obvDir > 0 ? "↑" : "↓"} · Price ${priceDir > 0 ? "↑" : priceDir < -0.002 ? "↓" : "→"}`
+      : "insufficient data",
+  });
+
+  // ---- RELATIVE STRENGTH ----
+  let rsScore = 0;
+  let rsSlopeNorm = null, rsPctile = null;
+  const bench = opts.benchmarkCloses || state.prices["SPY"]?.ohlcv?.map(d => d.c);
+  if (bench && bench.length >= 50 && closes.length >= 50) {
+    const tCloses50 = closes.slice(-50);
+    const bCloses50 = bench.slice(-50);
+    const rs50 = computeRSSeries(tCloses50, bCloses50);
+    if (rs50 && rs50.length >= 30) {
+      rsSlopeNorm = normalizedSlope(rs50.filter(x => x != null));
+      const priceSlopeNorm = normalizedSlope(tCloses50);
+      if (rsSlopeNorm != null && priceSlopeNorm != null) {
+        // Positive RS slope while price is flat-to-down = capital rotating in quietly
+        if (rsSlopeNorm > 0 && priceSlopeNorm < 0.003) {
+          if (rsSlopeNorm > 0.003)      rsScore += 25;
+          else if (rsSlopeNorm > 0.001) rsScore += 18;
+          else                          rsScore += 10;
+        } else if (rsSlopeNorm > 0.002) {
+          // Even with rising price, strong RS gets some credit
+          rsScore += 12;
+        }
+        // RS percentile bonus
+        if (bench.length >= 126 && closes.length >= 126) {
+          const rs126 = computeRSSeries(closes.slice(-126), bench.slice(-126));
+          if (rs126) {
+            const curRS = rs126[rs126.length - 1];
+            rsPctile = percentileRank(rs126, curRS);
+            if (rsPctile != null && rsPctile > 75) rsScore += 5;
+          }
+        }
+      }
+    }
+  }
+  rsScore = Math.min(30, Math.max(0, rsScore));
+  breakdown.push({
+    label: "Relative Strength",
+    score: rsScore,
+    max: 30,
+    detail: rsSlopeNorm != null
+      ? `RS ${rsSlopeNorm > 0 ? "↑" : "↓"} vs SPY${rsPctile != null ? ` · ${rsPctile.toFixed(0)}th pctile` : ""}`
+      : "no SPY benchmark",
+  });
+
+  const composite = squeezeScore + accuScore + rsScore;
+  return {
+    symbol,
+    composite,
+    squeeze: squeezeScore,
+    accumulation: accuScore,
+    rs: rsScore,
+    breakdown,
+    current_price: data.current_price || closes[closes.length - 1],
+    flagged_at: new Date().toISOString(),
+  };
+}
+
+// ============================================================================
+// PRE-SURGE UNIVERSE SCANNER
+// Runs computePreSurgeScore across watchlist + non-cash holdings + ETF_UNIVERSE.
+// Filters composite ≥ THRESHOLD, ranks descending. Returns array.
+// ============================================================================
+const PRESURGE_THRESHOLD = 70;
+const PRESURGE_LOCAL_KEY = "presurge_flags_v1"; // localStorage history cache
+
+function getPreSurgeUniverse() {
+  const set = new Set();
+  for (const w of state.watchlist) set.add(w.symbol);
+  for (const h of state.holdings) if (h.asset_class !== "cash") set.add(h.symbol);
+  for (const e of (typeof ETF_UNIVERSE !== "undefined" ? ETF_UNIVERSE : [])) set.add(e.symbol);
+  return Array.from(set);
+}
+
+function computePreSurgeUniverse() {
+  // Need SPY benchmark cached for RS. If missing, RS just won't score — composite still useful.
+  const benchCloses = state.prices["SPY"]?.ohlcv?.map(d => d.c);
+  const universe = getPreSurgeUniverse();
+  const scored = [];
+  for (const sym of universe) {
+    if (sym === "SPY") continue; // can't compute RS of SPY vs itself usefully
+    const r = computePreSurgeScore(sym, { benchmarkCloses: benchCloses });
+    if (r && r.composite >= PRESURGE_THRESHOLD) scored.push(r);
+  }
+  scored.sort((a, b) => b.composite - a.composite);
+  return scored;
+}
+
+// ============================================================================
+// PRE-SURGE HISTORY — persist flags so we can show track record over time.
+// Stored as localStorage (lightweight, no extra Firestore writes) keyed by
+// "{date}__{symbol}" so re-flagging the same name same day is idempotent.
+// Each entry: { symbol, date, composite, squeeze, accumulation, rs, price_at_flag }
+// ============================================================================
+function loadPreSurgeHistory() {
+  try {
+    const raw = localStorage.getItem(PRESURGE_LOCAL_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
+}
+function savePreSurgeHistory(history) {
+  try { localStorage.setItem(PRESURGE_LOCAL_KEY, JSON.stringify(history)); } catch (e) {}
+}
+function recordPreSurgeFlags(flags) {
+  const history = loadPreSurgeHistory();
+  const today = new Date().toISOString().slice(0, 10);
+  let added = 0;
+  for (const f of flags) {
+    const key = `${today}__${f.symbol}`;
+    if (history[key]) continue; // already recorded today
+    history[key] = {
+      symbol: f.symbol,
+      date: today,
+      composite: f.composite,
+      squeeze: f.squeeze,
+      accumulation: f.accumulation,
+      rs: f.rs,
+      price_at_flag: f.current_price,
+    };
+    added++;
+  }
+  // Trim history to last 60 days to bound localStorage size
+  const cutoff = new Date(Date.now() - 60 * 86400 * 1000).toISOString().slice(0, 10);
+  for (const k of Object.keys(history)) {
+    if (history[k].date < cutoff) delete history[k];
+  }
+  if (added > 0) savePreSurgeHistory(history);
+  return added;
+}
+
+// Returns the N most-recent flags older than `minAgeDays` (so we can show
+// "flagged X days ago, now at Y%"). Used by the track-record panel.
+function getRecentPreSurgeFlags(minAgeDays = 3, maxAgeDays = 30, limit = 6) {
+  const history = loadPreSurgeHistory();
+  const now = Date.now();
+  const out = [];
+  for (const k of Object.keys(history)) {
+    const f = history[k];
+    const flagDate = new Date(f.date + "T00:00:00").getTime();
+    const ageDays = (now - flagDate) / 86400000;
+    if (ageDays < minAgeDays || ageDays > maxAgeDays) continue;
+    const curPrice = state.prices[f.symbol]?.current_price;
+    if (curPrice == null || !f.price_at_flag) continue;
+    const sinceFlagPct = ((curPrice - f.price_at_flag) / f.price_at_flag) * 100;
+    out.push({ ...f, age_days: ageDays, current_price: curPrice, since_flag_pct: sinceFlagPct });
+  }
+  out.sort((a, b) => a.age_days - b.age_days); // most recent first
+  return out.slice(0, limit);
 }
 
 function computeEMA(closes, period) {
@@ -3747,6 +4353,193 @@ function tagActionsWithRecency(actions) {
   return actions;
 }
 
+// ============================================================================
+// PRE-SURGE CARD RENDERING (sits above Daily Scan on the Portfolio tab)
+// Composite ≥ 70 from three leading indicators:
+//   • Squeeze (BB bandwidth in lowest 10% of 6mo + days-in-squeeze + vol expansion)
+//   • Accumulation (OBV slope positive while price flat, + up/down volume ratio)
+//   • Relative Strength (RS line slope vs SPY rising while price flat, + RS pctile)
+// ============================================================================
+function renderPreSurgeCard() {
+  const cached = state.preSurge;
+  const loading = state.preSurgeLoading;
+  const ranAt = state.preSurgeRanAt;
+
+  // First-time empty state
+  if (!cached && !loading) {
+    return `
+      <div class="presurge-card empty">
+        <div class="presurge-head">
+          <div>
+            <h3>Pre-Surge Scanner</h3>
+            <div class="presurge-sub">Squeeze · Accumulation · Relative Strength</div>
+          </div>
+          <button class="btn btn-sm" data-act="run-presurge">Scan</button>
+        </div>
+        <div class="presurge-empty-body">
+          Scans watchlist, holdings, and ETF universe for the three leading-indicator setups that usually precede surges: Bollinger squeeze, OBV accumulation divergence, and relative-strength rotation. Composite score ≥ 70 = flagged. First scan downloads OHLCV histories — takes 15-30 seconds.
+        </div>
+      </div>
+    `;
+  }
+
+  if (loading) {
+    const p = state.preSurgeProgress || { fetched: 0, total: 0 };
+    const pct = p.total > 0 ? Math.round((p.fetched / p.total) * 100) : 0;
+    return `
+      <div class="presurge-card loading">
+        <div class="presurge-head">
+          <div>
+            <h3>Pre-Surge Scanner</h3>
+            <div class="presurge-sub">${p.total > 0 ? `Fetching ${p.fetched}/${p.total} · ${pct}%` : "Computing scores…"}</div>
+          </div>
+          <button class="btn btn-sm" disabled><span class="spinner" style="width:12px;height:12px;border-width:1.5px;"></span> Scanning…</button>
+        </div>
+        <div class="presurge-progress"><div class="presurge-progress-bar" style="width:${pct}%;"></div></div>
+      </div>
+    `;
+  }
+
+  const flags = cached || [];
+  const recentHistory = getRecentPreSurgeFlags(3, 30, 5);
+
+  // Filter out dismissed entries
+  const visibleFlags = flags.filter(f => {
+    const key = recKeyFor(f.symbol, "presurge", "presurge");
+    return getRecStatus(key) !== "dismissed";
+  });
+
+  let body;
+  if (visibleFlags.length === 0) {
+    body = `<div class="presurge-empty-body">
+      No setups above the threshold today. The market is either trending broadly (no compression) or fragmented (no clean rotation). Patience — these signals are sparse by design.
+    </div>`;
+  } else {
+    body = `
+      <div class="presurge-list">
+        ${visibleFlags.slice(0, 8).map(f => {
+          const recKey = recKeyFor(f.symbol, "presurge", "presurge");
+          const status = getRecStatus(recKey);
+          const isDone = status === "done";
+          const held = state.holdings.some(h => h.symbol === f.symbol && h.asset_class !== "cash");
+          const watched = state.watchlist.some(w => w.symbol === f.symbol);
+          return `
+          <div class="presurge-row ${isDone ? 'rec-done' : ''}" data-act="open-asset" data-symbol="${escAttr(f.symbol)}">
+            <div class="presurge-rank">${f.composite}</div>
+            <div class="presurge-mid">
+              <div class="presurge-sym-row">
+                <span class="presurge-sym">${escAttr(f.symbol)}</span>
+                ${held ? `<span class="presurge-tag held">held</span>` : ""}
+                ${watched ? `<span class="presurge-tag watched">watched</span>` : ""}
+                <span class="presurge-price">$${fmtUSD(f.current_price)}</span>
+              </div>
+              <div class="presurge-bars">
+                ${renderPresurgeBar("Squeeze", f.squeeze, 40, "var(--gold)")}
+                ${renderPresurgeBar("Accum",   f.accumulation, 30, "var(--green)")}
+                ${renderPresurgeBar("RS",      f.rs, 30, "var(--ink-soft)")}
+              </div>
+              <div class="presurge-details">
+                ${f.breakdown.map(b => `<span class="presurge-detail-chip">${escAttr(b.detail)}</span>`).join("")}
+              </div>
+            </div>
+            <div class="presurge-actions">
+              <button class="presurge-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" title="Hide">×</button>
+            </div>
+          </div>
+        `;}).join("")}
+      </div>
+    `;
+  }
+
+  // Track record panel — flags from 3-30 days ago with their since-flag return.
+  // This is the scanner's self-audit: are flagged names actually moving up?
+  let trackRecord = "";
+  if (recentHistory.length > 0) {
+    const avg = recentHistory.reduce((s, h) => s + h.since_flag_pct, 0) / recentHistory.length;
+    const wins = recentHistory.filter(h => h.since_flag_pct > 0).length;
+    const avgCls = avg >= 0 ? "pos" : "neg";
+    trackRecord = `
+      <div class="presurge-track">
+        <div class="presurge-track-head">
+          <span>Recent Flags · Track Record</span>
+          <span class="presurge-track-stats">
+            ${wins}/${recentHistory.length} positive · avg <span class="${avgCls}">${avg >= 0 ? "+" : ""}${avg.toFixed(1)}%</span>
+          </span>
+        </div>
+        <div class="presurge-track-list">
+          ${recentHistory.map(h => {
+            const cls = h.since_flag_pct >= 0 ? "pos" : "neg";
+            const ageDisp = h.age_days < 1 ? "today" : `${Math.round(h.age_days)}d ago`;
+            return `
+              <div class="presurge-track-row" data-act="open-asset" data-symbol="${escAttr(h.symbol)}">
+                <span class="ptr-sym">${escAttr(h.symbol)}</span>
+                <span class="ptr-age">${ageDisp}</span>
+                <span class="ptr-score">cs ${h.composite}</span>
+                <span class="ptr-pnl ${cls}">${h.since_flag_pct >= 0 ? "+" : ""}${h.since_flag_pct.toFixed(1)}%</span>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="presurge-card">
+      <div class="presurge-head">
+        <div>
+          <h3>Pre-Surge Scanner</h3>
+          <div class="presurge-sub">${visibleFlags.length} flagged · ${ranAt ? "Updated " + fmtRel(ranAt) : "Just now"}</div>
+        </div>
+        <button class="btn btn-sm" data-act="run-presurge">Rescan</button>
+      </div>
+      ${body}
+      ${trackRecord}
+      <div class="presurge-footer">Composite ≥ 70 of 100 · Squeeze 40 + Accumulation 30 + RS 30 · Leading indicators only</div>
+    </div>
+  `;
+}
+
+function renderPresurgeBar(label, value, max, color) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return `
+    <div class="presurge-bar-row">
+      <span class="presurge-bar-lbl">${escAttr(label)}</span>
+      <div class="presurge-bar-track">
+        <div class="presurge-bar-fill" style="width:${pct}%;background:${color};"></div>
+      </div>
+      <span class="presurge-bar-val">${value}/${max}</span>
+    </div>
+  `;
+}
+
+async function runPreSurge() {
+  if (state.preSurgeLoading) return;
+  state.preSurgeLoading = true;
+  state.preSurgeProgress = { fetched: 0, total: 0 };
+  renderCurrentView();
+  try {
+    await ensurePreSurgeData((fetched, total) => {
+      state.preSurgeProgress = { fetched, total };
+      // Only re-render every ~5 items to avoid flicker on slow networks
+      if (fetched % 5 === 0 || fetched === total) renderCurrentView();
+    });
+    const flags = computePreSurgeUniverse();
+    state.preSurge = flags;
+    state.preSurgeRanAt = new Date().toISOString();
+    const added = recordPreSurgeFlags(flags);
+    state.preSurgeLoading = false;
+    state.preSurgeProgress = null;
+    renderCurrentView();
+    toast(`${flags.length} pre-surge setup${flags.length === 1 ? "" : "s"} flagged${added > 0 ? ` · ${added} new today` : ""}`);
+  } catch (e) {
+    state.preSurgeLoading = false;
+    state.preSurgeProgress = null;
+    renderCurrentView();
+    toast(`Pre-Surge scan failed: ${(e.message || e).slice(0, 80)}`, 3000, "error");
+  }
+}
+
 function renderDailyScan() {
   let actions = computeDailyScan();
   if (actions.length === 0) {
@@ -4028,6 +4821,8 @@ function renderPortfolio() {
     </div>
 
     ${renderBreakoutPrompt()}
+
+    ${renderPreSurgeCard()}
 
     ${renderDailyScan()}
 
@@ -8163,6 +8958,7 @@ document.addEventListener("click", (e) => {
       case "submit-cond":            submitCondition(symbol); break;
       case "rm-cond":                removeCondition(symbol, target.dataset.cid); break;
       case "refresh-news":           refreshNews(); break;
+      case "run-presurge":           runPreSurge(); break;
       case "mark-rec-done":          markRecommendationDone(target.dataset.recKey); break;
       case "dismiss-rec":            dismissRecommendation(target.dataset.recKey); break;
       case "preview-chart":          togglePreviewChart(target.dataset.symbol, target.dataset.name); break;
