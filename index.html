@@ -957,6 +957,148 @@ body {
 .journal-del:hover { color: var(--red); border-color: var(--red); }
 .journal-del:active { transform: scale(0.92); }
 
+/* ===== MACRO REGIME CARD ===== */
+.macro-card {
+  margin: 12px 20px 0;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+}
+.macro-card::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: var(--ink-muted);
+}
+.macro-card.tailwind::before { background: var(--green); }
+.macro-card.headwind::before { background: var(--red); }
+.macro-card.empty,
+.macro-card.loading { padding-bottom: 12px; }
+.macro-head {
+  display: flex; justify-content: space-between; align-items: start;
+  gap: 12px; padding: 14px 18px 6px;
+}
+.macro-head h3 {
+  font-family: var(--display); font-size: 15px; font-weight: 500;
+  letter-spacing: -0.005em; margin-bottom: 2px;
+}
+.macro-sub {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-muted); letter-spacing: 0.04em;
+}
+.macro-empty-body {
+  padding: 8px 20px 4px;
+  font-size: 12.5px; color: var(--ink-soft);
+  line-height: 1.55;
+}
+.macro-regime-label {
+  padding: 8px 18px 12px;
+}
+.mrl-cur {
+  font-family: var(--display); font-size: 18px; font-weight: 600;
+  letter-spacing: -0.01em; margin-bottom: 4px;
+}
+.macro-card.tailwind .mrl-cur { color: var(--green); }
+.macro-card.headwind .mrl-cur { color: var(--red); }
+.mrl-blurb {
+  font-size: 12.5px; color: var(--ink-soft);
+  line-height: 1.5;
+}
+.macro-stats {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 1px; background: var(--rule-soft);
+  border-top: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.macro-stat {
+  padding: 12px 18px;
+  background: var(--bg-card);
+}
+.macro-stat-lbl {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-muted); margin-bottom: 4px;
+}
+.macro-stat-val {
+  font-family: var(--mono); font-size: 18px; font-weight: 600;
+  color: var(--ink);
+}
+.macro-stat-sub {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-soft); margin-top: 3px;
+}
+.macro-stat-sub .pos { color: var(--green); }
+.macro-stat-sub .neg { color: var(--red); }
+.macro-stat-sub .muted { color: var(--ink-muted); }
+.macro-verdict {
+  padding: 10px 18px;
+  display: flex; flex-direction: column; gap: 10px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.mv-block { display: flex; flex-direction: column; gap: 5px; }
+.mv-lbl {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.mv-block.favored .mv-lbl { color: var(--green); }
+.mv-block.headwind .mv-lbl { color: var(--red); }
+.mv-syms { display: flex; flex-wrap: wrap; gap: 4px; }
+.mv-chip {
+  font-family: var(--display); font-size: 11px; font-weight: 600;
+  padding: 3px 8px; border-radius: 4px;
+}
+.mv-chip.favored { background: rgba(74,122,74,0.15); color: var(--green); border: 1px solid var(--green); }
+.mv-chip.headwind { background: rgba(161,61,45,0.12); color: var(--red); border: 1px solid var(--red); }
+.macro-favors-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 1px; background: var(--rule-soft);
+}
+@media (max-width: 480px) {
+  .macro-favors-grid { grid-template-columns: 1fr; }
+}
+.macro-fg-col {
+  padding: 10px 14px;
+  background: var(--bg-card);
+}
+.mfg-lbl {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.macro-fg-col.favors .mfg-lbl { color: var(--green); }
+.macro-fg-col.against .mfg-lbl { color: var(--red); }
+.macro-fg-col ul { list-style: none; padding: 0; margin: 0; }
+.macro-fg-col li {
+  font-size: 12px; color: var(--ink-soft);
+  padding: 2px 0; line-height: 1.35;
+}
+.macro-fg-col li::before { content: "·  "; color: var(--ink-muted); }
+.macro-footer {
+  padding: 8px 18px;
+  border-top: 1px solid var(--rule-soft);
+  font-family: var(--mono); font-size: 9.5px;
+  color: var(--ink-muted); text-align: center;
+  letter-spacing: 0.04em;
+}
+
+/* DTC / short-interest badges on Pre-Surge rows */
+.presurge-tag.short-high-short {
+  background: rgba(176,141,60,0.15);
+  color: var(--gold);
+  border: 1px solid var(--gold);
+}
+.presurge-tag.short-squeeze-prone {
+  background: rgba(161,61,45,0.15);
+  color: var(--red);
+  border: 1px solid var(--red);
+  animation: pulse-squeeze 2s ease-in-out infinite;
+}
+@keyframes pulse-squeeze {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 /* ===== PRE-SURGE SCANNER CARD ===== */
 .presurge-card {
   margin: 12px 20px 0;
@@ -2655,6 +2797,11 @@ const state = {
   preSurgeRanAt: null,        // ISO timestamp of last scan
   preSurgeLoading: false,
   preSurgeProgress: null, // { fetched, total } during scan
+  // Macro regime — DXY + 10Y yield → favored vs headwind sectors for the book
+  macro: loadMacroCache(),    // { raw, classified, fetchedAt } | null
+  macroLoading: false,
+  // Short-interest data — bulk DTC for SCAN_UNIVERSE. Bi-monthly Finra data, cached 24h.
+  shortInterest: loadShortInterestCache() || null, // { SYM: { dtc, shortPctFloat, ... } } | null
   // Inline chart preview state for Ideas/ETF sections (no analysis call)
   previewChart: { symbol: null, name: null, range: "3M", loading: false, data: null },
   // Per-day per-recommendation "done" or "dismissed" tracking (localStorage-persisted)
@@ -3605,6 +3752,245 @@ function computeRSSeries(targetCloses, benchCloses) {
 }
 
 // ============================================================================
+// MACRO REGIME — DXY + 10Y yield → regime classification + sector mapping
+//
+// Two macro variables drive cross-asset capital flow more than anything else:
+//   • US Dollar Index (DXY): when it falls, dollar-denominated risk assets
+//     (gold, silver, EM, long-duration tech, crypto) tend to outperform.
+//     When it rises, defensive sectors and US-listed multinationals lag.
+//   • 10-Year Treasury Yield: when it falls, long-duration assets (growth tech,
+//     REITs, utilities, gold) tend to outperform. When it rises sharply,
+//     financials and value tend to outperform; growth tech and metals lag.
+//
+// The combination produces 4 archetypal regimes. We classify by 252d percentile
+// rank of DXY and 50d change in 10Y yield, mapping to a "favors / against"
+// list of sectors and a few specific tickers in the user's universe.
+//
+// Data refresh: localStorage TTL of 6 hours (macro moves slowly).
+// ============================================================================
+
+const MACRO_CACHE_KEY = "macroRegime_v1";
+const MACRO_TTL_HOURS = 6;
+
+function loadMacroCache() {
+  try {
+    const raw = localStorage.getItem(MACRO_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    if (!c.fetchedAt) return null;
+    const ageH = (Date.now() - new Date(c.fetchedAt).getTime()) / 3600000;
+    if (ageH > MACRO_TTL_HOURS) return null;
+    return c;
+  } catch (e) { return null; }
+}
+function saveMacroCache(payload) {
+  try {
+    localStorage.setItem(MACRO_CACHE_KEY, JSON.stringify({
+      ...payload, fetchedAt: new Date().toISOString(),
+    }));
+  } catch (e) {}
+}
+
+// Returns percentile rank of `value` within `series` (0 = lowest, 100 = highest).
+function pctileRank(series, value) {
+  const valid = series.filter(x => x != null && !isNaN(x));
+  if (valid.length === 0 || value == null) return null;
+  let below = 0;
+  for (const v of valid) if (v < value) below++;
+  return (below / valid.length) * 100;
+}
+
+// Given DXY + TNX response, compute the regime classification.
+function classifyMacroRegime(raw) {
+  if (!raw || !raw.dxy || !raw.tnx) return null;
+  const dxyCloses = raw.dxy.ohlcv.map(d => d.c);
+  const tnxCloses = raw.tnx.ohlcv.map(d => d.c);
+  if (dxyCloses.length < 50 || tnxCloses.length < 50) return null;
+
+  const dxyCur  = raw.dxy.current ?? dxyCloses[dxyCloses.length - 1];
+  const tnxCur  = raw.tnx.current ?? tnxCloses[tnxCloses.length - 1];
+  // ^TNX is quoted yield × 100 — e.g. raw 45.0 = 4.50% real yield
+  const tnxDisplayPct = tnxCur / 10;
+
+  // DXY: 252d percentile rank (low = weak dollar regime = bullish risk/metals)
+  const dxy252 = pctileRank(dxyCloses.slice(-252), dxyCur);
+  const dxy50  = pctileRank(dxyCloses.slice(-50), dxyCur);
+  // DXY 20-day slope (sign matters more than magnitude)
+  const dxy20Slope = dxyCloses.length >= 20
+    ? (dxyCloses[dxyCloses.length - 1] - dxyCloses[dxyCloses.length - 20]) / dxyCloses[dxyCloses.length - 20] * 100
+    : null;
+
+  // 10Y: 50d change in yield (bps roughly) — falling yield = long-duration tailwind
+  const tnxAgo50 = tnxCloses.length >= 50 ? tnxCloses[tnxCloses.length - 50] : null;
+  const tnx50Change = tnxAgo50 != null ? (tnxCur - tnxAgo50) / 10 : null; // in real % points
+
+  // Classify into one of 4 archetypes
+  const dxyFalling = (dxy20Slope != null && dxy20Slope < -1.5) || (dxy252 != null && dxy252 < 25);
+  const dxyRising  = (dxy20Slope != null && dxy20Slope > 1.5)  || (dxy252 != null && dxy252 > 75);
+  const yieldsFalling = tnx50Change != null && tnx50Change < -0.3;
+  const yieldsRising  = tnx50Change != null && tnx50Change > 0.3;
+
+  let regime, regimeLabel, regimeBlurb, favors, against;
+
+  if (dxyFalling && yieldsFalling) {
+    regime = "risk_on_metals";
+    regimeLabel = "Weak Dollar + Falling Yields";
+    regimeBlurb = "Strongest tailwind for long-duration risk: metals, growth tech, EM, crypto. Defensive value lags.";
+    favors = ["Gold/Silver (ISLN, IGLN, PPLT, GLD, SLV)", "Long-duration tech (QQQ, MSFT, NVDA)", "EM equities (EIMI, VWO, INDA)", "Crypto (BTC, ETH, MSTR)"];
+    against = ["Financials (XLF, JPM)", "Dollar-strong defensive (utilities)"];
+  } else if (dxyFalling && yieldsRising) {
+    regime = "reflation";
+    regimeLabel = "Weak Dollar + Rising Yields";
+    regimeBlurb = "Reflation trade — commodities and value cyclicals tend to win, long-duration growth and gold get mixed signals.";
+    favors = ["Energy (XLE, XOM, CVX)", "Industrials (XLI, CAT, DE)", "EM equities", "Materials"];
+    against = ["Long-duration growth", "Utilities", "Gold gets mixed signals — watch DXY break"];
+  } else if (dxyRising && yieldsFalling) {
+    regime = "deflation_scare";
+    regimeLabel = "Strong Dollar + Falling Yields";
+    regimeBlurb = "Defensive/flight-to-quality regime — typically a slowdown signal. Treasuries and quality outperform; risk assets struggle.";
+    favors = ["Long Treasuries (TLT, IEF)", "Quality defensive (utilities, healthcare)", "Cash"];
+    against = ["EM (EIMI, VWO)", "Metals (mixed — gold may benefit from real-yield drop)", "Commodities", "Crypto"];
+  } else if (dxyRising && yieldsRising) {
+    regime = "risk_off";
+    regimeLabel = "Strong Dollar + Rising Yields";
+    regimeBlurb = "Risk-off regime — both real rates and dollar headwinds against most asset classes. Cash and short-duration win.";
+    favors = ["Cash / short-duration bonds", "Financials (rising yields help margins)", "Dollar-positive defensive"];
+    against = ["Metals (ISLN, IGLN, PPLT)", "Long-duration growth (QQQ, tech)", "EM", "Crypto", "MSTR"];
+  } else {
+    regime = "neutral";
+    regimeLabel = "Range-Bound";
+    regimeBlurb = "No clear macro directional bias right now. Focus on idiosyncratic catalysts; cross-asset rotation signals are weak.";
+    favors = ["Idiosyncratic stock selection", "Balanced allocation"];
+    against = [];
+  }
+
+  return {
+    regime, regimeLabel, regimeBlurb, favors, against,
+    dxy: { current: dxyCur, pctile_252d: dxy252, pctile_50d: dxy50, slope_20d_pct: dxy20Slope, day_change_pct: raw.dxy.day_change_pct },
+    tnx: { current: tnxCur, display_pct: tnxDisplayPct, change_50d_pp: tnx50Change, day_change_pct: raw.tnx.day_change_pct },
+  };
+}
+
+async function fetchMacroRegime() {
+  // Try cache first
+  const cached = loadMacroCache();
+  if (cached) return cached;
+  const r = await fetch(`${WORKER_URL}/macro-regime`);
+  if (!r.ok) throw new Error(`macro fetch ${r.status}`);
+  const raw = await r.json();
+  const classified = classifyMacroRegime(raw);
+  if (!classified) throw new Error("macro classification failed (insufficient data)");
+  saveMacroCache({ raw, classified });
+  return { raw, classified, fetchedAt: new Date().toISOString() };
+}
+
+// Map each macro regime to which of the user's holdings get a "favored" tag.
+// Lightweight — just sector-class heuristics, not a full mapping.
+function userHoldingsMacroVerdict(classified) {
+  if (!classified) return { favored: [], headwind: [] };
+  const favored = [], headwind = [];
+  for (const h of state.holdings) {
+    if (h.asset_class === "cash") continue;
+    const v = symbolMacroVerdict(h.symbol, h.asset_class, classified.regime);
+    if (v === "favored") favored.push(h.symbol);
+    else if (v === "headwind") headwind.push(h.symbol);
+  }
+  // Watchlist too
+  for (const w of state.watchlist) {
+    const v = symbolMacroVerdict(w.symbol, w.asset_class, classified.regime);
+    if (v === "favored" && !favored.includes(w.symbol)) favored.push(w.symbol);
+    else if (v === "headwind" && !headwind.includes(w.symbol)) headwind.push(w.symbol);
+  }
+  return { favored, headwind };
+}
+
+function symbolMacroVerdict(symbol, assetClass, regime) {
+  // Defensive: this is heuristic — we use asset_class buckets + a few known tickers.
+  const metalSyms = new Set(["GLD","SLV","ISLN","IGLN","PPLT","PSLV","SIVR","GDX","GDXJ"]);
+  const cryptoProxies = new Set(["BTC","ETH","MSTR","COIN","MARA","RIOT"]);
+  const longDurationTech = new Set(["QQQ","MSFT","AAPL","NVDA","GOOGL","AMZN","META","TSLA","ADBE","CRM","NFLX","ORCL","AVGO","AMD"]);
+  const emEquity = new Set(["EIMI","VWO","INDA","MCHI","EWJ"]);
+  const longTreasuries = new Set(["TLT","IEF","ZROZ","EDV"]);
+  const financials = new Set(["JPM","BAC","GS","MS","C","XLF","WFC","SCHW"]);
+  const energy = new Set(["XOM","CVX","COP","SLB","EOG","OXY","XLE"]);
+  const cyclicals = new Set(["CAT","DE","GE","BA","XLI","XLB"]);
+
+  const isMetal = assetClass === "metal" || metalSyms.has(symbol);
+  const isCrypto = assetClass === "crypto" || cryptoProxies.has(symbol);
+  const isLDT = longDurationTech.has(symbol);
+  const isEM = emEquity.has(symbol);
+  const isLT = longTreasuries.has(symbol);
+  const isFin = financials.has(symbol);
+  const isEnergy = energy.has(symbol);
+  const isCyc = cyclicals.has(symbol);
+
+  switch (regime) {
+    case "risk_on_metals":
+      if (isMetal || isCrypto || isLDT || isEM) return "favored";
+      if (isFin) return "headwind";
+      return null;
+    case "reflation":
+      if (isEnergy || isCyc || isEM) return "favored";
+      if (isLT || isMetal) return "headwind";
+      return null;
+    case "deflation_scare":
+      if (isLT) return "favored";
+      if (isCrypto || isEM || isCyc || isEnergy) return "headwind";
+      if (isMetal) return null; // mixed for metals
+      return null;
+    case "risk_off":
+      if (isFin) return "favored";
+      if (isMetal || isCrypto || isLDT || isEM) return "headwind";
+      return null;
+    case "neutral":
+    default:
+      return null;
+  }
+}
+
+// ============================================================================
+// SHORT INTEREST — Days-to-Cover for SCAN_UNIVERSE
+// Cached for 24h since FINRA short data is bi-monthly anyway.
+// ============================================================================
+const SHORT_INTEREST_CACHE_KEY = "shortInterest_v1";
+const SHORT_INTEREST_TTL_HOURS = 24;
+
+function loadShortInterestCache() {
+  try {
+    const raw = localStorage.getItem(SHORT_INTEREST_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    if (!c.fetchedAt) return null;
+    const ageH = (Date.now() - new Date(c.fetchedAt).getTime()) / 3600000;
+    if (ageH > SHORT_INTEREST_TTL_HOURS) return null;
+    return c.results || null;
+  } catch (e) { return null; }
+}
+function saveShortInterestCache(results) {
+  try {
+    localStorage.setItem(SHORT_INTEREST_CACHE_KEY, JSON.stringify({
+      results, fetchedAt: new Date().toISOString(),
+    }));
+  } catch (e) {}
+}
+
+async function fetchShortInterestForUniverse(symbols) {
+  // Cache hit?
+  const cached = loadShortInterestCache();
+  if (cached) return cached;
+  const r = await fetch(`${WORKER_URL}/short-interest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ symbols }),
+  });
+  if (!r.ok) throw new Error(`short-interest fetch ${r.status}`);
+  const j = await r.json();
+  const results = j.results || {};
+  saveShortInterestCache(results);
+  return results;
+}
+
+// ============================================================================
 // PRE-SURGE COMPOSITE SCORER
 // Three signals, composite 0-100. Threshold ≥70 = flagged.
 //
@@ -4488,6 +4874,142 @@ function tagActionsWithRecency(actions) {
 }
 
 // ============================================================================
+// MACRO REGIME CARD — DXY + 10Y yield → favored / headwind sectors for your book
+// ============================================================================
+function renderMacroRegimeCard() {
+  const macro = state.macro;
+  const loading = state.macroLoading;
+
+  if (!macro && !loading) {
+    return `
+      <div class="macro-card empty">
+        <div class="macro-head">
+          <div>
+            <h3>Macro Regime</h3>
+            <div class="macro-sub">Dollar + 10Y yield → favored vs headwind sectors</div>
+          </div>
+          <button class="btn btn-sm" data-act="refresh-macro">Load</button>
+        </div>
+        <div class="macro-empty-body">
+          Reads US Dollar Index (DXY) and 10-Year Treasury yield from Yahoo to classify which regime we're in. Cached for 6 hours (macro moves slowly).
+        </div>
+      </div>
+    `;
+  }
+
+  if (loading) {
+    return `
+      <div class="macro-card loading">
+        <div class="macro-head">
+          <div>
+            <h3>Macro Regime</h3>
+            <div class="macro-sub">Fetching DXY + 10Y yield…</div>
+          </div>
+          <button class="btn btn-sm" disabled><span class="spinner" style="width:12px;height:12px;border-width:1.5px;"></span></button>
+        </div>
+      </div>
+    `;
+  }
+
+  const c = macro.classified;
+  const dxy = c.dxy;
+  const tnx = c.tnx;
+  const verdict = userHoldingsMacroVerdict(c);
+
+  // Pick a color based on the regime's mood toward the user's actual book.
+  // More headwinds than favored = a "caution" tone. More favored = "tailwind" tone.
+  let toneClass = "neutral";
+  if (verdict.favored.length > verdict.headwind.length + 1) toneClass = "tailwind";
+  else if (verdict.headwind.length > verdict.favored.length + 1) toneClass = "headwind";
+
+  const dxySlopeArrow = dxy.slope_20d_pct == null ? "→" : (dxy.slope_20d_pct > 0.5 ? "↑" : dxy.slope_20d_pct < -0.5 ? "↓" : "→");
+  const dxySlopeClass = dxy.slope_20d_pct == null ? "" : (dxy.slope_20d_pct > 0.5 ? "neg" : dxy.slope_20d_pct < -0.5 ? "pos" : ""); // rising dollar is bad for risk in user's book
+  const tnxChangeArrow = tnx.change_50d_pp == null ? "→" : (tnx.change_50d_pp > 0.1 ? "↑" : tnx.change_50d_pp < -0.1 ? "↓" : "→");
+
+  return `
+    <div class="macro-card ${toneClass}">
+      <div class="macro-head">
+        <div>
+          <h3>Macro Regime</h3>
+          <div class="macro-sub">Updated ${fmtRel(macro.fetchedAt || new Date().toISOString())}</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" data-act="refresh-macro">Refresh</button>
+      </div>
+
+      <div class="macro-regime-label">
+        <div class="mrl-cur">${escAttr(c.regimeLabel)}</div>
+        <div class="mrl-blurb">${escAttr(c.regimeBlurb)}</div>
+      </div>
+
+      <div class="macro-stats">
+        <div class="macro-stat">
+          <div class="macro-stat-lbl">DXY</div>
+          <div class="macro-stat-val">${dxy.current != null ? dxy.current.toFixed(2) : "—"}</div>
+          <div class="macro-stat-sub">
+            <span class="${dxySlopeClass}">${dxySlopeArrow} ${dxy.slope_20d_pct != null ? (dxy.slope_20d_pct >= 0 ? "+" : "") + dxy.slope_20d_pct.toFixed(2) + "% 20d" : ""}</span>
+            ${dxy.pctile_252d != null ? `<span class="muted"> · ${dxy.pctile_252d.toFixed(0)}th pctile</span>` : ""}
+          </div>
+        </div>
+        <div class="macro-stat">
+          <div class="macro-stat-lbl">10Y Yield</div>
+          <div class="macro-stat-val">${tnx.display_pct != null ? tnx.display_pct.toFixed(2) + "%" : "—"}</div>
+          <div class="macro-stat-sub">
+            <span>${tnxChangeArrow} ${tnx.change_50d_pp != null ? (tnx.change_50d_pp >= 0 ? "+" : "") + tnx.change_50d_pp.toFixed(2) + "pp 50d" : ""}</span>
+          </div>
+        </div>
+      </div>
+
+      ${verdict.favored.length > 0 || verdict.headwind.length > 0 ? `
+      <div class="macro-verdict">
+        ${verdict.favored.length > 0 ? `
+        <div class="mv-block favored">
+          <div class="mv-lbl">Your book: Tailwind</div>
+          <div class="mv-syms">${verdict.favored.map(s => `<span class="mv-chip favored">${escAttr(s)}</span>`).join("")}</div>
+        </div>` : ""}
+        ${verdict.headwind.length > 0 ? `
+        <div class="mv-block headwind">
+          <div class="mv-lbl">Your book: Headwind</div>
+          <div class="mv-syms">${verdict.headwind.map(s => `<span class="mv-chip headwind">${escAttr(s)}</span>`).join("")}</div>
+        </div>` : ""}
+      </div>` : ""}
+
+      <div class="macro-favors-grid">
+        <div class="macro-fg-col favors">
+          <div class="mfg-lbl">Regime Favors</div>
+          <ul>${c.favors.map(f => `<li>${escAttr(f)}</li>`).join("")}</ul>
+        </div>
+        ${c.against.length > 0 ? `
+        <div class="macro-fg-col against">
+          <div class="mfg-lbl">Regime Against</div>
+          <ul>${c.against.map(a => `<li>${escAttr(a)}</li>`).join("")}</ul>
+        </div>` : ""}
+      </div>
+
+      <div class="macro-footer">Cached 6h · DXY pctile vs 252d · 10Y yield change in % points</div>
+    </div>
+  `;
+}
+
+async function refreshMacro() {
+  if (state.macroLoading) return;
+  state.macroLoading = true;
+  // Force-clear the cache so refresh truly refetches
+  try { localStorage.removeItem(MACRO_CACHE_KEY); } catch (e) {}
+  renderCurrentView();
+  try {
+    const m = await fetchMacroRegime();
+    state.macro = m;
+    state.macroLoading = false;
+    renderCurrentView();
+    toast(`Macro: ${m.classified.regimeLabel}`);
+  } catch (e) {
+    state.macroLoading = false;
+    renderCurrentView();
+    toast(`Macro fetch failed: ${(e.message || e).slice(0, 80)}`, 3000, "error");
+  }
+}
+
+// ============================================================================
 // PRE-SURGE CARD RENDERING (sits above Daily Scan on the Portfolio tab)
 // Composite ≥ 70 from three leading indicators:
 //   • Squeeze (BB bandwidth in lowest 10% of 6mo + days-in-squeeze + vol expansion)
@@ -4597,6 +5119,7 @@ function renderPreSurgeCard() {
                   ${aboveThresh ? `<span class="presurge-tag held" style="background:rgba(176,141,60,0.18);color:var(--gold);border-color:var(--gold);">FLAGGED</span>` : ""}
                   ${held ? `<span class="presurge-tag held">held</span>` : ""}
                   ${watched ? `<span class="presurge-tag watched">watched</span>` : ""}
+                  ${renderShortInterestBadge(f.symbol)}
                   <span class="presurge-price">$${fmtUSD(f.current_price)}</span>
                 </div>
                 <div class="presurge-bars">
@@ -4643,6 +5166,7 @@ function renderPreSurgeCard() {
                 <span class="presurge-sym">${escAttr(f.symbol)}</span>
                 ${held ? `<span class="presurge-tag held">held</span>` : ""}
                 ${watched ? `<span class="presurge-tag watched">watched</span>` : ""}
+                ${renderShortInterestBadge(f.symbol)}
                 <span class="presurge-price">$${fmtUSD(f.current_price)}</span>
               </div>
               <div class="presurge-bars">
@@ -4728,6 +5252,41 @@ function renderPresurgeBar(label, value, max, color) {
   `;
 }
 
+// Renders a "SQUEEZE-PRONE" / "HIGH SHORT" badge if DTC data is known for this
+// symbol AND DTC > 5. Empty string otherwise — including when data is missing
+// (international tickers, low-volume, or Yahoo not returning it).
+function renderShortInterestBadge(symbol) {
+  const si = state.shortInterest;
+  if (!si || !si[symbol]) return "";
+  const dtc = si[symbol].dtc;
+  const sp = si[symbol].shortPctFloat;
+  if (dtc == null) return "";
+  if (dtc < 5) return "";
+  // Tooltip shows short pct of float when available
+  const tip = sp != null
+    ? `Days-to-cover ${dtc.toFixed(1)} · ${sp.toFixed(1)}% of float short`
+    : `Days-to-cover ${dtc.toFixed(1)}`;
+  const cls = dtc >= 10 ? "squeeze-prone" : "high-short";
+  const label = dtc >= 10 ? `SQUEEZE-PRONE · DTC ${dtc.toFixed(1)}` : `HIGH SHORT · DTC ${dtc.toFixed(1)}`;
+  return `<span class="presurge-tag short-${cls}" title="${escAttr(tip)}">${label}</span>`;
+}
+
+async function fetchShortInterestBackground() {
+  // Fire-and-forget. Only fetches for the SCAN_UNIVERSE — international tickers,
+  // ETFs, and crypto don't have meaningful short-interest data.
+  // Skipped silently on failure since this is purely informational badging.
+  try {
+    const cached = loadShortInterestCache();
+    if (cached) { state.shortInterest = cached; return; }
+    const symbols = (typeof SCAN_UNIVERSE !== "undefined" ? SCAN_UNIVERSE : []);
+    if (symbols.length === 0) return;
+    const results = await fetchShortInterestForUniverse(symbols);
+    state.shortInterest = results;
+    // Re-render so badges appear on existing pre-surge rows
+    if (state.currentView === "portfolio") renderCurrentView();
+  } catch (e) { /* silent — badge is non-essential */ }
+}
+
 async function runPreSurge() {
   if (state.preSurgeLoading) return;
   state.preSurgeLoading = true;
@@ -4748,6 +5307,8 @@ async function runPreSurge() {
     state.preSurgeProgress = null;
     renderCurrentView();
     toast(`${flagged.length} pre-surge setup${flagged.length === 1 ? "" : "s"} flagged${added > 0 ? ` · ${added} new today` : ""} · ${allScored.length} scored`);
+    // Kick off DTC fetch in background to enrich rows with short-interest badges
+    fetchShortInterestBackground();
   } catch (e) {
     state.preSurgeLoading = false;
     state.preSurgeProgress = null;
@@ -5037,6 +5598,8 @@ function renderPortfolio() {
     </div>
 
     ${renderBreakoutPrompt()}
+
+    ${renderMacroRegimeCard()}
 
     ${renderPreSurgeCard()}
 
@@ -9176,6 +9739,7 @@ document.addEventListener("click", (e) => {
       case "refresh-news":           refreshNews(); break;
       case "run-presurge":           runPreSurge(); break;
       case "toggle-presurge-debug":  state.preSurgeDebug = !state.preSurgeDebug; renderCurrentView(); break;
+      case "refresh-macro":          refreshMacro(); break;
       case "mark-rec-done":          markRecommendationDone(target.dataset.recKey); break;
       case "dismiss-rec":            dismissRecommendation(target.dataset.recKey); break;
       case "preview-chart":          togglePreviewChart(target.dataset.symbol, target.dataset.name); break;
