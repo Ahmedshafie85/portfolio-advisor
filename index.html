@@ -954,10 +954,274 @@ body {
 .journal-del:hover { color: var(--red); border-color: var(--red); }
 .journal-del:active { transform: scale(0.92); }
 
-.alert-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--rule-soft); }
-.alert-info .symbol { font-family: var(--display); font-size: 15px; font-weight: 600; }
-.alert-info .cond { font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
-.alert-actions { display: flex; gap: 6px; }
+/* ===== JOURNAL STRATEGY ROWS (TP + Exit on logged trades) ===== */
+.journal-strategy {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-top: 8px; padding: 8px 10px;
+  background: var(--bg-elev); border-radius: 6px;
+  font-family: var(--mono); font-size: 11px;
+  align-items: center;
+}
+.journal-strategy.tp   { border-left: 2px solid var(--green); }
+.journal-strategy.exit { border-left: 2px solid var(--red); }
+.journal-strategy .js-lbl {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-muted); margin-right: 6px;
+}
+.journal-strategy .js-cell { color: var(--ink-soft); }
+.journal-strategy .js-cell b { color: var(--ink); margin-right: 4px; }
+.journal-strategy .js-cell-wide { flex-basis: 100%; }
+
+/* ===== LOG TRADE STRATEGY BLOCKS ===== */
+.lt-strategy-block {
+  margin: 14px 0;
+  padding: 12px 14px;
+  background: var(--bg-elev);
+  border: 1px solid var(--rule-soft);
+  border-radius: 8px;
+}
+.lt-strategy-head {
+  font-family: var(--display); font-size: 13px; font-weight: 500;
+  margin-bottom: 4px; letter-spacing: -0.005em;
+}
+.lt-strategy-hint {
+  font-size: 11px; color: var(--ink-muted);
+  margin-bottom: 10px;
+}
+
+/* ===== TP + EXIT GRID (analysis card) ===== */
+.tp-exit-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; padding: 12px 18px 6px;
+}
+@media (max-width: 480px) {
+  .tp-exit-grid { grid-template-columns: 1fr; }
+}
+.tp-block, .exit-block {
+  padding: 10px 12px;
+  background: var(--bg-elev); border-radius: 8px;
+  border: 1px solid var(--rule-soft);
+}
+.tp-block  { border-left: 3px solid var(--green); }
+.exit-block { border-left: 3px solid var(--red); }
+.tpe-lbl {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-muted); margin-bottom: 8px;
+}
+.tpe-row {
+  font-family: var(--mono); font-size: 12px;
+  margin-bottom: 4px; color: var(--ink-soft);
+  line-height: 1.4;
+}
+.tpe-row b {
+  color: var(--ink); font-weight: 600;
+  margin-right: 6px; display: inline-block; min-width: 38px;
+}
+.tpe-row-wrap { display: block; }
+.tpe-note {
+  font-size: 11px; color: var(--ink-muted);
+  margin-top: 6px; padding-top: 6px;
+  border-top: 1px dashed var(--rule-soft);
+  font-family: var(--mono);
+}
+
+/* ===== SCAN CARD: done state, dismiss button ===== */
+.scan-actions-col {
+  display: flex; flex-direction: column; gap: 4px;
+  align-items: center; justify-content: center;
+  margin-left: 4px;
+}
+.scan-del {
+  background: transparent; border: none;
+  color: var(--ink-muted); cursor: pointer;
+  width: 26px; height: 26px; border-radius: 50%;
+  font-size: 18px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.scan-del:hover, .scan-del:active {
+  background: rgba(161,61,45,0.12); color: var(--red);
+}
+.scan-log.done {
+  background: rgba(74,122,74,0.18);
+  color: var(--green);
+  border: 1px solid var(--green);
+  cursor: default; opacity: 1;
+}
+.scan-item.rec-done { opacity: 0.65; }
+.scan-item.rec-done .scan-action { text-decoration: line-through; text-decoration-color: var(--ink-muted); text-decoration-thickness: 1px; }
+.scan-recency.done {
+  background: var(--green); color: var(--bg);
+}
+
+/* ===== WATCHLIST SUGGEST-STRIP: done + delete ===== */
+.watch-suggest-strip .wss-del {
+  background: transparent; border: none;
+  color: var(--ink-muted); cursor: pointer;
+  width: 24px; height: 24px; border-radius: 50%;
+  font-size: 16px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  margin-left: 4px; padding: 0;
+}
+.watch-suggest-strip .wss-del:active { background: rgba(161,61,45,0.12); color: var(--red); }
+.watch-suggest-strip.done {
+  opacity: 0.75;
+  background: rgba(74,122,74,0.08);
+}
+.watch-suggest-strip.done .wss-action { color: var(--green); }
+.wss-log.done {
+  background: rgba(74,122,74,0.18);
+  color: var(--green); border: 1px solid var(--green);
+  cursor: default;
+}
+
+/* ===== INLINE CHART PREVIEW (Ideas + ETF Leaderboard) ===== */
+.preview-chart-wrap {
+  margin: 8px 0 4px;
+  padding: 10px 12px 12px;
+  background: var(--bg-elev);
+  border-radius: 8px;
+  border: 1px solid var(--rule-soft);
+}
+.preview-chart-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.preview-chart-head .pc-sym {
+  font-family: var(--display); font-weight: 600; font-size: 14px;
+  margin-right: 8px;
+}
+.preview-chart-head .pc-price {
+  font-family: var(--mono); font-size: 13px; color: var(--ink-soft);
+  margin-right: 6px;
+}
+.preview-chart-head .pc-day {
+  font-family: var(--mono); font-size: 11px;
+  padding: 2px 6px; border-radius: 3px;
+}
+.preview-chart-head .pc-day.pos { background: rgba(74,122,74,0.15); color: var(--green); }
+.preview-chart-head .pc-day.neg { background: rgba(161,61,45,0.15); color: var(--red); }
+.preview-chart-head .pc-close {
+  background: transparent; border: none;
+  color: var(--ink-muted); font-size: 20px; line-height: 1;
+  cursor: pointer; padding: 2px 6px;
+}
+.preview-chart-head .pc-close:hover { color: var(--red); }
+.preview-chart-controls {
+  display: flex; gap: 4px; margin-bottom: 8px;
+}
+.preview-chart-controls .pc-range {
+  background: transparent; border: 1px solid var(--rule-soft);
+  color: var(--ink-muted); font-family: var(--mono);
+  font-size: 10.5px; padding: 4px 9px; border-radius: 4px;
+  cursor: pointer; letter-spacing: 0.04em;
+}
+.preview-chart-controls .pc-range.active {
+  background: var(--ink); color: var(--bg); border-color: var(--ink);
+}
+.preview-chart-el {
+  width: 100%; height: 220px; min-height: 220px;
+}
+
+/* ETF Leaderboard row wrap (to include inline chart) */
+.lb-row-wrap { display: block; }
+.lb-row-wrap .preview-chart-wrap { margin: 0 20px 12px; }
+
+/* ===== NEWS TAB (Big Opportunities) ===== */
+.news-intro {
+  padding: 8px 20px 14px;
+  font-family: var(--mono); font-size: 11.5px;
+  color: var(--ink-muted); line-height: 1.5;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.news-card {
+  margin: 12px 20px;
+  padding: 14px 16px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  position: relative;
+}
+.news-card.high   { border-left: 3px solid var(--red); }
+.news-card.medium { border-left: 3px solid var(--gold); }
+.news-card.low    { border-left: 3px solid var(--ink-muted); }
+.news-card-head {
+  display: flex; justify-content: space-between; align-items: start;
+  gap: 10px; margin-bottom: 6px;
+}
+.news-headline {
+  font-family: var(--display); font-size: 15px; font-weight: 500;
+  line-height: 1.35; letter-spacing: -0.005em; flex: 1;
+}
+.news-urgency {
+  font-family: var(--mono); font-size: 9.5px;
+  padding: 2px 6px; border-radius: 3px;
+  letter-spacing: 0.1em; flex-shrink: 0;
+}
+.news-urgency.high   { background: var(--red); color: var(--bg); }
+.news-urgency.medium { background: var(--gold); color: var(--bg); }
+.news-urgency.low    { background: var(--bg-elev); color: var(--ink-muted); border: 1px solid var(--rule-soft); }
+.news-sym-row {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-bottom: 8px;
+}
+.news-sym {
+  font-family: var(--display); font-weight: 600; font-size: 13px;
+  padding: 3px 8px; background: var(--bg-elev); border-radius: 4px;
+}
+.news-dir {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em;
+  padding: 3px 7px; border-radius: 3px; text-transform: uppercase;
+}
+.news-dir.long  { background: rgba(74,122,74,0.15); color: var(--green); border: 1px solid var(--green); }
+.news-dir.short { background: rgba(161,61,45,0.15); color: var(--red);   border: 1px solid var(--red); }
+.news-dir.neutral { background: var(--bg-elev); color: var(--ink-muted); border: 1px solid var(--rule-soft); }
+.news-tag {
+  font-family: var(--mono); font-size: 9.5px;
+  padding: 2px 6px; border-radius: 3px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.news-tag.held    { background: rgba(176,141,60,0.15); color: var(--gold); border: 1px solid var(--gold); }
+.news-tag.onlist  { background: rgba(74,122,74,0.12); color: var(--green); border: 1px solid var(--green); }
+.news-thesis {
+  font-size: 13px; line-height: 1.5; color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+.news-strat-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 8px; margin-bottom: 10px;
+}
+.news-strat-cell {
+  padding: 8px 10px; background: var(--bg-elev); border-radius: 6px;
+}
+.news-strat-cell .lbl {
+  font-family: var(--mono); font-size: 9.5px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-muted); margin-bottom: 3px;
+}
+.news-strat-cell .val {
+  font-family: var(--mono); font-size: 12px; color: var(--ink);
+  line-height: 1.3;
+}
+.news-risk {
+  font-size: 11.5px; color: var(--ink-soft);
+  padding: 8px 10px; margin-bottom: 10px;
+  background: rgba(161,61,45,0.06); border-left: 2px solid var(--red);
+  border-radius: 4px; line-height: 1.45;
+}
+.news-risk-lbl {
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--red); margin-right: 4px;
+}
+.news-source {
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted);
+  margin-bottom: 8px;
+}
+.news-actions {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
 
 .toast {
   position: fixed; bottom: 100px; left: 50%;
@@ -1428,46 +1692,6 @@ body {
 }
 .breakout-prompt-dismiss:hover { color: var(--red); }
 
-/* ===== CRYPTO BOT SECTION ===== */
-.crypto-bot-section {
-  margin: 24px 20px 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.crypto-bot-header {
-  padding: 16px 18px 8px;
-  border-bottom: 1px solid var(--rule-soft);
-}
-.crypto-bot-header h3 {
-  font-family: var(--display); font-size: 18px; font-weight: 500;
-  margin: 0; letter-spacing: -0.01em;
-}
-.crypto-bot-sub {
-  font-family: var(--mono); font-size: 11px; color: var(--ink-muted);
-  margin-top: 3px; letter-spacing: 0.02em;
-}
-.crypto-bot-disclaimer {
-  padding: 10px 18px;
-  background: rgba(176,141,60,0.10);
-  border-bottom: 1px solid var(--rule-soft);
-  font-family: var(--mono); font-size: 10.5px; line-height: 1.5;
-  color: var(--ink-soft);
-}
-.crypto-bot-disclaimer strong { color: var(--gold); font-weight: 600; }
-.crypto-bot-empty {
-  padding: 16px 18px 20px;
-  font-family: var(--sans); font-size: 13px; color: var(--ink-soft);
-  line-height: 1.55;
-}
-.crypto-bot-empty p { margin: 0 0 8px 0; }
-.crypto-bot-actions {
-  padding: 10px 18px;
-  display: flex; gap: 8px;
-  border-bottom: 1px solid var(--rule-soft);
-}
-
 /* ===== STRATEGY TIER HEADERS (bot tab) ===== */
 .strategy-tier-header {
   margin: 22px 20px 8px;
@@ -1916,10 +2140,10 @@ body {
         <path d="M4 4h13a3 3 0 0 1 3 3v13a3 3 0 0 1-3 3H4z"/><path d="M8 8h8M8 12h8M8 16h5"/>
       </svg>Journal
     </button>
-    <button class="tab" data-view="alerts">
+    <button class="tab" data-view="news">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>
-      </svg>Alerts
+        <path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M8 8h8M8 12h8M8 16h5"/><path d="M20 7v10a3 3 0 0 0 3 3"/>
+      </svg>News
     </button>
     <button class="tab" data-view="bot">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
@@ -2094,6 +2318,46 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
+// ----- Recommendation status (per-day "done" / "dismissed" tracking) -----
+// Persisted in localStorage so it survives reloads. Auto-trims entries
+// older than today since recommendations are date-scoped.
+const REC_STATUS_KEY = "recStatus_v1";
+function loadRecStatus() {
+  try {
+    const raw = localStorage.getItem(REC_STATUS_KEY);
+    const all = raw ? JSON.parse(raw) : {};
+    const today = new Date().toISOString().slice(0, 10);
+    // Keep only today's entries — yesterday's recs are stale
+    const fresh = {};
+    for (const [k, v] of Object.entries(all)) {
+      if (v && v.date === today) fresh[k] = v;
+    }
+    return fresh;
+  } catch (e) { return {}; }
+}
+function saveRecStatus() {
+  try { localStorage.setItem(REC_STATUS_KEY, JSON.stringify(state.recStatus)); } catch (e) {}
+}
+function recKeyFor(symbol, kind, source) {
+  // Includes today's date so a new day = fresh slate
+  return `${new Date().toISOString().slice(0, 10)}__${source || "scan"}__${symbol}__${kind || "any"}`;
+}
+function markRecommendationDone(recKey) {
+  if (!recKey) return;
+  state.recStatus[recKey] = { date: new Date().toISOString().slice(0, 10), status: "done", ts: Date.now() };
+  saveRecStatus();
+  renderCurrentView();
+}
+function dismissRecommendation(recKey) {
+  if (!recKey) return;
+  state.recStatus[recKey] = { date: new Date().toISOString().slice(0, 10), status: "dismissed", ts: Date.now() };
+  saveRecStatus();
+  renderCurrentView();
+}
+function getRecStatus(recKey) {
+  return state.recStatus[recKey]?.status || null;
+}
+
 const state = {
   uid: null,
   pinAttempts: 0,
@@ -2114,14 +2378,18 @@ const state = {
   bot: { bh: null, dca: null, valueavg: null, trend: null, dip: null, regime: null, portfolio: null },
   botRunning: false,
   botChartVisible: { bh: true, dca: true, valueavg: true, trend: true, dip: true, regime: true, portfolio: true },
-  // Crypto bot: separate simulator for BTC/ETH/XRP/SOL with crypto-specific strategies
-  cryptoBot: { crypto_bh: null, crypto_dca: null, btc_trend: null, alt_rotate: null },
-  cryptoBotRunning: false,
-  cryptoBotChartVisible: { crypto_bh: true, crypto_dca: true, btc_trend: true, alt_rotate: true },
   ohlcvCache: {}, // symbol -> { ohlcv, fetched_at }
   expandedAnalyses: {}, // key -> bool; "portfolio" or symbol
   showWatchouts: localStorage.getItem("showWatchouts") === "1", // opt-in
   breakoutPromptDismissed: localStorage.getItem("breakoutPromptDismissed") === "1",
+  // News (big-opportunity filter)
+  newsItems: null,
+  newsFetchedAt: null,
+  newsLoading: false,
+  // Inline chart preview state for Ideas/ETF sections (no analysis call)
+  previewChart: { symbol: null, name: null, range: "3M", loading: false, data: null },
+  // Per-day per-recommendation "done" or "dismissed" tracking (localStorage-persisted)
+  recStatus: loadRecStatus(),
   // Discover Ideas runtime state
   discoverDynamic: null,        // array of {symbol, name, theme, source, date, thesis} from live refresh
   discoverDynamicFetchedAt: null,
@@ -2394,7 +2662,7 @@ async function checkAnonHasData(anonUid) {
 
 async function migrateAnonData(anonUid, newUid) {
   // Copy these subcollections from anon to new account
-  const subcollections = ["holdings", "watchlist", "journal", "alerts", "analyses", "portfolio_analyses", "triggers", "bot"];
+  const subcollections = ["holdings", "watchlist", "journal", "analyses", "portfolio_analyses", "triggers", "bot"];
   for (const sub of subcollections) {
     try {
       const snap = await db.collection("users").doc(anonUid).collection(sub).get();
@@ -3004,7 +3272,7 @@ function renderCurrentView() {
   else if (v === "markets") renderMarkets();
   else if (v === "watchlist") renderWatchlist();
   else if (v === "journal") renderJournal();
-  else if (v === "alerts") renderAlerts();
+  else if (v === "news") renderNews();
   else if (v === "bot") renderBot();
   else if (v === "settings") renderSettings();
 }
@@ -3484,16 +3752,26 @@ function renderDailyScan() {
     return "";
   };
 
+  // Filter out dismissed recommendations from the visible list
+  const visibleActions = actions.filter(a => {
+    const key = recKeyFor(a.symbol, a.kind, "scan");
+    return getRecStatus(key) !== "dismissed";
+  });
+
   return `
     <div class="scan-card">
       <div class="scan-head">
         <h3>Today's Buys & Adds</h3>
-        <span class="scan-pill">${actions.length} idea${actions.length === 1 ? "" : "s"}</span>
+        <span class="scan-pill">${visibleActions.length} idea${visibleActions.length === 1 ? "" : "s"}</span>
       </div>
       ${summaryHeader}
       <div class="scan-list">
-        ${actions.map(a => `
-          <div class="scan-item ${a.recency === "carried" && a.daysActive >= 5 ? "stale" : ""}" data-act="open-asset" data-symbol="${escAttr(a.symbol)}">
+        ${visibleActions.map(a => {
+          const recKey = recKeyFor(a.symbol, a.kind, "scan");
+          const status = getRecStatus(recKey);
+          const isDone = status === "done";
+          return `
+          <div class="scan-item ${a.recency === "carried" && a.daysActive >= 5 ? "stale" : ""} ${isDone ? "rec-done" : ""}" data-act="open-asset" data-symbol="${escAttr(a.symbol)}">
             <div class="scan-icon" style="color:${colorFor(a.kind)};">${iconFor(a.kind)}</div>
             <div class="scan-body">
               <div class="scan-action">${escAttr(a.text)}</div>
@@ -3502,12 +3780,17 @@ function renderDailyScan() {
                 <span class="scan-sym">${escAttr(a.symbol)}</span>
                 <span class="scan-kind ${a.kind}">${a.kind.toUpperCase()}</span>
                 <span class="scan-conf ${escAttr(a.confidence)}">${escAttr(a.confidence)} conf</span>
-                ${recencyBadge(a.recency, a.daysActive || 1)}
+                ${isDone ? `<span class="scan-recency done">✓ DONE</span>` : recencyBadge(a.recency, a.daysActive || 1)}
               </div>
             </div>
-            <button class="scan-log" data-act="log-trade" data-symbol="${escAttr(a.symbol)}" onclick="event.stopPropagation();" title="Log this trade">Log</button>
+            <div class="scan-actions-col" onclick="event.stopPropagation();">
+              ${isDone
+                ? `<button class="scan-log done" disabled title="Logged">✓</button>`
+                : `<button class="scan-log" data-act="log-trade" data-symbol="${escAttr(a.symbol)}" data-rec-key="${escAttr(recKey)}" title="Log this trade">Log</button>`}
+              <button class="scan-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" title="Hide this recommendation">×</button>
+            </div>
           </div>
-        `).join("")}
+        `;}).join("")}
       </div>
       <div class="scan-footer">Rule-based · NEW = first time seen · STRONGER = signal deepened · DAY N = same as N days ago</div>
     </div>
@@ -3904,17 +4187,27 @@ function renderWatchlist() {
         `;
       } else {
         const kind = heldHere ? "add" : "open";
-        const setup = snap.setup_score || 0;
-        const strength = setup >= 70 ? 1.5 : 1.0;
-        const size = suggestBuySize(w.symbol, kind, strength);
-        if (size.dollars > 0) {
-          suggestStrip = `
-            <div class="watch-suggest-strip">
-              <span class="wss-action">${kind === "add" ? "Add" : "Enter"} ~$${fmtUSD(size.dollars, 0)} (~${size.pct.toFixed(1)}%)</span>
-              <span class="wss-price">at $${fmtUSD(snap.current_price)}</span>
-              <button class="wss-log" data-act="log-trade" data-symbol="${escAttr(w.symbol)}" onclick="event.stopPropagation();">Log</button>
-            </div>
-          `;
+        const recKey = recKeyFor(w.symbol, kind, "watch");
+        const recState = getRecStatus(recKey);
+        if (recState === "dismissed") {
+          suggestStrip = ""; // hide entirely
+        } else {
+          const setup = snap.setup_score || 0;
+          const strength = setup >= 70 ? 1.5 : 1.0;
+          const size = suggestBuySize(w.symbol, kind, strength);
+          if (size.dollars > 0) {
+            const isDone = recState === "done";
+            suggestStrip = `
+              <div class="watch-suggest-strip ${isDone ? 'done' : ''}">
+                <span class="wss-action">${isDone ? '✓ Logged · ' : ''}${kind === "add" ? "Add" : "Enter"} ~$${fmtUSD(size.dollars, 0)} (~${size.pct.toFixed(1)}%)</span>
+                <span class="wss-price">at $${fmtUSD(snap.current_price)}</span>
+                ${isDone
+                  ? `<button class="wss-log done" disabled>✓</button>`
+                  : `<button class="wss-log" data-act="log-trade" data-symbol="${escAttr(w.symbol)}" data-rec-key="${escAttr(recKey)}" onclick="event.stopPropagation();">Log</button>`}
+                <button class="wss-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" onclick="event.stopPropagation();" title="Hide this suggestion">×</button>
+              </div>
+            `;
+          }
         }
       }
     }
@@ -4062,24 +4355,27 @@ function renderDiscoverIdeas() {
       const onList = inWatchlist.has(p.symbol);
       const owned = held.has(p.symbol);
       const dynamicBadge = p._dynamic ? `<span class="discover-fresh-badge">new</span>` : "";
-      // Action buttons: always show Analyze; Watch only if not held/listed
+      // Action buttons: always show Analyze + Chart; Watch only if not held/listed
       let actionButtons;
       if (owned) {
         actionButtons = `
           <div class="discover-actions-row">
             <span class="discover-tag held">Held</span>
+            <button class="btn btn-secondary btn-sm" data-act="preview-chart" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Chart</button>
             <button class="btn btn-secondary btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Analyze</button>
           </div>`;
       } else if (onList) {
         actionButtons = `
           <div class="discover-actions-row">
             <span class="discover-tag onlist">On Watchlist</span>
+            <button class="btn btn-secondary btn-sm" data-act="preview-chart" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Chart</button>
             <button class="btn btn-secondary btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Analyze</button>
           </div>`;
       } else {
         actionButtons = `
           <div class="discover-actions-row">
             <button class="btn btn-sm" data-act="add-curated" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">+ Watch</button>
+            <button class="btn btn-secondary btn-sm" data-act="preview-chart" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Chart</button>
             <button class="btn btn-secondary btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Analyze</button>
           </div>`;
       }
@@ -4098,6 +4394,7 @@ function renderDiscoverIdeas() {
             <span class="discover-src">${escAttr(p.source)}</span>
             <span class="discover-date">${escAttr(p.date)}</span>
           </div>
+          ${renderPreviewChartFor(p.symbol)}
         </div>
       `;
     }).join("");
@@ -4353,26 +4650,30 @@ function renderEtfLeaderboard() {
         const retClass = d.return_pct >= 0 ? "pos" : "neg";
         const ddClass = d.max_drawdown_pct <= -20 ? "warn" : d.max_drawdown_pct <= -10 ? "med" : "ok";
         return `
-          <div class="lb-row">
-            <div class="lb-rank">${i + 1}</div>
-            <div class="lb-main">
-              <div class="lb-symline">
-                <span class="lb-sym">${escAttr(d.symbol)}</span>
-                <span class="lb-cat">${escAttr(d.category)}</span>
-                ${owned ? `<span class="lb-tag held">held</span>` : ""}
-                ${onList ? `<span class="lb-tag onlist">watched</span>` : ""}
+          <div class="lb-row-wrap">
+            <div class="lb-row">
+              <div class="lb-rank">${i + 1}</div>
+              <div class="lb-main">
+                <div class="lb-symline">
+                  <span class="lb-sym">${escAttr(d.symbol)}</span>
+                  <span class="lb-cat">${escAttr(d.category)}</span>
+                  ${owned ? `<span class="lb-tag held">held</span>` : ""}
+                  ${onList ? `<span class="lb-tag onlist">watched</span>` : ""}
+                </div>
+                <div class="lb-name">${escAttr(d.name)}</div>
+                <div class="lb-stats">
+                  <span class="lb-stat ${retClass}">${d.return_pct >= 0 ? "+" : ""}${d.return_pct.toFixed(1)}% ${tfLabel} return</span>
+                  <span class="lb-stat ${ddClass}">${d.max_drawdown_pct != null ? d.max_drawdown_pct.toFixed(1) + "% max DD" : ""}</span>
+                  ${d.trend_200ma ? `<span class="lb-stat ${d.trend_200ma === 'above_200ma' ? 'pos' : 'neg'}">${d.trend_200ma === 'above_200ma' ? '↑' : '↓'} 200MA</span>` : ""}
+                </div>
               </div>
-              <div class="lb-name">${escAttr(d.name)}</div>
-              <div class="lb-stats">
-                <span class="lb-stat ${retClass}">${d.return_pct >= 0 ? "+" : ""}${d.return_pct.toFixed(1)}% ${tfLabel} return</span>
-                <span class="lb-stat ${ddClass}">${d.max_drawdown_pct != null ? d.max_drawdown_pct.toFixed(1) + "% max DD" : ""}</span>
-                ${d.trend_200ma ? `<span class="lb-stat ${d.trend_200ma === 'above_200ma' ? 'pos' : 'neg'}">${d.trend_200ma === 'above_200ma' ? '↑' : '↓'} 200MA</span>` : ""}
+              <div class="lb-actions">
+                <button class="btn btn-secondary btn-sm" data-act="preview-chart" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">Chart</button>
+                <button class="btn btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">Analyze</button>
+                ${!owned && !onList ? `<button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">+ Watch</button>` : ""}
               </div>
             </div>
-            <div class="lb-actions">
-              <button class="btn btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">Analyze</button>
-              ${!owned && !onList ? `<button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">+ Watch</button>` : ""}
-            </div>
+            ${renderPreviewChartFor(d.symbol)}
           </div>
         `;
       }).join("");
@@ -4478,6 +4779,113 @@ async function analyzeFromDiscover(symbol, name) {
 function cryptoRandomId() {
   return "c" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
+
+// ============================================================================
+// INLINE CHART PREVIEW (Ideas + ETF Leaderboard)
+// Lets you peek at a chart without adding to watchlist or spending AI tokens.
+// One preview at a time — re-tapping closes; tapping a different row swaps.
+// ============================================================================
+async function togglePreviewChart(symbol, name) {
+  if (!symbol) return;
+  if (state.previewChart.symbol === symbol) {
+    // Same row tapped again — collapse
+    state.previewChart = { symbol: null, name: null, range: "3M", loading: false, data: null };
+    renderCurrentView();
+    return;
+  }
+  state.previewChart = { symbol, name: name || symbol, range: "3M", loading: true, data: null };
+  renderCurrentView();
+  try {
+    // Use cached price if we have it, else fetch
+    let priceData = state.prices[symbol];
+    if (!priceData || !priceData.ohlcv) {
+      const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(symbol)}`);
+      if (!r.ok) throw new Error(`fetch_${r.status}`);
+      priceData = await r.json();
+      state.prices[symbol] = priceData;
+    }
+    state.previewChart.data = priceData;
+    state.previewChart.loading = false;
+    renderCurrentView();
+    // After DOM update, draw the chart
+    setTimeout(() => drawPreviewChart(), 60);
+  } catch (e) {
+    state.previewChart.loading = false;
+    toast(`Couldn't load chart: ${(e.message || e).slice(0, 80)}`, 3000, "error");
+    renderCurrentView();
+  }
+}
+
+function setPreviewRange(range) {
+  state.previewChart.range = range;
+  renderCurrentView();
+  setTimeout(() => drawPreviewChart(), 60);
+}
+
+function drawPreviewChart() {
+  const el = document.getElementById("previewChartEl");
+  if (!el || !window.LightweightCharts) return;
+  const pc = state.previewChart;
+  if (!pc.data || !pc.data.ohlcv) return;
+  const range = pc.range || "3M";
+  const days = range === "1M" ? 22 : range === "3M" ? 66 : range === "6M" ? 130 : range === "1Y" ? 252 : pc.data.ohlcv.length;
+  const slice = pc.data.ohlcv.slice(-days);
+  const c = getThemeColors();
+  el.innerHTML = "";
+  const chart = LightweightCharts.createChart(el, {
+    width: el.clientWidth || 320,
+    height: 220,
+    layout: { background: { color: "transparent" }, textColor: c.muted, fontFamily: "ui-monospace, monospace" },
+    grid: { vertLines: { color: c.rule }, horzLines: { color: c.rule } },
+    rightPriceScale: { borderColor: c.rule },
+    timeScale: { borderColor: c.rule, timeVisible: false },
+    crosshair: { mode: 1 },
+  });
+  const series = chart.addAreaSeries({
+    lineColor: c.accent || c.gold,
+    topColor: (c.accent || c.gold) + "33",
+    bottomColor: (c.accent || c.gold) + "08",
+    lineWidth: 2,
+  });
+  const data = slice
+    .filter(d => d.c != null && d.t)
+    .map(d => ({ time: Math.floor((d.t || 0) / 1000), value: d.c }));
+  if (data.length > 0) series.setData(data);
+  chart.timeScale().fitContent();
+}
+
+function renderPreviewChartFor(symbol) {
+  // Returns the inline preview chart HTML if it's open for this symbol; else "".
+  if (state.previewChart.symbol !== symbol) return "";
+  const pc = state.previewChart;
+  if (pc.loading) {
+    return `<div class="preview-chart-wrap"><div class="empty-state" style="padding:30px;"><span class="spinner"></span></div></div>`;
+  }
+  if (!pc.data) return "";
+  const cur = pc.data.current_price;
+  const prev = pc.data.prev_close;
+  const dayPct = (cur != null && prev) ? ((cur - prev) / prev) * 100 : null;
+  const dayClass = dayPct != null && dayPct >= 0 ? "pos" : "neg";
+  const ranges = ["1M","3M","6M","1Y","ALL"];
+  return `
+    <div class="preview-chart-wrap">
+      <div class="preview-chart-head">
+        <div>
+          <span class="pc-sym">${escAttr(symbol)}</span>
+          <span class="pc-price">$${fmtUSD(cur)}</span>
+          ${dayPct != null ? `<span class="pc-day ${dayClass}">${fmtPct(dayPct)}</span>` : ""}
+        </div>
+        <button class="pc-close" data-act="preview-chart" data-symbol="${escAttr(symbol)}" title="Close chart">×</button>
+      </div>
+      <div class="preview-chart-controls">
+        ${ranges.map(r => `<button class="pc-range ${pc.range === r ? 'active' : ''}" onclick="event.stopPropagation(); window._setPreviewRange('${r}');">${r}</button>`).join("")}
+      </div>
+      <div id="previewChartEl" class="preview-chart-el"></div>
+    </div>
+  `;
+}
+// Bridge so the inline onclick can reach the function (inline handlers can't see closures).
+window._setPreviewRange = setPreviewRange;
 
 function renderWatchDetail(symbol) {
   const w = state.watchlist.find(x => x.symbol === symbol);
@@ -4832,20 +5240,33 @@ function renderAiCard(symbol, a) {
       ${horizonCell("Medium", "medium_term")}
       ${horizonCell("Long", "long_term")}
     </div>
+
+    ${(a.take_profit || a.exit_strategy) ? `
+    <div class="tp-exit-grid">
+      ${a.take_profit ? `
+        <div class="tp-block">
+          <div class="tpe-lbl">Take Profit</div>
+          ${a.take_profit.tp1 ? `<div class="tpe-row"><b>TP1</b> ${escAttr(a.take_profit.tp1)}</div>` : ""}
+          ${a.take_profit.tp2 ? `<div class="tpe-row"><b>TP2</b> ${escAttr(a.take_profit.tp2)}</div>` : ""}
+          ${a.take_profit.tp3 ? `<div class="tpe-row"><b>TP3</b> ${escAttr(a.take_profit.tp3)}</div>` : ""}
+          ${a.take_profit.scaling_rule ? `<div class="tpe-note">${escAttr(a.take_profit.scaling_rule)}</div>` : ""}
+        </div>` : ""}
+      ${a.exit_strategy ? `
+        <div class="exit-block">
+          <div class="tpe-lbl">Exit Strategy</div>
+          ${a.exit_strategy.stop_loss ? `<div class="tpe-row"><b>Stop</b> ${escAttr(a.exit_strategy.stop_loss)}</div>` : ""}
+          ${a.exit_strategy.trailing_rule ? `<div class="tpe-row"><b>Trail</b> ${escAttr(a.exit_strategy.trailing_rule)}</div>` : ""}
+          ${a.exit_strategy.thesis_break ? `<div class="tpe-row tpe-row-wrap"><b>Break</b> ${escAttr(a.exit_strategy.thesis_break)}</div>` : ""}
+        </div>` : ""}
+    </div>` : ""}
+
     <div class="ai-body">
       ${a.what_changed ? `<div class="what-changed">${escAttr(a.what_changed)}</div>` : ""}
-      ${a.confluence ? `
-        <div class="ai-section" style="margin-top:14px;">
-          <h4>Confluence</h4>
-          <div class="confluence-row"><span class="confluence-score">${escAttr(a.confluence.score || "—")}</span></div>
-          <p>${escAttr(a.confluence.summary || "")}</p>
-        </div>` : ""}
-      ${a.ta_summary ? `<div class="ai-section"><h4>Technical Read</h4><p>${escAttr(a.ta_summary)}</p></div>` : ""}
-      ${a.sentiment_summary ? `<div class="ai-section"><h4>Sentiment</h4><p>${escAttr(a.sentiment_summary)}</p></div>` : ""}
+      ${a.ta_summary ? `<div class="ai-section"><h4>Read</h4><p>${escAttr(a.ta_summary)}</p></div>` : ""}
       ${a.key_risks?.length ? `
         <div class="ai-section risks">
           <h4>Key Risks</h4>
-          <ul>${a.key_risks.map(r => `<li>${escAttr(r)}</li>`).join("")}</ul>
+          <ul>${a.key_risks.slice(0, 3).map(r => `<li>${escAttr(r)}</li>`).join("")}</ul>
         </div>` : ""}
       ${a.position_context ? `
         <div class="ai-section">
@@ -5014,11 +5435,10 @@ async function loadIndicators(symbol) {
 async function loadSentiment(symbol) {
   const block = $("#sentBlock");
   if (!block) return;
-  block.innerHTML = `<div class="sent-card"><h3>Sentiment & News</h3><div class="empty-state" style="padding:20px;"><span class="spinner"></span></div></div>`;
+  block.innerHTML = `<div class="sent-card"><h3>News</h3><div class="empty-state" style="padding:20px;"><span class="spinner"></span></div></div>`;
   try {
     const r = await fetch(`${WORKER_URL}/sentiment/${encodeURIComponent(symbol)}`);
     const j = await r.json();
-    const reddit = j.reddit || {};
     const news   = j.news?.headlines || [];
     let newsHtml = news.slice(0, 5).map(n => `
       <div class="news-item">
@@ -5029,18 +5449,12 @@ async function loadSentiment(symbol) {
     if (!newsHtml) newsHtml = `<div class="news-item" style="color:var(--ink-muted);font-size:13px;">No recent headlines.</div>`;
     block.innerHTML = `
       <div class="sent-card">
-        <h3>Reddit · 24h</h3>
-        <div class="sent-row"><span class="lbl">Mentions</span><span class="val">${reddit.mention_count_24h || 0}</span></div>
-        <div class="sent-row"><span class="lbl">Bullish / Bearish keywords</span><span class="val">${reddit.bullish_count || 0} / ${reddit.bearish_count || 0}</span></div>
-        <div class="sent-row"><span class="lbl">Sentiment</span><span class="val">${reddit.sentiment_score != null ? (reddit.sentiment_score > 0.1 ? 'Bullish-skewed' : reddit.sentiment_score < -0.1 ? 'Bearish-skewed' : 'Mixed') : '—'}</span></div>
-      </div>
-      <div class="sent-card">
         <h3>News</h3>
         <div class="news-list">${newsHtml}</div>
       </div>
     `;
   } catch (e) {
-    block.innerHTML = `<div class="sent-card"><h3>Sentiment</h3><div class="empty-state" style="padding:20px;color:var(--ink-muted);">Couldn't load sentiment.</div></div>`;
+    block.innerHTML = `<div class="sent-card"><h3>News</h3><div class="empty-state" style="padding:20px;color:var(--ink-muted);">Couldn't load news.</div></div>`;
   }
 }
 
@@ -5298,7 +5712,12 @@ async function renderJournal() {
     </div>`;
     return;
   }
-  $("#journalList").innerHTML = entries.map(e => `
+  $("#journalList").innerHTML = entries.map(e => {
+    const tp = e.take_profit || {};
+    const ex = e.exit_strategy || {};
+    const hasTp = tp.tp1 || tp.tp2 || tp.tp3;
+    const hasEx = ex.stop_loss || ex.thesis_break;
+    return `
     <div class="journal-entry">
       <div class="journal-head">
         <div>
@@ -5314,9 +5733,20 @@ async function renderJournal() {
       </div>
       <div class="journal-meta">${fmtNum(e.quantity, 6)} @ $${fmtUSD(e.price)}</div>
       ${e.reason ? `<div class="journal-reason">${escAttr(e.reason)}</div>` : ""}
+      ${hasTp ? `<div class="journal-strategy tp">
+        <span class="js-lbl">Take Profit</span>
+        ${tp.tp1 ? `<span class="js-cell"><b>TP1</b> ${escAttr(tp.tp1)}</span>` : ""}
+        ${tp.tp2 ? `<span class="js-cell"><b>TP2</b> ${escAttr(tp.tp2)}</span>` : ""}
+        ${tp.tp3 ? `<span class="js-cell"><b>TP3</b> ${escAttr(tp.tp3)}</span>` : ""}
+      </div>` : ""}
+      ${hasEx ? `<div class="journal-strategy exit">
+        <span class="js-lbl">Exit</span>
+        ${ex.stop_loss ? `<span class="js-cell"><b>Stop</b> ${escAttr(ex.stop_loss)}</span>` : ""}
+        ${ex.thesis_break ? `<span class="js-cell js-cell-wide"><b>Break</b> ${escAttr(ex.thesis_break)}</span>` : ""}
+      </div>` : ""}
       ${e.signal_at_time ? `<div class="journal-snapshot">App stance at time: ${escAttr(e.signal_at_time)} · ${escAttr(e.confidence_at_time || "")}</div>` : ""}
     </div>
-  `).join("");
+  `;}).join("");
 }
 
 async function deleteJournalEntry(id) {
@@ -5332,60 +5762,152 @@ async function deleteJournalEntry(id) {
   }
 }
 
-async function loadAlerts() {
-  const snap = await db.collection("users").doc(state.uid).collection("alerts").where("active", "==", true).get();
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-}
-async function renderAlerts() {
-  $("#topbarTitle").textContent = "Alerts";
+// ============================================================================
+// NEWS — big-opportunity filter. Calls worker, shows only high-signal items.
+// ============================================================================
+async function renderNews() {
+  $("#topbarTitle").textContent = "News";
   const view = $("#view");
-  view.innerHTML = `
-    <div class="section-head" style="padding: 20px 20px 0;">
-      <h2>Alerts</h2>
-      <button class="btn-ghost" data-act="add-alert" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
-    </div>
-    <div id="alertsList"><div class="empty-state"><span class="spinner"></span></div></div>
-  `;
-  const alerts = await loadAlerts();
-  if (alerts.length === 0) {
-    $("#alertsList").innerHTML = `<div class="empty-state">
-      <span class="display">No active alerts</span>
-      <p>Alerts trigger when prices cross your set thresholds. Checked when you open the app or refresh.</p>
-    </div>`;
+  const cached = state.newsItems;
+  const lastFetch = state.newsFetchedAt;
+  const loading = state.newsLoading;
+
+  if (!cached && !loading) {
+    view.innerHTML = `
+      <div class="section-head" style="padding: 20px 20px 0;">
+        <h2>Big Opportunities</h2>
+        <button class="btn btn-sm" data-act="refresh-news">Fetch</button>
+      </div>
+      <div class="news-intro">
+        Filtered news. Only items with a clear actionable opportunity — sized position, entry zone, exit plan. No noise, no daily headlines.
+      </div>
+      <div class="empty-state">
+        <span class="display">No news fetched yet</span>
+        <p>Tap Fetch to scan major financial news for genuine asymmetric opportunities.</p>
+      </div>
+    `;
     return;
   }
-  $("#alertsList").innerHTML = alerts.map(a => `
-    <div class="alert-row">
-      <div class="alert-info">
-        <div class="symbol">${escAttr(a.symbol)}</div>
-        <div class="cond">${a.type === 'price_above' ? 'Above' : 'Below'} $${fmtUSD(a.threshold)}</div>
+
+  const headerBtn = loading
+    ? `<button class="btn btn-sm" disabled><span class="spinner" style="width:12px;height:12px;border-width:1.5px;"></span> Scanning…</button>`
+    : `<button class="btn btn-sm" data-act="refresh-news">Refresh</button>`;
+
+  const stamp = lastFetch ? `Updated ${fmtRel(lastFetch)}` : "";
+
+  if (loading && !cached) {
+    view.innerHTML = `
+      <div class="section-head" style="padding: 20px 20px 0;">
+        <h2>Big Opportunities</h2>
+        ${headerBtn}
       </div>
-      <div class="alert-actions">
-        <button class="btn-ghost btn-sm" data-act="delete-alert" data-id="${escAttr(a.id)}">Remove</button>
-      </div>
-    </div>
-  `).join("");
-}
-async function deleteAlert(id) {
-  await db.collection("users").doc(state.uid).collection("alerts").doc(id).delete();
-  toast("Alert removed");
-  renderAlerts();
-}
-async function checkAlerts() {
-  const alerts = await loadAlerts();
-  for (const a of alerts) {
-    const p = state.prices[a.symbol];
-    if (!p) continue;
-    const cur = p.current_price;
-    const trigger = (a.type === "price_above" && cur > a.threshold) || (a.type === "price_below" && cur < a.threshold);
-    if (trigger) {
-      toast(`${a.symbol} ${a.type === 'price_above' ? 'crossed above' : 'dropped below'} $${fmtUSD(a.threshold)}`);
-      await db.collection("users").doc(state.uid).collection("alerts").doc(a.id).update({
-        active: false,
-        triggered_at: firebase.firestore.FieldValue.serverTimestamp(),
-      });
-    }
+      <div class="empty-state"><span class="spinner"></span><p style="margin-top:14px;">Scanning headlines, filtering noise…</p></div>
+    `;
+    return;
   }
+
+  const items = cached || [];
+  if (items.length === 0) {
+    view.innerHTML = `
+      <div class="section-head" style="padding: 20px 20px 0;">
+        <h2>Big Opportunities</h2>
+        ${headerBtn}
+      </div>
+      <div class="news-intro">${stamp}</div>
+      <div class="empty-state">
+        <span class="display">Nothing actionable today</span>
+        <p>The news cycle has no high-conviction setups. Patience — wait for a real opportunity, don't force trades.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const cards = items.map((n, i) => {
+    const heldSet = new Set(state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol));
+    const watchedSet = new Set(state.watchlist.map(w => w.symbol));
+    const owned = n.symbol && heldSet.has(n.symbol);
+    const onList = n.symbol && watchedSet.has(n.symbol);
+    const urgencyClass = (n.urgency || "medium").toLowerCase();
+    const dirClass = (n.direction || "").toLowerCase().includes("long") ? "long" : (n.direction || "").toLowerCase().includes("short") ? "short" : "neutral";
+
+    return `
+      <div class="news-card ${urgencyClass}">
+        <div class="news-card-head">
+          <div class="news-headline">${escAttr(n.headline || "")}</div>
+          <span class="news-urgency ${urgencyClass}">${escAttr((n.urgency || "medium").toUpperCase())}</span>
+        </div>
+        ${n.symbol ? `
+        <div class="news-sym-row">
+          <span class="news-sym">${escAttr(n.symbol)}</span>
+          ${n.direction ? `<span class="news-dir ${dirClass}">${escAttr(n.direction)}</span>` : ""}
+          ${owned ? `<span class="news-tag held">held</span>` : ""}
+          ${onList ? `<span class="news-tag onlist">watched</span>` : ""}
+        </div>` : ""}
+        ${n.thesis ? `<div class="news-thesis">${escAttr(n.thesis)}</div>` : ""}
+        ${(n.entry_zone || n.stop_loss || n.take_profit) ? `
+        <div class="news-strat-grid">
+          ${n.entry_zone ? `<div class="news-strat-cell"><div class="lbl">Entry</div><div class="val">${escAttr(n.entry_zone)}</div></div>` : ""}
+          ${n.stop_loss ? `<div class="news-strat-cell"><div class="lbl">Stop / Exit</div><div class="val">${escAttr(n.stop_loss)}</div></div>` : ""}
+          ${n.take_profit ? `<div class="news-strat-cell"><div class="lbl">Take Profit</div><div class="val">${escAttr(n.take_profit)}</div></div>` : ""}
+          ${n.timeframe ? `<div class="news-strat-cell"><div class="lbl">Timeframe</div><div class="val">${escAttr(n.timeframe)}</div></div>` : ""}
+        </div>` : ""}
+        ${n.risk ? `<div class="news-risk"><span class="news-risk-lbl">Risk:</span> ${escAttr(n.risk)}</div>` : ""}
+        ${n.source ? `<div class="news-source">${escAttr(n.source)}${n.published ? " · " + escAttr(n.published) : ""}</div>` : ""}
+        ${n.symbol ? `
+        <div class="news-actions">
+          ${!owned && !onList ? `<button class="btn btn-sm" data-act="add-curated" data-symbol="${escAttr(n.symbol)}" data-name="${escAttr(n.name || n.symbol)}">+ Watch</button>` : ""}
+          <button class="btn btn-secondary btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(n.symbol)}" data-name="${escAttr(n.name || n.symbol)}">Analyze</button>
+        </div>` : ""}
+      </div>
+    `;
+  }).join("");
+
+  view.innerHTML = `
+    <div class="section-head" style="padding: 20px 20px 0;">
+      <h2>Big Opportunities</h2>
+      ${headerBtn}
+    </div>
+    <div class="news-intro">
+      ${items.length} actionable item${items.length === 1 ? "" : "s"}${stamp ? " · " + stamp : ""}. Filtered for asymmetric setups only.
+    </div>
+    ${cards}
+  `;
+}
+
+async function refreshNews() {
+  if (state.newsLoading) return;
+  state.newsLoading = true;
+  renderNews();
+  try {
+    const idToken = await auth.currentUser.getIdToken();
+    const r = await fetch(`${WORKER_URL}/news-opportunities`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        held_symbols: state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol),
+        watchlist_symbols: state.watchlist.map(w => w.symbol),
+        idToken,
+      }),
+    });
+    if (!r.ok) {
+      if (r.status === 404) {
+        toast("Worker doesn't support /news-opportunities yet — deploy worker first", 4000, "error");
+      } else {
+        toast(`News fetch failed: ${r.status}`, 3000, "error");
+      }
+      state.newsLoading = false;
+      renderNews();
+      return;
+    }
+    const j = await r.json();
+    state.newsItems = Array.isArray(j.opportunities) ? j.opportunities : [];
+    state.newsFetchedAt = new Date().toISOString();
+    toast(`${state.newsItems.length} opportunit${state.newsItems.length === 1 ? "y" : "ies"} found`);
+  } catch (e) {
+    toast(`News failed: ${e.message || e}`, 3000, "error");
+  }
+  state.newsLoading = false;
+  renderNews();
 }
 
 // ============================================================================
@@ -5896,30 +6418,6 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
             sig = { side: "sell", reason: `Regime ${regimeMode}: trim to ${(targetMultiplier*100).toFixed(0)}%`, _vaSellPortion: sellPortion };
           }
         }
-      } else if (mode === "crypto_dca") {
-        // Crypto basket DCA: buy on cadence using fixed weights (BTC-heavy by design).
-        if (isDcaDay) {
-          const w = CRYPTO_BASKET_WEIGHTS[sym] || 0;
-          if (w > 0) {
-            // Same cycle slice as equity DCA but applied via basket weight
-            const cycleBudget = 200; // $200 per cycle, conservative for crypto's volatility
-            const slice = cycleBudget * w;
-            if (sim.cash >= slice && slice >= 5) {
-              sig = { side: "buy", reason: `Crypto DCA cycle ${Math.ceil(dcaSessionCounter / DCA_INTERVAL)} (${(w*100).toFixed(0)}% basket weight)`, _vaSize: slice };
-            }
-          }
-        }
-      } else if (mode === "crypto_bh") {
-        // Crypto B&H: buy ONCE per symbol on first eligible day using basket weights
-        if (!hasPos) {
-          const w = CRYPTO_BASKET_WEIGHTS[sym] || 0;
-          if (w > 0) {
-            const slice = startCapital * w;
-            if (sim.cash >= slice && slice >= 50) {
-              sig = { side: "buy", reason: `Crypto B&H entry (${(w*100).toFixed(0)}% basket)`, _vaSize: slice };
-            }
-          }
-        }
       } else if (mode === "altrotate") {
         // Alt rotation: on check days, adjust position to match altTarget decision
         if (isAltCheckDay) {
@@ -6105,53 +6603,6 @@ const BOT_STRATEGIES = [
 function getStrategy(key) { return BOT_STRATEGIES.find(s => s.key === key); }
 
 // ============================================================================
-// CRYPTO BOT — separate registry, separate universe.
-// Crypto markets behave differently from equities:
-//   - 24/7 trading, much higher volatility (10% daily moves are normal)
-//   - Strong trends in big multi-month moves (momentum > mean reversion)
-//   - Tight correlations during stress (4 coins ≈ 1 trade in a crash)
-//   - No fundamentals to anchor to; trend-following + DCA dominate the
-//     few honest historical retail strategies that have worked.
-// All strategies use HALVED position sizing vs equity defaults.
-// ============================================================================
-const CRYPTO_UNIVERSE = ["BTC", "ETH", "XRP", "SOL"];
-
-// Weights for the crypto basket (BTC-heavy by design — risk-adjusted history shows
-// concentrated alts get wiped out in bear markets while BTC tends to recover).
-const CRYPTO_BASKET_WEIGHTS = { BTC: 0.70, ETH: 0.15, SOL: 0.10, XRP: 0.05 };
-
-// Crypto strategy signals — handled in engine; these return null (like dca/bh).
-function cryptoBasketDcaSignal() { return null; }
-function cryptoBuyHoldSignal() { return null; }
-
-// BTC Weekly Trend: only buy BTC when above 20-week (140-day) MA. Sell when below.
-// This filters out long bear regimes — historically would have avoided the worst of
-// 2018, 2022 drawdowns while capturing 2020, 2021, 2023, 2024 trends.
-function btcWeeklyTrendSignal(closes, _highs, idx, hasPosition, _entryPrice, _position, _times) {
-  if (idx < 140) return null; // need 20 weeks of data
-  const cur = closes[idx];
-  const ma140 = closes.slice(idx - 139, idx + 1).reduce((a, b) => a + b, 0) / 140;
-  const above = cur > ma140;
-  if (above && !hasPosition) return { side: "buy", reason: `BTC above 20wk MA ($${ma140.toFixed(0)})` };
-  if (!above && hasPosition) return { side: "sell", reason: `BTC below 20wk MA ($${ma140.toFixed(0)})` };
-  return null;
-}
-
-// Alt Momentum Rotation: every 30 days, rank alts (ETH, XRP, SOL) by their 90-day
-// performance vs BTC. Hold the top 1. Rotate when leadership changes.
-// Implemented in engine via mode === "altrotate".
-function altMomentumSignal() { return null; }
-
-const CRYPTO_STRATEGIES = [
-  { key: "crypto_bh",     label: "Crypto B&H",         tag: "C-B&H",   tier: "passive",   fn: cryptoBuyHoldSignal,    mode: "crypto_bh",    color: "#4a4639", desc: "BTC-heavy basket (70/15/10/5), never sells" },
-  { key: "crypto_dca",    label: "Crypto Basket DCA",  tag: "C-DCA",   tier: "passive",   fn: cryptoBasketDcaSignal,  mode: "crypto_dca",   color: "#5c8aa1", desc: "Bi-weekly DCA into BTC-heavy basket — historically most resilient" },
-  { key: "btc_trend",     label: "BTC Weekly Trend",   tag: "BTC-T",   tier: "active",    fn: btcWeeklyTrendSignal,   mode: "crypto_active", color: "#b08d3c", desc: "Hold BTC only when above 20-week MA — filters bear regimes" },
-  { key: "alt_rotate",    label: "Alt Momentum",       tag: "ALT-R",   tier: "active",    fn: altMomentumSignal,      mode: "altrotate",    color: "#8a4a5c", desc: "Rotate to top alt by 90d vs-BTC momentum; cash when none lead" },
-];
-
-function getCryptoStrategy(key) { return CRYPTO_STRATEGIES.find(s => s.key === key); }
-
-// ============================================================================
 // CURATED PICKS — sourced from credible analyst reports & research firms
 // All picks include source + date. This is research, NOT advice — you decide.
 // Snapshot taken from sources published Dec 2025 - Feb 2026.
@@ -6279,6 +6730,21 @@ const ETF_UNIVERSE = [
   { symbol: "EWU",   name: "iShares MSCI United Kingdom",       category: "International" },
   { symbol: "INDA",  name: "iShares MSCI India",                category: "International" },
   { symbol: "MCHI",  name: "iShares MSCI China",                category: "International" },
+  // Europe (US-listed broad/sector)
+  { symbol: "VGK",   name: "Vanguard FTSE Europe",              category: "Europe" },
+  { symbol: "IEUR",  name: "iShares Core MSCI Europe",          category: "Europe" },
+  { symbol: "EZU",   name: "iShares MSCI Eurozone",             category: "Europe" },
+  { symbol: "FEZ",   name: "SPDR Euro Stoxx 50",                category: "Europe" },
+  { symbol: "HEDJ",  name: "WisdomTree Europe Hedged Equity",   category: "Europe" },
+  { symbol: "FEU",   name: "SPDR Stoxx Europe 50",              category: "Europe" },
+  { symbol: "EWP",   name: "iShares MSCI Spain",                category: "Europe" },
+  { symbol: "EWQ",   name: "iShares MSCI France",               category: "Europe" },
+  { symbol: "EWI",   name: "iShares MSCI Italy",                category: "Europe" },
+  { symbol: "EWL",   name: "iShares MSCI Switzerland",          category: "Europe" },
+  { symbol: "EWN",   name: "iShares MSCI Netherlands",          category: "Europe" },
+  { symbol: "EWD",   name: "iShares MSCI Sweden",               category: "Europe" },
+  { symbol: "DAX",   name: "Global X DAX Germany",              category: "Europe" },
+  { symbol: "EUFN",  name: "iShares MSCI Europe Financials",    category: "Europe" },
   // Emerging markets
   { symbol: "VWO",   name: "Vanguard FTSE Emerging Markets",    category: "EM" },
   { symbol: "EEM",   name: "iShares MSCI Emerging Markets",     category: "EM" },
@@ -6804,7 +7270,6 @@ function renderBot() {
         when leadership changed, and the per-strategy cards explain what each is doing.</p>
         <button class="btn" data-act="bot-backtest">Run 2-Year Backtest</button>
       </div>
-      ${renderCryptoBotSection()}
     `;
   } else {
     // Group cards by tier for visual organization
@@ -6841,7 +7306,6 @@ function renderBot() {
       ${rerunNotice}
       ${renderLeaderboard()}
       ${cardsByTier}
-      ${renderCryptoBotSection()}
     `;
   }
 
@@ -6858,252 +7322,6 @@ function renderBot() {
 
 function toggleBotLine(key) {
   state.botChartVisible[key] = !state.botChartVisible[key];
-  renderBot();
-}
-
-// ============================================================================
-// CRYPTO BOT — separate UI section, separate backtest, separate strategies.
-// ============================================================================
-function renderCryptoBotSection() {
-  const populated = CRYPTO_STRATEGIES.filter(s => state.cryptoBot[s.key]);
-  const noData = populated.length === 0;
-  const lastRun = populated.map(s => state.cryptoBot[s.key]?.last_run_at).filter(Boolean).sort().pop();
-
-  let body;
-  if (noData) {
-    body = `
-      <div class="crypto-bot-empty">
-        <p>Four crypto strategies tuned for BTC, ETH, XRP, SOL specifically. Each starts with
-        $${BOT_STARTING_CAPITAL.toLocaleString()}. Crypto markets behave differently from equities:
-        higher volatility, stronger trends, weaker mean reversion. The strategies reflect that.</p>
-        <ul style="font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);line-height:1.7;margin:8px 0 14px 18px;">
-          <li><strong>Crypto B&H</strong>: BTC-heavy basket (70/15/10/5), never sells</li>
-          <li><strong>Crypto DCA</strong>: bi-weekly buys into same BTC-heavy basket</li>
-          <li><strong>BTC Weekly Trend</strong>: hold BTC only when above 20-week MA</li>
-          <li><strong>Alt Momentum</strong>: monthly rotation to top alt by 90d vs-BTC performance</li>
-        </ul>
-        <button class="btn btn-sm" data-act="crypto-bot-backtest">Run Crypto Backtest</button>
-      </div>
-    `;
-  } else {
-    const leaderboard = renderCryptoLeaderboard();
-    const chart = renderCryptoEquityChart();
-    const cards = CRYPTO_STRATEGIES.filter(s => state.cryptoBot[s.key]).map(s => renderCryptoStrategyCard(s.key)).join("");
-    body = `
-      <div class="bot-hero">
-        <div class="sub">BTC · ETH · XRP · SOL · ${lastRun ? "Last run " + fmtRel(lastRun) : "Never run"}</div>
-        <div style="margin:0;padding:0;border:none;background:transparent;">${chart}</div>
-      </div>
-      <div class="crypto-bot-actions">
-        <button class="btn btn-sm" data-act="crypto-bot-backtest" ${state.cryptoBotRunning ? "disabled" : ""}>
-          ${state.cryptoBotRunning ? "Running…" : "Re-run Crypto Backtest"}
-        </button>
-        <button class="btn btn-secondary btn-sm" data-act="crypto-bot-reset" ${state.cryptoBotRunning ? "disabled" : ""}>Reset</button>
-      </div>
-      ${leaderboard}
-      ${cards}
-    `;
-  }
-
-  return `
-    <div class="crypto-bot-section">
-      <div class="crypto-bot-header">
-        <h3>Crypto Bot</h3>
-        <div class="crypto-bot-sub">Tuned for BTC, ETH, XRP, SOL — separate from equity bot</div>
-      </div>
-      <div class="crypto-bot-disclaimer">
-        <strong>Crypto carries 5-10x higher volatility than equities.</strong> Drawdowns of 50-80% are historically normal in bear cycles. Even the "passive" strategies here can lose half their value. Size positions accordingly.
-      </div>
-      ${body}
-    </div>
-  `;
-}
-
-function renderCryptoLeaderboard() {
-  const rows = CRYPTO_STRATEGIES
-    .map(s => ({ ...s, sim: state.cryptoBot[s.key] }))
-    .filter(s => s.sim)
-    .map(s => {
-      const equity = s.sim.equity ?? BOT_STARTING_CAPITAL;
-      const ret = ((equity / BOT_STARTING_CAPITAL) - 1) * 100;
-      const dd = s.sim.maxDrawdown ?? 0;
-      return { ...s, equity, ret, dd };
-    })
-    .sort((a, b) => b.equity - a.equity);
-
-  return `
-    <div class="lb-card">
-      <h3>Crypto Leaderboard</h3>
-      <table class="lb-table">
-        <thead>
-          <tr><th>Strategy</th><th class="num">Equity</th><th class="num">Return</th><th class="num">Max DD</th></tr>
-        </thead>
-        <tbody>
-          ${rows.map((r, i) => `
-            <tr>
-              <td>
-                <span class="lb-rank">${i === 0 ? "★" : i + 1}</span>
-                <span class="lb-dot" style="background:${r.color};"></span>
-                <span class="${i === 0 ? "lb-name-winner" : ""}">${escAttr(r.label)}</span>
-              </td>
-              <td class="num ${i === 0 ? "lb-equity-winner" : ""}">$${fmtUSD(r.equity, 0)}</td>
-              <td class="num ${r.ret >= 0 ? "pos" : "neg"}">${r.ret >= 0 ? "+" : ""}${r.ret.toFixed(2)}%</td>
-              <td class="num neg">${r.dd.toFixed(1)}%</td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-function renderCryptoEquityChart() {
-  // Reuse the same chart renderer pattern as the equity bot
-  const visible = state.cryptoBotChartVisible;
-  const series = [];
-  for (const s of CRYPTO_STRATEGIES) {
-    if (!visible[s.key]) continue;
-    const sim = state.cryptoBot[s.key];
-    if (!sim || !sim.equityCurve || sim.equityCurve.length === 0) continue;
-    series.push({ label: s.label, color: s.color, points: sim.equityCurve });
-  }
-  if (series.length === 0) return `<div style="padding:20px;text-align:center;color:var(--ink-muted);font-family:var(--mono);font-size:12px;">No data — run backtest above</div>`;
-
-  // Build SVG chart inline
-  const W = 720, H = 280, padL = 50, padR = 20, padT = 20, padB = 30;
-  let minV = Infinity, maxV = -Infinity;
-  for (const s of series) for (const p of s.points) { if (p.v < minV) minV = p.v; if (p.v > maxV) maxV = p.v; }
-  if (BOT_STARTING_CAPITAL < minV) minV = BOT_STARTING_CAPITAL * 0.98;
-  if (BOT_STARTING_CAPITAL > maxV) maxV = BOT_STARTING_CAPITAL * 1.02;
-  const xMin = series[0].points[0]?.t || 0;
-  const xMax = series[0].points[series[0].points.length - 1]?.t || 1;
-  const xSc = t => padL + ((t - xMin) / (xMax - xMin)) * (W - padL - padR);
-  const ySc = v => H - padB - ((v - minV) / (maxV - minV)) * (H - padT - padB);
-
-  const paths = series.map(s => {
-    const d = s.points.map((p, i) => `${i === 0 ? "M" : "L"}${xSc(p.t).toFixed(1)},${ySc(p.v).toFixed(1)}`).join(" ");
-    return `<path d="${d}" stroke="${s.color}" stroke-width="1.6" fill="none" />`;
-  }).join("");
-  const baseline = ySc(BOT_STARTING_CAPITAL).toFixed(1);
-
-  const toggles = CRYPTO_STRATEGIES.map(s => `
-    <label class="chart-toggle ${visible[s.key] ? "on" : ""}" data-act="crypto-bot-toggle-line" data-key="${s.key}">
-      <span class="dot" style="background:${s.color};"></span>${escAttr(s.tag)}
-    </label>
-  `).join("");
-
-  return `
-    <div class="chart-toggles">${toggles}</div>
-    <svg viewBox="0 0 ${W} ${H}" class="equity-chart" preserveAspectRatio="none">
-      <line x1="${padL}" x2="${W - padR}" y1="${baseline}" y2="${baseline}" stroke="var(--rule-soft)" stroke-dasharray="3 3" />
-      <text x="${padL - 8}" y="${ySc(maxV).toFixed(1)}" text-anchor="end" font-family="ui-monospace,monospace" font-size="9" fill="var(--ink-muted)">$${fmtUSD(maxV, 0)}</text>
-      <text x="${padL - 8}" y="${ySc(BOT_STARTING_CAPITAL).toFixed(1) - 2}" text-anchor="end" font-family="ui-monospace,monospace" font-size="9" fill="var(--ink-muted)">$${fmtUSD(BOT_STARTING_CAPITAL, 0)}</text>
-      <text x="${padL - 8}" y="${ySc(minV).toFixed(1)}" text-anchor="end" font-family="ui-monospace,monospace" font-size="9" fill="var(--ink-muted)">$${fmtUSD(minV, 0)}</text>
-      ${paths}
-    </svg>
-  `;
-}
-
-function renderCryptoStrategyCard(key) {
-  const strat = getCryptoStrategy(key);
-  const sim = state.cryptoBot[key];
-  if (!sim) return "";
-  const equity = sim.equity ?? BOT_STARTING_CAPITAL;
-  const ret = ((equity / BOT_STARTING_CAPITAL) - 1) * 100;
-  const winRate = sim.trades && sim.trades.length > 0
-    ? (sim.trades.filter(t => t.pnl > 0).length / sim.trades.length) * 100
-    : 0;
-  const trades = sim.trades || [];
-  const dd = sim.maxDrawdown ?? 0;
-  return `
-    <div class="strat-card">
-      <div class="strat-head">
-        <div>
-          <div class="strat-name"><span class="dot" style="background:${strat.color};"></span> ${escAttr(strat.label)}</div>
-          <div class="strat-desc">${escAttr(strat.desc)}</div>
-        </div>
-        <div class="strat-stats">
-          <div><strong>$${fmtUSD(equity, 0)}</strong></div>
-          <div class="${ret >= 0 ? "pos" : "neg"}">${ret >= 0 ? "+" : ""}${ret.toFixed(2)}%</div>
-        </div>
-      </div>
-      <div class="strat-stats-row">
-        <span>Trades: ${trades.length}</span>
-        <span>Win rate: ${winRate.toFixed(0)}%</span>
-        <span>Max DD: <span class="neg">${dd.toFixed(1)}%</span></span>
-      </div>
-    </div>
-  `;
-}
-
-function toggleCryptoBotLine(key) {
-  state.cryptoBotChartVisible[key] = !state.cryptoBotChartVisible[key];
-  renderBot();
-}
-
-async function runCryptoBacktest() {
-  if (state.cryptoBotRunning) return;
-  state.cryptoBotRunning = true;
-  renderBot();
-  toast("Fetching crypto price history…", 1500);
-  try {
-    // Fetch price/OHLCV for each crypto symbol from the worker
-    const symData = {};
-    for (const sym of CRYPTO_UNIVERSE) {
-      try {
-        const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(sym)}`);
-        if (!r.ok) {
-          toast(`Failed to fetch ${sym}: ${r.status}`, 3000, "error");
-          continue;
-        }
-        const j = await r.json();
-        if (!j.ohlcv || j.ohlcv.length < 100) {
-          toast(`${sym}: insufficient data (${j.ohlcv?.length || 0} bars)`, 3000, "error");
-          continue;
-        }
-        symData[sym] = j.ohlcv;
-      } catch (e) {
-        toast(`Fetch failed for ${sym}: ${(e.message || "").slice(0, 60)}`, 3000, "error");
-      }
-    }
-    if (Object.keys(symData).length === 0) {
-      toast("No crypto data could be fetched. Worker may be down.", 4000, "error");
-      state.cryptoBotRunning = false;
-      renderBot();
-      return;
-    }
-
-    toast(`Backtesting ${CRYPTO_STRATEGIES.length} crypto strategies…`, 1500);
-    // Run backtest for each crypto strategy
-    for (const strat of CRYPTO_STRATEGIES) {
-      try {
-        const result = backtestStrategy(strat.fn, symData, strat.mode, BOT_STARTING_CAPITAL, 730);
-        // Equity at end of run
-        let posVal = 0;
-        for (const sym of Object.keys(result.positions || {})) {
-          const lastBar = symData[sym]?.[symData[sym].length - 1];
-          if (lastBar) posVal += (result.positions[sym].qty || 0) * lastBar.c;
-        }
-        const finalEquity = result.cash + posVal;
-        state.cryptoBot[strat.key] = {
-          ...result,
-          equity: finalEquity,
-          last_run_at: new Date().toISOString(),
-        };
-      } catch (e) {
-        console.warn(`Crypto strategy ${strat.key} failed:`, e);
-      }
-    }
-    toast(`Crypto backtest complete — ${CRYPTO_STRATEGIES.length} strategies`);
-  } catch (e) {
-    toast(`Backtest failed: ${(e.message || e).slice(0, 80)}`, 3000, "error");
-  }
-  state.cryptoBotRunning = false;
-  renderBot();
-}
-
-function resetCryptoBot() {
-  state.cryptoBot = { crypto_bh: null, crypto_dca: null, btc_trend: null, alt_rotate: null };
   renderBot();
 }
 
@@ -7206,13 +7424,11 @@ function resetPin() {
 async function manualRefresh() {
   toast("Refreshing prices…");
   await refreshAllPrices();
-  await checkAlerts();
   toast("Refreshed");
   renderCurrentView();
 }
 async function exportData() {
   const journal = await loadJournal();
-  const alerts  = await loadAlerts();
   const data = {
     exported_at: new Date().toISOString(),
     holdings: state.holdings,
@@ -7220,7 +7436,7 @@ async function exportData() {
     portfolio_analysis: state.portfolioAnalysis,
     watchlist: state.watchlist,
     bot: state.bot,
-    journal, alerts,
+    journal,
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -7572,9 +7788,20 @@ async function removeCondition(symbol, condId) {
   renderWatchDetail(symbol);
 }
 
-function openLogTrade(symbol) {
+function openLogTrade(symbol, recKey) {
+  state._pendingRecKey = recKey || null;
   const sigSnapshot = symbol && state.analyses[symbol] ? state.analyses[symbol] : null;
   const stanceLabel = sigSnapshot?.stance || sigSnapshot?.signal || null;
+
+  // Pre-fill exit/TP from analysis if available
+  const analysis = sigSnapshot || {};
+  const aTp = analysis.take_profit || {};
+  const aExit = analysis.exit_strategy || {};
+  const prefillTp1 = aTp.tp1 || "";
+  const prefillTp2 = aTp.tp2 || "";
+  const prefillTp3 = aTp.tp3 || "";
+  const prefillStop = aExit.stop_loss || aExit.invalidation || "";
+  const prefillExitTrigger = aExit.thesis_break || aExit.trailing_rule || "";
 
   // Build picker options from holdings + watchlist (deduped, alphabetical)
   const seen = new Set();
@@ -7627,8 +7854,26 @@ function openLogTrade(symbol) {
     </div>
     <div class="field">
       <label>Reason / Thesis</label>
-      <textarea id="lt_reason" rows="3" placeholder="Why did you make this trade?" style="font-family:var(--sans);"></textarea>
+      <textarea id="lt_reason" rows="2" placeholder="Why did you make this trade?" style="font-family:var(--sans);"></textarea>
     </div>
+
+    <div class="lt-strategy-block">
+      <div class="lt-strategy-head">Take Profit Strategy</div>
+      <div class="lt-strategy-hint">Stage your exits. Pre-filled from the latest analysis if available.</div>
+      <div class="field-row">
+        <div class="field"><label>TP1 (first scale-out)</label><input id="lt_tp1" placeholder="e.g. +10% or $120" value="${escAttr(prefillTp1)}" /></div>
+        <div class="field"><label>TP2 (core target)</label><input id="lt_tp2" placeholder="e.g. +25% or $145" value="${escAttr(prefillTp2)}" /></div>
+      </div>
+      <div class="field"><label>TP3 (stretch)</label><input id="lt_tp3" placeholder="e.g. +50% or $180" value="${escAttr(prefillTp3)}" /></div>
+    </div>
+
+    <div class="lt-strategy-block">
+      <div class="lt-strategy-head">Exit Strategy</div>
+      <div class="lt-strategy-hint">Where you cut the loss or admit the thesis is wrong.</div>
+      <div class="field"><label>Stop / Hard exit</label><input id="lt_stop" placeholder="e.g. -8% or $98" value="${escAttr(prefillStop)}" /></div>
+      <div class="field"><label>Thesis-break trigger</label><textarea id="lt_exit_trigger" rows="2" placeholder="What would invalidate this trade?" style="font-family:var(--sans);">${escAttr(prefillExitTrigger)}</textarea></div>
+    </div>
+
     ${stanceLabel ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--ink-muted);margin-bottom:14px;padding:10px;background:var(--bg-elev);border-radius:6px;">App stance: ${escAttr(stanceLabel)} · ${escAttr(sigSnapshot.confidence || "")} confidence</div>` : ""}
     <button class="btn btn-block" data-act="submit-trade" id="lt_submit_btn" ${stanceLabel ? `data-sig="${escAttr(stanceLabel)}" data-conf="${escAttr(sigSnapshot.confidence || '')}"` : ""}>Save</button>
   `);
@@ -7661,6 +7906,11 @@ async function submitTrade(sig, conf) {
     const qty    = parseFloat($("#lt_qty").value);
     const price  = parseFloat($("#lt_price").value);
     const reason = $("#lt_reason").value.trim();
+    const tp1    = ($("#lt_tp1")?.value || "").trim();
+    const tp2    = ($("#lt_tp2")?.value || "").trim();
+    const tp3    = ($("#lt_tp3")?.value || "").trim();
+    const stop   = ($("#lt_stop")?.value || "").trim();
+    const exitTrigger = ($("#lt_exit_trigger")?.value || "").trim();
     if (!symbol || !qty || !price) {
       toast("Fill symbol, quantity, and price", 2400, "error");
       submitBtn.disabled = false;
@@ -7674,9 +7924,11 @@ async function submitTrade(sig, conf) {
       return;
     }
 
-    // 1) Save journal entry
+    // 1) Save journal entry — includes take-profit and exit strategy
     const journalRef = await db.collection("users").doc(state.uid).collection("journal").add({
       symbol, action, quantity: qty, price, reason,
+      take_profit: { tp1, tp2, tp3 },
+      exit_strategy: { stop_loss: stop, thesis_break: exitTrigger },
       date: new Date().toISOString().slice(0, 10),
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       signal_at_time: sig || null,
@@ -7693,6 +7945,17 @@ async function submitTrade(sig, conf) {
       submitBtn.disabled = false;
       submitBtn.textContent = "Save";
       return;
+    }
+
+    // 3) If this log was triggered from a recommendation, mark it done
+    if (state._pendingRecKey) {
+      state.recStatus[state._pendingRecKey] = {
+        date: new Date().toISOString().slice(0, 10),
+        status: "done",
+        ts: Date.now(),
+      };
+      saveRecStatus();
+      state._pendingRecKey = null;
     }
 
     toast(`Trade logged · Portfolio updated`);
@@ -7812,36 +8075,6 @@ function guessAssetClass(sym) {
   return "us_stock";
 }
 
-function openAddAlert() {
-  const opts = state.holdings.filter(h => h.asset_class !== "cash").map(h => `<option value="${escAttr(h.symbol)}">${escAttr(h.symbol)}</option>`).join("");
-  openModal(`
-    <div class="modal-head"><h3>New Alert</h3></div>
-    <div class="field"><label>Symbol</label><select id="al_symbol">${opts}</select></div>
-    <div class="field"><label>Trigger</label>
-      <select id="al_type">
-        <option value="price_above">Price above</option>
-        <option value="price_below">Price below</option>
-      </select>
-    </div>
-    <div class="field"><label>Threshold (USD)</label><input id="al_threshold" type="number" step="any" /></div>
-    <button class="btn btn-block" data-act="submit-alert">Create Alert</button>
-  `);
-}
-async function submitAlert() {
-  const symbol = $("#al_symbol").value;
-  const type   = $("#al_type").value;
-  const threshold = parseFloat($("#al_threshold").value);
-  if (!symbol || !threshold) { toast("Fill all fields", 2400, "error"); return; }
-  await db.collection("users").doc(state.uid).collection("alerts").add({
-    symbol, type, threshold, active: true,
-    created_at: firebase.firestore.FieldValue.serverTimestamp(),
-  });
-  toast("Alert created");
-  closeModal();
-  if (state.currentView === "alerts") renderAlerts();
-}
-
-// Open trigger from opportunity card → mark seen, open asset
 async function openTrigger(symbol, triggerId) {
   if (triggerId) await markTriggerSeen(triggerId);
   openAsset(symbol, "portfolio");
@@ -7874,7 +8107,7 @@ document.addEventListener("click", (e) => {
       case "run-portfolio-analysis": runPortfolioAnalysis(); break;
       case "rescan":                 rescan(); break;
       case "open-trigger":           openTrigger(symbol, target.dataset.triggerId); break;
-      case "log-trade":              openLogTrade(symbol); break;
+      case "log-trade":              openLogTrade(symbol, target.dataset.recKey); break;
       case "add-holding":            openAddHolding(); break;
       case "submit-add":             submitAddHolding(); break;
       case "edit-holding":           openEditHolding(symbol); break;
@@ -7887,9 +8120,10 @@ document.addEventListener("click", (e) => {
       case "add-cond":               openAddCondition(symbol); break;
       case "submit-cond":            submitCondition(symbol); break;
       case "rm-cond":                removeCondition(symbol, target.dataset.cid); break;
-      case "add-alert":              openAddAlert(); break;
-      case "submit-alert":           submitAlert(); break;
-      case "delete-alert":           deleteAlert(target.dataset.id); break;
+      case "refresh-news":           refreshNews(); break;
+      case "mark-rec-done":          markRecommendationDone(target.dataset.recKey); break;
+      case "dismiss-rec":            dismissRecommendation(target.dataset.recKey); break;
+      case "preview-chart":          togglePreviewChart(target.dataset.symbol, target.dataset.name); break;
       case "pick-symbol":
         $("#ah_symbol").value = target.dataset.symbol;
         $("#ah_name").value = target.dataset.name || "";
@@ -7926,9 +8160,6 @@ document.addEventListener("click", (e) => {
       case "refresh-leaderboard":    fetchEtfLeaderboard(true); break;
       case "lb-tf":                  setLeaderboardTimeframe(target.dataset.tf); break;
       case "lb-sort":                setLeaderboardSort(target.dataset.sort); break;
-      case "crypto-bot-backtest":    runCryptoBacktest(); break;
-      case "crypto-bot-reset":       resetCryptoBot(); break;
-      case "crypto-bot-toggle-line": toggleCryptoBotLine(target.dataset.key); break;
       case "dismiss-breakout-prompt": dismissBreakoutPrompt(); break;
       case "add-breakout-conditions": addBreakoutConditionsToHeld(); break;
     }
