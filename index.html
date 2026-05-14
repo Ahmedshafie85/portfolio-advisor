@@ -3109,7 +3109,9 @@ async function ensurePreSurgeData(onProgress) {
   if (missing.length === 0) return { fetched: 0, total: universe.length };
 
   let fetched = 0;
-  const concurrency = 6;
+  // Concurrency 8 — balances first-scan latency (now ~166 symbols with SCAN_UNIVERSE)
+  // against not hammering the worker. Yahoo's rate limits tolerate this fine.
+  const concurrency = 8;
   const work = missing.slice();
   if (onProgress) onProgress(0, missing.length);
 
@@ -3728,14 +3730,55 @@ function computePreSurgeScore(symbol, opts = {}) {
 // Runs computePreSurgeScore across watchlist + non-cash holdings + ETF_UNIVERSE.
 // Filters composite ≥ THRESHOLD, ranks descending. Returns array.
 // ============================================================================
+// PRE-SURGE SCAN-ONLY UNIVERSE
+// ~80 large-cap names the Pre-Surge scanner watches WITHOUT cluttering the
+// watchlist UI. These are high-liquidity stocks where leading indicators
+// (OBV, BB squeeze, RS rotation) are most reliable — i.e. enough institutional
+// flow for accumulation to be detectable on daily bars.
+//
+// Selection criteria:
+//   - US-listed (so SPY benchmark is comparable for RS)
+//   - $20B+ market cap, $500M+ avg daily volume
+//   - Across all S&P sectors so rotation is detectable
+//   - A handful of high-quality mid-caps that move with rotation
+//
+// If you want to add a name permanently to your watchlist with conditions,
+// use the Watchlist tab. SCAN_UNIVERSE just gives Pre-Surge eyes on more names.
+// ============================================================================
+const SCAN_UNIVERSE = [
+  // Mega-cap tech (the gravitational center)
+  "AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA","AVGO","ORCL","ADBE",
+  "CRM","NFLX","AMD","INTC","QCOM","TXN","CSCO","IBM","MU","INTU",
+  // Semis / hardware
+  "ASML","TSM","LRCX","AMAT","KLAC","MRVL","ON","ADI","SMCI","ANET",
+  // Financials
+  "JPM","BAC","WFC","GS","MS","C","BLK","SCHW","AXP","V","MA",
+  // Healthcare & pharma
+  "UNH","JNJ","LLY","MRK","PFE","ABBV","TMO","ABT","DHR","BMY","CVS","ISRG",
+  // Consumer
+  "WMT","COST","HD","NKE","SBUX","MCD","PG","KO","PEP","DIS","LOW",
+  // Energy
+  "XOM","CVX","COP","SLB","EOG","OXY",
+  // Industrials & materials
+  "BA","CAT","GE","LMT","RTX","HON","UNP","DE","NEE","LIN","FCX",
+  // Communication / new economy
+  "T","VZ","TMUS","UBER","SHOP","SQ","PYPL","COIN","SNOW","PLTR",
+];
+function getScanUniverseSymbols() { return SCAN_UNIVERSE; }
+
+// ============================================================================
 const PRESURGE_THRESHOLD = 70;
 const PRESURGE_LOCAL_KEY = "presurge_flags_v1"; // localStorage history cache
 
 function getPreSurgeUniverse() {
+  // Deduped union of: watchlist + non-cash holdings + ETF universe + SCAN_UNIVERSE.
+  // SCAN_UNIVERSE gives Pre-Surge eyes on large-cap US stocks without
+  // cluttering the watchlist. Same symbol in two lists → scored once.
   const set = new Set();
   for (const w of state.watchlist) set.add(w.symbol);
   for (const h of state.holdings) if (h.asset_class !== "cash") set.add(h.symbol);
   for (const e of (typeof ETF_UNIVERSE !== "undefined" ? ETF_UNIVERSE : [])) set.add(e.symbol);
+  for (const s of SCAN_UNIVERSE) set.add(s);
   return Array.from(set);
 }
 
@@ -4377,7 +4420,7 @@ function renderPreSurgeCard() {
           <button class="btn btn-sm" data-act="run-presurge">Scan</button>
         </div>
         <div class="presurge-empty-body">
-          Scans watchlist, holdings, and ETF universe for the three leading-indicator setups that usually precede surges: Bollinger squeeze, OBV accumulation divergence, and relative-strength rotation. Composite score ≥ 70 = flagged. First scan downloads OHLCV histories — takes 15-30 seconds.
+          Scans watchlist, holdings, ETF universe, and ~90 large-cap US stocks for the three leading-indicator setups that usually precede surges: Bollinger squeeze, OBV accumulation divergence, and relative-strength rotation. Composite score ≥ 70 = flagged. First scan downloads OHLCV histories for ~165 symbols — takes 30-60 seconds. Subsequent scans are instant.
         </div>
       </div>
     `;
