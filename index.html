@@ -1097,6 +1097,8 @@ body {
 .vote-chip.buy  { background: rgba(74,122,74,0.12);  color: var(--green); border: 1px solid rgba(74,122,74,0.3); }
 .vote-chip.sell { background: rgba(161,61,45,0.12);  color: var(--red);   border: 1px solid rgba(161,61,45,0.3); }
 .vote-chip.tilt { background: var(--bg-elev);         color: var(--ink-soft); border: 1px solid var(--rule-soft); }
+.vote-chip.tilt.pos { background: rgba(74,122,74,0.06); color: var(--green); border: 1px solid rgba(74,122,74,0.2); opacity: 0.85; }
+.vote-chip.tilt.neg { background: rgba(161,61,45,0.06); color: var(--red);   border: 1px solid rgba(161,61,45,0.2); opacity: 0.85; }
 .vote-chip.decayed {
   background: transparent;
   color: var(--ink-muted);
@@ -3199,6 +3201,11 @@ const state = {
   macroLoading: false,
   // Short-interest data — bulk DTC for SCAN_UNIVERSE. Bi-monthly Finra data, cached 24h.
   shortInterest: loadShortInterestCache() || null, // { SYM: { dtc, shortPctFloat, ... } } | null
+  // Calendar data — earnings + ex-div + dividend yield per symbol, bulk-fetched.
+  // Feeds the Timing vote in the verdict aggregator. Cached 24h client-side
+  // (worker also caches 6h on its side).
+  calendar: loadCalendarCache() || null, // { SYM: { earnings_date, ex_dividend_date, dividend_yield_pct } } | null
+  calendarLoading: false,
   // Raw signals section — collapsed by default so user sees decisions first, not noise.
   // localStorage-persisted so the toggle stays where you left it.
   rawSignalsExpanded: localStorage.getItem("rawSignalsExpanded") === "1",
@@ -3638,6 +3645,25 @@ async function autoRefreshSignals() {
       await fetchEtfLeaderboard(false); // false = use cache if fresh
     }
   } catch (e) { console.warn("auto etf:", e.message || e); }
+
+  // Calendar — earnings + ex-div dates for held + watchlist symbols.
+  // Cheap: one bulk POST. 24h client cache + 6h worker cache.
+  try {
+    if (!state.calendar) {
+      const heldSyms = state.holdings.map(h => h.symbol);
+      const watchSyms = state.watchlist.map(w => w.symbol);
+      const allSyms = Array.from(new Set([...heldSyms, ...watchSyms]));
+      if (allSyms.length > 0) {
+        state.calendarLoading = true;
+        const cal = await fetchCalendarForUniverse(allSyms);
+        state.calendar = cal;
+        state.calendarLoading = false;
+      }
+    }
+  } catch (e) {
+    console.warn("auto calendar:", e.message || e);
+    state.calendarLoading = false;
+  }
 
   renderCurrentView();
 }
@@ -4497,6 +4523,328 @@ async function fetchShortInterestForUniverse(symbols) {
 }
 
 // ============================================================================
+// CALENDAR ENGINE — earnings dates, ex-div dates, macro events, anniversaries.
+// Feeds the Timing vote in the verdict aggregator.
+//
+// Three sources:
+//   1. Worker /calendar endpoint: earnings + ex-dividend + dividend yield
+//      per symbol (Yahoo quoteSummary).
+//   2. Hardcoded 2026 macro calendar: FOMC, CPI, NFP, ECB.
+//   3. Anniversary pivots: scanned from already-cached OHLCV. Looks at the
+//      last 3 years and finds prior-year highs/lows that land within ±5
+//      trading days of today's calendar date.
+//
+// The Timing vote weight is intentionally LOW (max ±0.5 per source, summing
+// to ±2 hard-capped). It nudges conviction but does NOT flip action labels.
+// A single calendar date should never override Daily Scan + AI + Pre-Surge.
+// ============================================================================
+
+const CALENDAR_CACHE_KEY = "calendarData_v1";
+const CALENDAR_TTL_HOURS = 24; // worker side caches 6h already
+
+function loadCalendarCache() {
+  try {
+    const raw = localStorage.getItem(CALENDAR_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    if (!c.fetchedAt) return null;
+    const ageH = (Date.now() - new Date(c.fetchedAt).getTime()) / 3600000;
+    if (ageH > CALENDAR_TTL_HOURS) return null;
+    return c.results || null;
+  } catch (e) { return null; }
+}
+function saveCalendarCache(results) {
+  try {
+    localStorage.setItem(CALENDAR_CACHE_KEY, JSON.stringify({
+      results, fetchedAt: new Date().toISOString(),
+    }));
+  } catch (e) {}
+}
+
+// Bulk fetch calendar data for all held + watchlist symbols at once.
+// One round trip; worker handles per-symbol concurrency.
+async function fetchCalendarForUniverse(symbols) {
+  const cached = loadCalendarCache();
+  if (cached) return cached;
+  try {
+    const r = await fetch(`${WORKER_URL}/calendar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbols }),
+    });
+    if (!r.ok) throw new Error(`calendar fetch ${r.status}`);
+    const j = await r.json();
+    const results = j.results || {};
+    saveCalendarCache(results);
+    return results;
+  } catch (e) {
+    console.warn("calendar fetch failed:", e.message || e);
+    return {};
+  }
+}
+
+// Helper: get calendar data for one symbol from cache (null if missing)
+function calendarFor(symbol) {
+  return state.calendar?.[symbol] ?? null;
+}
+
+// ----------------------------------------------------------------------------
+// HARDCODED 2026 MACRO CALENDAR
+// ----------------------------------------------------------------------------
+// FOMC = Federal Open Market Committee rate decision dates (8/year)
+// CPI  = Consumer Price Index release (monthly, ~mid-month, before market open)
+// NFP  = Non-Farm Payrolls (first Friday of each month, before market open)
+// ECB  = European Central Bank rate decision (every ~6 weeks)
+//
+// These are public scheduled events known well in advance. The Fed publishes
+// FOMC dates a year ahead; BLS publishes CPI/NFP release calendar annually.
+//
+// Update annually. If a date is moved (rare for FOMC, more common for CPI),
+// edit here. Past dates auto-filter out of the proximity check.
+const MACRO_CALENDAR_2026 = [
+  // FOMC meetings (8 per year, dates per Federal Reserve schedule)
+  { date: "2026-01-28", type: "FOMC", impact: "high" },
+  { date: "2026-03-18", type: "FOMC", impact: "high" },
+  { date: "2026-04-29", type: "FOMC", impact: "high" },
+  { date: "2026-06-17", type: "FOMC", impact: "high" },
+  { date: "2026-07-29", type: "FOMC", impact: "high" },
+  { date: "2026-09-16", type: "FOMC", impact: "high" },
+  { date: "2026-10-28", type: "FOMC", impact: "high" },
+  { date: "2026-12-09", type: "FOMC", impact: "high" },
+  // CPI releases (typically 8:30 AM ET, mid-month)
+  { date: "2026-01-14", type: "CPI", impact: "high" },
+  { date: "2026-02-11", type: "CPI", impact: "high" },
+  { date: "2026-03-11", type: "CPI", impact: "high" },
+  { date: "2026-04-15", type: "CPI", impact: "high" },
+  { date: "2026-05-13", type: "CPI", impact: "high" },
+  { date: "2026-06-10", type: "CPI", impact: "high" },
+  { date: "2026-07-15", type: "CPI", impact: "high" },
+  { date: "2026-08-12", type: "CPI", impact: "high" },
+  { date: "2026-09-10", type: "CPI", impact: "high" },
+  { date: "2026-10-15", type: "CPI", impact: "high" },
+  { date: "2026-11-12", type: "CPI", impact: "high" },
+  { date: "2026-12-10", type: "CPI", impact: "high" },
+  // NFP releases (first Friday of month)
+  { date: "2026-01-02", type: "NFP", impact: "high" },
+  { date: "2026-02-06", type: "NFP", impact: "high" },
+  { date: "2026-03-06", type: "NFP", impact: "high" },
+  { date: "2026-04-03", type: "NFP", impact: "high" },
+  { date: "2026-05-01", type: "NFP", impact: "high" },
+  { date: "2026-06-05", type: "NFP", impact: "high" },
+  { date: "2026-07-02", type: "NFP", impact: "high" },
+  { date: "2026-08-07", type: "NFP", impact: "high" },
+  { date: "2026-09-04", type: "NFP", impact: "high" },
+  { date: "2026-10-02", type: "NFP", impact: "high" },
+  { date: "2026-11-06", type: "NFP", impact: "high" },
+  { date: "2026-12-04", type: "NFP", impact: "high" },
+];
+
+// Return any macro event within N days of today (default 5).
+// Negative `daysOut` = event already passed today.
+function upcomingMacroEvents(daysAhead = 5) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const out = [];
+  for (const ev of MACRO_CALENDAR_2026) {
+    const d = new Date(ev.date + "T00:00:00");
+    const daysOut = Math.round((d.getTime() - today.getTime()) / 86400000);
+    if (daysOut >= -1 && daysOut <= daysAhead) {
+      out.push({ ...ev, daysOut });
+    }
+  }
+  return out;
+}
+
+// ----------------------------------------------------------------------------
+// ANNIVERSARY PIVOT SCANNER
+// ----------------------------------------------------------------------------
+// Scans last 3 years of OHLCV for the strongest highs and lows by magnitude,
+// then checks if today's calendar date (same month-day) falls within ±5
+// trading days of any of those anniversary dates.
+//
+// Why this is the only Gann method used:
+//   - Anniversaries have a defensible mechanism (tax-year cycles, seasonal
+//     earnings patterns, trader memory, fund rebalancing windows).
+//   - Square of 9 and Gann fans generate so many "important" dates per year
+//     that one always lands near any move retroactively — curve fit.
+//
+// Returns { anniversaryHigh, anniversaryLow } where each is either null or
+// { date, price, daysFromToday, yearsAgo }.
+function anniversaryPivotsFor(symbol) {
+  const data = state.prices?.[symbol];
+  if (!data?.ohlcv || data.ohlcv.length < 252) return { anniversaryHigh: null, anniversaryLow: null };
+
+  const today = new Date();
+  const todayMonth = today.getMonth();
+  const todayDay = today.getDate();
+  const todayMs = today.getTime();
+
+  // Find top 5 highs and top 5 lows over last 3 years (756 trading days)
+  const lookback = Math.min(data.ohlcv.length, 756);
+  const window = data.ohlcv.slice(-lookback);
+
+  // For pivots: a "local high" is the max of an 11-bar window centered on it
+  // (5 bars each side). Same for lows. This avoids treating every minor wiggle
+  // as a pivot.
+  const highs = [];
+  const lows = [];
+  for (let i = 5; i < window.length - 5; i++) {
+    const slice = window.slice(i - 5, i + 6);
+    const h = window[i].h;
+    const l = window[i].l;
+    if (h === Math.max(...slice.map(b => b.h))) highs.push({ t: window[i].t, price: h });
+    if (l === Math.min(...slice.map(b => b.l))) lows.push({ t: window[i].t, price: l });
+  }
+  // Keep top 5 by magnitude (extreme highs, deep lows)
+  highs.sort((a, b) => b.price - a.price);
+  lows.sort((a, b) => a.price - b.price);
+  const topHighs = highs.slice(0, 5);
+  const topLows = lows.slice(0, 5);
+
+  // Check if any of those dates falls within ±5 days of today's anniversary
+  let bestHighMatch = null;
+  let bestLowMatch = null;
+  for (const h of topHighs) {
+    const d = new Date(h.t);
+    // Build the anniversary date in current year
+    const anniv = new Date(today.getFullYear(), d.getMonth(), d.getDate());
+    const daysFromToday = Math.round((anniv.getTime() - todayMs) / 86400000);
+    if (Math.abs(daysFromToday) <= 5) {
+      const yearsAgo = today.getFullYear() - d.getFullYear();
+      if (!bestHighMatch || Math.abs(daysFromToday) < Math.abs(bestHighMatch.daysFromToday)) {
+        bestHighMatch = { date: d.toISOString().slice(0, 10), price: h.price, daysFromToday, yearsAgo };
+      }
+    }
+  }
+  for (const l of topLows) {
+    const d = new Date(l.t);
+    const anniv = new Date(today.getFullYear(), d.getMonth(), d.getDate());
+    const daysFromToday = Math.round((anniv.getTime() - todayMs) / 86400000);
+    if (Math.abs(daysFromToday) <= 5) {
+      const yearsAgo = today.getFullYear() - d.getFullYear();
+      if (!bestLowMatch || Math.abs(daysFromToday) < Math.abs(bestLowMatch.daysFromToday)) {
+        bestLowMatch = { date: d.toISOString().slice(0, 10), price: l.price, daysFromToday, yearsAgo };
+      }
+    }
+  }
+  return { anniversaryHigh: bestHighMatch, anniversaryLow: bestLowMatch };
+}
+
+// ----------------------------------------------------------------------------
+// TIMING VOTE COMPUTER
+// ----------------------------------------------------------------------------
+// Returns a vote-compatible object that the verdict aggregator can splice in:
+//   { signal: "Timing", dir: "buy"|"sell"|"tilt", weight, note, sources: [...] }
+// or returns null if no calendar signal applies (skip the vote entirely —
+// don't fake it).
+//
+// Weighting philosophy: each source contributes at most 0.5 to net score.
+// Multiple sources stack additively. Hard cap at ±1.0 total weight (so even
+// stacked catalysts can't outvote a real Pre-Surge or AI Analyze).
+//
+// Sources:
+//   A. Earnings within 0-3 days  → -0.5 (binary event, don't add ahead)
+//   B. Earnings 5-15 days + bullish drift signal → +0.5 (pre-earnings runup)
+//   C. Ex-dividend 0-2 days on high-yield (>3%) → -0.5 (price drops by div amount next day)
+//   D. FOMC/CPI/NFP within 0-2 days → -0.3 (broad caution, all symbols)
+//   E. Anniversary high within ±5d → -0.4 (historical resistance window)
+//   F. Anniversary low within ±5d → +0.4 (historical support window)
+// ----------------------------------------------------------------------------
+function computeTimingVote(symbol, assetClass) {
+  const sources = [];
+  let net = 0;
+
+  // -- A & B: Earnings proximity --
+  const cal = calendarFor(symbol);
+  if (cal?.earnings_date) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const earn = new Date(cal.earnings_date + "T00:00:00");
+    const daysOut = Math.round((earn.getTime() - today.getTime()) / 86400000);
+    if (daysOut >= 0 && daysOut <= 3) {
+      // Binary event imminent — flag as caution
+      net -= 0.5;
+      sources.push({ kind: "earnings_imminent", days: daysOut, label: `earnings ${daysOut === 0 ? "today" : `+${daysOut}d`} (avoid)` });
+    } else if (daysOut >= 5 && daysOut <= 15) {
+      // Pre-earnings drift window — only count as tailwind if AI is bullish
+      const ai = aiStanceFor(symbol);
+      if (ai && (ai.stance === "ACCUMULATE" || ai.stance === "HOLD")) {
+        net += 0.5;
+        sources.push({ kind: "earnings_drift", days: daysOut, label: `earnings +${daysOut}d tailwind` });
+      }
+    }
+  }
+
+  // -- C: Ex-dividend proximity --
+  if (cal?.ex_dividend_date && cal?.dividend_yield_pct != null && cal.dividend_yield_pct >= 3) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const xd = new Date(cal.ex_dividend_date + "T00:00:00");
+    const daysOut = Math.round((xd.getTime() - today.getTime()) / 86400000);
+    if (daysOut >= 0 && daysOut <= 2) {
+      // Don't add right before ex-div — price drops by div amount the next day
+      net -= 0.5;
+      sources.push({ kind: "ex_div", days: daysOut, label: `ex-div ${daysOut === 0 ? "today" : `+${daysOut}d`} (-${cal.dividend_yield_pct.toFixed(1)}%/yr)` });
+    }
+  }
+
+  // -- D: Macro events --
+  const macroEvents = upcomingMacroEvents(2);
+  if (macroEvents.length > 0) {
+    const closest = macroEvents.reduce((a, b) => Math.abs(a.daysOut) < Math.abs(b.daysOut) ? a : b);
+    // Crypto and rate-sensitive sectors react more to FOMC; everything reacts to CPI/NFP
+    if (closest.daysOut >= 0 && closest.daysOut <= 2) {
+      net -= 0.3;
+      sources.push({ kind: "macro_event", days: closest.daysOut, label: `${closest.type} ${closest.daysOut === 0 ? "today" : `+${closest.daysOut}d`}` });
+    }
+  }
+
+  // -- E & F: Anniversary pivots --
+  const { anniversaryHigh, anniversaryLow } = anniversaryPivotsFor(symbol);
+  if (anniversaryHigh) {
+    net -= 0.4;
+    sources.push({
+      kind: "anniv_high",
+      days: anniversaryHigh.daysFromToday,
+      label: `${anniversaryHigh.yearsAgo}y-ago high $${fmtUSD(anniversaryHigh.price)} window`,
+    });
+  }
+  if (anniversaryLow) {
+    net += 0.4;
+    sources.push({
+      kind: "anniv_low",
+      days: anniversaryLow.daysFromToday,
+      label: `${anniversaryLow.yearsAgo}y-ago low $${fmtUSD(anniversaryLow.price)} window`,
+    });
+  }
+
+  // No signals → skip the vote entirely. Better silent than fake.
+  if (sources.length === 0) return null;
+
+  // Clamp net to ±1.0 — Timing should refine, not dominate
+  if (net > 1.0) net = 1.0;
+  if (net < -1.0) net = -1.0;
+
+  // Build the chip label — shortest source description, with count if multiple
+  let chipLabel;
+  if (sources.length === 1) {
+    chipLabel = sources[0].label;
+  } else {
+    // Pick the strongest-signed source as headline, mention count
+    const headline = sources.reduce((a, b) => Math.abs(net) > 0 ? a : b);
+    chipLabel = `${sources[0].label} +${sources.length - 1} more`;
+  }
+
+  return {
+    signal: "Timing",
+    dir: "tilt", // signed weight, just like Macro
+    weight: net,
+    note: chipLabel,
+    sources, // kept for debugging; UI uses note
+  };
+}
+
+// ============================================================================
 // PRE-SURGE COMPOSITE SCORER
 // Three signals, composite 0-100. Threshold ≥70 = flagged.
 //
@@ -5115,6 +5463,14 @@ function computeHeldVerdict(holding, cachedScanActions) {
     }
   }
 
+  // --- TIMING vote (earnings / ex-div / macro / anniversary pivots) ---
+  // Low-weight tilt vote that refines conviction. Hard-capped at ±1.0 weight
+  // so it never overrides the directional votes above.
+  const timing = computeTimingVote(sym, holding.asset_class);
+  if (timing) {
+    votes.push(timing);
+  }
+
   // --- Tally ---
   let net = 0;
   for (const v of votes) {
@@ -5266,6 +5622,21 @@ function buildTradePlan(verdict, holding) {
   const peak90 = highs90.length ? Math.max(...highs90) : cur;
   const dropFromPeak = peak90 > 0 ? ((cur - peak90) / peak90) * 100 : 0;
 
+  // === EARNINGS-IMMINENT CHECK ===
+  // If earnings within 3 calendar days for ADD/PRIME, the plan changes:
+  // we don't enter ahead of a binary event. Override the entry with a "wait"
+  // instruction. The rest of the plan (stop, horizon) still applies.
+  const cal = calendarFor(sym);
+  let earningsImminent = null;
+  if (cal?.earnings_date) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const earn = new Date(cal.earnings_date + "T00:00:00");
+    const daysOut = Math.round((earn.getTime() - today.getTime()) / 86400000);
+    if (daysOut >= 0 && daysOut <= 3) {
+      earningsImminent = { daysOut, date: cal.earnings_date, isEstimate: !!cal.earnings_is_estimate };
+    }
+  }
+
   // === ADD / PRIME verdicts → ENTRY PLAN + STOP + EXIT LADDER ===
   if (verdict.action === "ADD" || verdict.action === "PRIME") {
     const plan = {
@@ -5275,9 +5646,24 @@ function buildTradePlan(verdict, holding) {
       invalidation: null,
       horizon: null,
       exitLadder: null,
+      earningsImminent, // surfaced so UI can flag the wait
     };
 
-    // ENTRY — driven by dominant signal
+    // EARNINGS GUARD: if binary event imminent, swap entry for "wait until after"
+    if (earningsImminent) {
+      const dayWord = earningsImminent.daysOut === 0 ? "today" : `in ${earningsImminent.daysOut}d (${earningsImminent.date})`;
+      const estNote = earningsImminent.isEstimate ? " (date estimated, verify before earnings)" : "";
+      plan.entry = {
+        style: "wait",
+        priceHint: cur,
+        text: `Wait — earnings ${dayWord}${estNote}. Re-evaluate the morning AFTER earnings. Adding ahead of a binary event = gambling, not investing.`,
+      };
+      plan.horizon = "Re-evaluate post-earnings (1-2 days)";
+      // Don't build out the rest — entry is the whole story when waiting
+      return plan;
+    }
+
+    // ENTRY — driven by dominant signal (only reached when no earnings imminent)
     if (rsi != null && rsi < 35 && dropFromPeak > -15) {
       // RSI oversold: time-sensitive, buy now at market
       plan.entry = {
@@ -5522,6 +5908,12 @@ function computeOpportunityVerdict(symbol, assetClassGuess) {
     votes.push({ signal: "Macro", dir: "tilt", weight: -0.5, note: "regime headwind" });
   }
 
+  // --- TIMING vote (earnings / ex-div / macro / anniversary pivots) ---
+  const timing = computeTimingVote(symbol, assetClassGuess || guessAssetClass(symbol));
+  if (timing) {
+    votes.push(timing);
+  }
+
   // --- Tally ---
   let net = 0;
   for (const v of votes) {
@@ -5740,7 +6132,7 @@ function renderTodaysVerdictCard() {
       </div>
       ${body}
       ${holdsLine}
-      <div class="verdict-footer">Synthesizes Daily Scan + AI Analysis + Pre-Surge + Macro + News into one weighted verdict per held symbol</div>
+      <div class="verdict-footer">Synthesizes Daily Scan + AI Analysis + Pre-Surge + Macro + News + Timing into one weighted verdict per held symbol</div>
     </div>
   `;
 }
@@ -5768,7 +6160,7 @@ function renderVerdictItem(v) {
   const voteChips = [
     ...buyVotes.map(x => `<span class="vote-chip buy">✓ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
     ...sellVotes.map(x => `<span class="vote-chip sell">✗ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
-    ...tiltVotes.map(x => `<span class="vote-chip tilt">${x.weight >= 0 ? "+" : ""} ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
+    ...tiltVotes.map(x => `<span class="vote-chip tilt ${x.weight >= 0 ? 'pos' : 'neg'}">${x.weight >= 0 ? "↑" : "↓"} ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
     ...decayedVotes.map(x => `<span class="vote-chip decayed">⊘ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
   ].join("");
 
@@ -5874,7 +6266,7 @@ function renderTradePlan(plan) {
 
   if (plan.kind === "add" || plan.kind === "prime") {
     return `
-      <div class="trade-plan">
+      <div class="trade-plan" onclick="event.stopPropagation();">
         <div class="tp-row">
           <span class="tp-label">Entry</span>
           <span class="tp-text">${escAttr(plan.entry?.text || "—")}</span>
@@ -5905,7 +6297,7 @@ function renderTradePlan(plan) {
 
   if (plan.kind === "trim") {
     return `
-      <div class="trade-plan">
+      <div class="trade-plan" onclick="event.stopPropagation();">
         <div class="tp-row">
           <span class="tp-label">Exit</span>
           <span class="tp-text">${escAttr(plan.exit.text)}</span>
@@ -5920,7 +6312,7 @@ function renderTradePlan(plan) {
 
   if (plan.kind === "exit") {
     return `
-      <div class="trade-plan">
+      <div class="trade-plan" onclick="event.stopPropagation();">
         <div class="tp-row">
           <span class="tp-label">Exit</span>
           <span class="tp-text">${escAttr(plan.exit.text)}</span>
@@ -6010,7 +6402,7 @@ function renderTodaysOpportunitiesCard() {
       <div class="opps-list">
         ${top5.map(o => renderOpportunityItem(o)).join("")}
       </div>
-      <div class="opps-footer">Top 5 by conviction · Pre-Surge + Watchlist + News + ETF Momentum + Ideas + Macro</div>
+      <div class="opps-footer">Top 5 by conviction · Pre-Surge + Watchlist + News + ETF Momentum + Ideas + Macro + Timing</div>
     </div>
   `;
 }
@@ -6035,7 +6427,7 @@ function renderOpportunityItem(o) {
   const tiltVotes = o.votes.filter(x => x.dir === "tilt");
   const voteChips = [
     ...buyVotes.map(x => `<span class="vote-chip buy">✓ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
-    ...tiltVotes.map(x => `<span class="vote-chip tilt">${x.weight >= 0 ? "+" : ""} ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
+    ...tiltVotes.map(x => `<span class="vote-chip tilt ${x.weight >= 0 ? 'pos' : 'neg'}">${x.weight >= 0 ? "↑" : "↓"} ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
   ].join("");
 
   const onWatchlist = state.watchlist.some(w => w.symbol === o.symbol);
