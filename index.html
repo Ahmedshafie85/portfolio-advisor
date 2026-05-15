@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="day">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
@@ -39,25 +39,6 @@
   --display: 'Fraunces', Georgia, 'Times New Roman', serif;
   --sans:    'IBM Plex Sans', -apple-system, system-ui, sans-serif;
   --mono:    'IBM Plex Mono', 'SF Mono', Menlo, monospace;
-}
-[data-theme="night"] {
-  --bg:           #14110d;
-  --bg-elev:     #1d1914;
-  --bg-card:     #1a1612;
-  --ink:          #f0e9d6;
-  --ink-soft:    #c4bca6;
-  --ink-muted:   #8a8270;
-  --rule:        #2d2820;
-  --rule-soft:   #221d17;
-  --accent:      #d97a5a;
-  --accent-soft: #b85a3d;
-  --green:       #7ab37a;
-  --green-soft:  #5a8e5a;
-  --red:         #d97a5a;
-  --red-soft:    #b85a3d;
-  --gold:        #d4a85c;
-  --shadow:      0 1px 0 rgba(0,0,0,.3), 0 6px 18px -10px rgba(0,0,0,.5);
-  --shadow-deep: 0 24px 60px -24px rgba(0,0,0,.7);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body {
@@ -1001,7 +982,6 @@ body {
   .rst-sub { display: none; }
 }
 .raw-signals-section .scan-card,
-.raw-signals-section .watchout-card,
 .raw-signals-section .opp-card,
 .raw-signals-section .ai-card,
 .raw-signals-section .presurge-card {
@@ -1099,6 +1079,94 @@ body {
 .vote-chip.tilt { background: var(--bg-elev);         color: var(--ink-soft); border: 1px solid var(--rule-soft); }
 .vote-chip.tilt.pos { background: rgba(74,122,74,0.06); color: var(--green); border: 1px solid rgba(74,122,74,0.2); opacity: 0.85; }
 .vote-chip.tilt.neg { background: rgba(161,61,45,0.06); color: var(--red);   border: 1px solid rgba(161,61,45,0.2); opacity: 0.85; }
+
+/* ===== AI ANALYZE STALENESS PROMPT (#6) ===== */
+.ai-prompt {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 8px; padding: 7px 10px;
+  border-radius: 4px;
+  font-family: var(--mono); font-size: 11px;
+  border: 1px dashed var(--rule);
+}
+.ai-prompt.missing { background: rgba(176,141,60,0.06); border-color: rgba(176,141,60,0.3); color: var(--ink-soft); }
+.ai-prompt.stale   { background: var(--bg-elev); border-color: var(--rule-soft); color: var(--ink-muted); }
+.ai-prompt.running { background: rgba(74,122,122,0.06); border-color: rgba(74,122,122,0.3); color: var(--ink-soft); font-style: italic; }
+.ai-prompt-text { flex: 1; min-width: 0; }
+.ai-prompt-btn { flex-shrink: 0; }
+.ai-prompt-spinner { display: inline-block; animation: spin 1.2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== INVERSION CHECK (#12) ===== */
+.verdict-inversion-row {
+  display: flex; justify-content: flex-end;
+  margin-top: 8px; padding: 0 2px;
+}
+.verdict-inversion-btn {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em;
+  opacity: 0.85;
+}
+.verdict-inversion-btn:hover { opacity: 1; }
+.inversion-card {
+  margin-top: 10px; padding: 12px 14px;
+  background: rgba(176,141,60,0.05);
+  border: 1px solid rgba(176,141,60,0.25);
+  border-left: 3px solid var(--gold);
+  border-radius: 4px;
+}
+.inversion-card.loading,
+.inversion-card.error {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-muted); font-style: italic;
+  display: flex; align-items: center; gap: 8px;
+}
+.inversion-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.inversion-label {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em;
+  color: var(--gold); text-transform: uppercase;
+}
+.inversion-dismiss {
+  background: transparent; border: none; color: var(--ink-muted);
+  font-size: 16px; cursor: pointer; padding: 0 4px;
+}
+.inversion-headline {
+  font-family: var(--display); font-size: 14px; font-weight: 500;
+  color: var(--ink); margin-bottom: 6px;
+}
+.inversion-body {
+  font-size: 12.5px; color: var(--ink-soft); line-height: 1.5;
+  margin-bottom: 8px;
+}
+.inversion-risks {
+  list-style: none; padding: 0; margin: 0;
+}
+.inversion-risks li {
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted);
+  padding: 2px 0 2px 12px; position: relative;
+  line-height: 1.5;
+}
+.inversion-risks li::before {
+  content: "·"; position: absolute; left: 4px; color: var(--gold);
+}
+
+/* ===== IV RANK CHIP (#9) ===== */
+.iv-chip {
+  font-family: var(--mono); font-size: 10.5px;
+  padding: 3px 7px; border-radius: 3px;
+  letter-spacing: 0.02em;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.iv-chip.low    { background: rgba(74,122,74,0.10);  color: var(--green);    border: 1px solid rgba(74,122,74,0.25); }
+.iv-chip.medium { background: var(--bg-elev);        color: var(--ink-soft); border: 1px solid var(--rule); }
+.iv-chip.high   { background: rgba(176,141,60,0.10); color: var(--gold);     border: 1px solid rgba(176,141,60,0.3); }
+.iv-chip.extreme{ background: rgba(161,61,45,0.12);  color: var(--red);      border: 1px solid rgba(161,61,45,0.3); }
+.tp-row.tp-iv-advisory .tp-text {
+  color: var(--gold);
+  font-size: 11.5px;
+  font-style: italic;
+}
 .vote-chip.decayed {
   background: transparent;
   color: var(--ink-muted);
@@ -2667,58 +2735,6 @@ body {
   text-align: center; letter-spacing: 0.04em;
 }
 
-/* ===== DAILY WATCHOUTS ===== */
-.watchouts-card {  margin: 12px 20px;
-  background: var(--bg-card);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.watchouts-head {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 14px 18px 8px;
-}
-.watchouts-head h3 {
-  font-family: var(--display); font-size: 15px; font-weight: 500;
-}
-.watchouts-count {
-  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em;
-  background: var(--bg-elev); color: var(--ink-muted);
-  padding: 3px 9px; border-radius: 10px;
-  text-transform: uppercase;
-}
-.watchouts-list {}
-.watchout-item {
-  display: flex; gap: 12px;
-  padding: 11px 18px;
-  border-top: 1px solid var(--rule-soft);
-  border-left: 3px solid transparent;
-  cursor: pointer;
-  transition: background-color .12s;
-}
-.watchout-item:hover { background: var(--bg-elev); }
-.watchout-icon {
-  font-family: var(--display); font-size: 20px; line-height: 1;
-  width: 22px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700;
-}
-.watchout-body { flex: 1; min-width: 0; }
-.watchout-title {
-  font-family: var(--display); font-size: 14px; font-weight: 500;
-  margin-bottom: 2px;
-}
-.watchout-detail {
-  font-family: var(--mono); font-size: 11px; color: var(--ink-muted);
-  line-height: 1.4;
-}
-.watchouts-more {
-  padding: 9px 18px; text-align: center;
-  font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted);
-  background: var(--bg-elev); border-top: 1px solid var(--rule-soft);
-  letter-spacing: 0.04em; text-transform: uppercase;
-}
-
 /* ===== COLLAPSIBLE ANALYSIS ===== */
 .collapsible-card {
   background: var(--bg-card);
@@ -2876,12 +2892,6 @@ body {
       <div class="topbar-meta" id="topbarMeta">—</div>
     </div>
     <div class="topbar-icons">
-      <button class="icon-btn" id="themeBtn" title="Theme">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="4"/>
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
-        </svg>
-      </button>
       <button class="icon-btn" id="refreshBtn" title="Refresh">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.7 1 6.4 2.6L21 8"/>
@@ -3173,7 +3183,6 @@ const state = {
   selectedSymbol: null,
   selectedRange: "3M",
   chart: null,
-  theme: localStorage.getItem("theme") || "day",
   lastScanAt: null,
   // bot simulator: 7 strategies in parallel (tier-organized May 2026)
   bot: { bh: null, dca: null, valueavg: null, trend: null, dip: null, regime: null, portfolio: null },
@@ -3181,7 +3190,6 @@ const state = {
   botChartVisible: { bh: true, dca: true, valueavg: true, trend: true, dip: true, regime: true, portfolio: true },
   ohlcvCache: {}, // symbol -> { ohlcv, fetched_at }
   expandedAnalyses: {}, // key -> bool; "portfolio" or symbol
-  showWatchouts: localStorage.getItem("showWatchouts") === "1", // opt-in
   breakoutPromptDismissed: localStorage.getItem("breakoutPromptDismissed") === "1",
   // News (big-opportunity filter) — hydrate from localStorage so opportunities
   // survive iOS tab unloading and page reloads (within TTL window)
@@ -3206,6 +3214,18 @@ const state = {
   // (worker also caches 6h on its side).
   calendar: loadCalendarCache() || null, // { SYM: { earnings_date, ex_dividend_date, dividend_yield_pct } } | null
   calendarLoading: false,
+  // Per-symbol "AI Analyze currently running" map. Drives the spinner state
+  // on the inline "Run AI Analyze" buttons on verdict cards.
+  analyzingSymbols: {}, // { SYM: true } while a /analyze request is in flight
+  // Per-symbol inversion check results (the "stress-test this verdict" feature).
+  // Map of SYM -> { headline, counter_argument, key_risks, generated_at }.
+  // Ephemeral — not persisted; resets on reload. That's intentional, an
+  // inversion is a one-off sanity check, not an ongoing signal.
+  inversionResults: {}, // { SYM: { ...inversion response, loading: true|undefined } }
+  // Per-symbol IV rank fetched on demand from /iv-rank endpoint. Map of
+  // SYM -> { ivRank, atmIv, daysToExpiry, fetched_at } | null.
+  // 4-hour client cache to avoid hammering the worker on every render.
+  ivRank: loadIvRankCache() || {},
   // Raw signals section — collapsed by default so user sees decisions first, not noise.
   // localStorage-persisted so the toggle stays where you left it.
   rawSignalsExpanded: localStorage.getItem("rawSignalsExpanded") === "1",
@@ -3231,7 +3251,6 @@ const state = {
   etfLeaderboardTimeframe: "1y", // "3m" | "1y" | "3y"
   etfLeaderboardSort: "return",  // "return" | "drawdown" | "trend"
 };
-document.documentElement.setAttribute("data-theme", state.theme);
 
 // ============================================================================
 // UTILS
@@ -3663,6 +3682,23 @@ async function autoRefreshSignals() {
   } catch (e) {
     console.warn("auto calendar:", e.message || e);
     state.calendarLoading = false;
+  }
+
+  // IV Rank — options-derived volatility expectations per held + watch symbol.
+  // 4h client cache + 4h worker cache. Skipped on crypto/illiquid (worker
+  // returns null and we render no chip).
+  try {
+    if (!state.ivRank || Object.keys(state.ivRank).length === 0) {
+      const heldSyms = state.holdings.map(h => h.symbol);
+      const watchSyms = state.watchlist.map(w => w.symbol);
+      const allSyms = Array.from(new Set([...heldSyms, ...watchSyms]));
+      if (allSyms.length > 0) {
+        const iv = await fetchIvRankForUniverse(allSyms);
+        state.ivRank = iv || {};
+      }
+    }
+  } catch (e) {
+    console.warn("auto iv-rank:", e.message || e);
   }
 
   renderCurrentView();
@@ -4588,6 +4624,66 @@ function calendarFor(symbol) {
   return state.calendar?.[symbol] ?? null;
 }
 
+// ============================================================================
+// IV RANK ENGINE (Feature #9)
+// Fetches ATM straddle IV vs 252d HV distribution from worker /iv-rank endpoint.
+// Cached 4h client-side (worker also caches 4h server-side).
+//
+// Used in two ways:
+//   1. As a chip on each verdict card ("IV 82 · expensive options")
+//   2. As an input to the trade plan — high IV means consider selling premium
+//      instead of buying stock outright, OR wait for IV to fall after earnings.
+//
+// Null result (crypto, illiquid, international) → no chip, no plan effect.
+// ============================================================================
+const IV_RANK_CACHE_KEY = "ivRank_v1";
+const IV_RANK_TTL_HOURS = 4;
+
+function loadIvRankCache() {
+  try {
+    const raw = localStorage.getItem(IV_RANK_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    if (!c.fetchedAt) return null;
+    const ageH = (Date.now() - new Date(c.fetchedAt).getTime()) / 3600000;
+    if (ageH > IV_RANK_TTL_HOURS) return null;
+    return c.results || null;
+  } catch (e) { return null; }
+}
+function saveIvRankCache(results) {
+  try {
+    localStorage.setItem(IV_RANK_CACHE_KEY, JSON.stringify({
+      results, fetchedAt: new Date().toISOString(),
+    }));
+  } catch (e) {}
+}
+
+// Bulk fetch IV rank for all held + watchlist symbols
+async function fetchIvRankForUniverse(symbols) {
+  const cached = loadIvRankCache();
+  if (cached && Object.keys(cached).length > 0) return cached;
+  try {
+    const r = await fetch(`${WORKER_URL}/iv-rank`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbols }),
+    });
+    if (!r.ok) throw new Error(`iv-rank fetch ${r.status}`);
+    const j = await r.json();
+    const results = j.results || {};
+    saveIvRankCache(results);
+    return results;
+  } catch (e) {
+    console.warn("iv-rank fetch failed:", e.message || e);
+    return {};
+  }
+}
+
+// Helper: get IV rank for one symbol from cache (null if missing/illiquid)
+function ivRankFor(symbol) {
+  return state.ivRank?.[symbol] ?? null;
+}
+
 // ----------------------------------------------------------------------------
 // HARDCODED 2026 MACRO CALENDAR
 // ----------------------------------------------------------------------------
@@ -5391,6 +5487,26 @@ function aiStanceFor(symbol) {
   };
 }
 
+// Helper: AI Analyze status for verdict cards.
+// Returns one of: "fresh" | "stale" | "missing" | "running"
+// Used to drive the inline "Run AI Analyze" prompt on verdict cards.
+//
+// Thresholds tuned to match the decay schedule in aiStanceFor:
+//   - 0-7 days  → "fresh" (full or near-full weight)
+//   - 7-14 days → "stale" (weight tapering, refresh recommended)
+//   - >14 days OR missing → "missing"/null (zero weight, refresh required for AI vote)
+function aiAnalysisStatus(symbol) {
+  if (state.analyzingSymbols && state.analyzingSymbols[symbol]) return "running";
+  const a = state.analyses[symbol];
+  if (!a || !a.stance) return "missing";
+  const ts = a.generated_at;
+  if (!ts) return "missing";
+  const ageDays = (Date.now() - new Date(ts).getTime()) / 86400000;
+  if (ageDays >= 14) return "missing"; // effectively gone
+  if (ageDays >= 7) return "stale";
+  return "fresh";
+}
+
 // ----------------------------------------------------------------------------
 // HELD-SYMBOL VERDICT — what to do with what we own
 // Returns: { symbol, name, action, conviction, dollars, votes, blocker, prime }
@@ -5637,6 +5753,24 @@ function buildTradePlan(verdict, holding) {
     }
   }
 
+  // === IV ELEVATION CHECK ===
+  // High IV doesn't block entry like earnings does — it just changes HOW you
+  // enter. High IV near earnings or a known catalyst means options are pricing
+  // in a big move; the stock might be expensive *because* of that expectation.
+  // We surface this as an advisory note attached to the entry plan, not a hard
+  // override. Trader can still buy stock; advice is to consider sizing smaller
+  // or wait for IV to compress.
+  const ivData = ivRankFor(sym);
+  let ivAdvisory = null;
+  if (ivData && (ivData.iv_band === "high" || ivData.iv_band === "extreme")) {
+    const r = Math.round(ivData.iv_rank);
+    if (ivData.iv_band === "extreme") {
+      ivAdvisory = `⚠ IV ${r} (extreme) — options market expects a big move. Consider smaller size or waiting for IV to compress.`;
+    } else {
+      ivAdvisory = `IV ${r} (elevated) — options are pricing in volatility. Smaller-than-usual size suggested.`;
+    }
+  }
+
   // === ADD / PRIME verdicts → ENTRY PLAN + STOP + EXIT LADDER ===
   if (verdict.action === "ADD" || verdict.action === "PRIME") {
     const plan = {
@@ -5647,6 +5781,7 @@ function buildTradePlan(verdict, holding) {
       horizon: null,
       exitLadder: null,
       earningsImminent, // surfaced so UI can flag the wait
+      ivAdvisory,       // optional advisory shown on the trade plan
     };
 
     // EARNINGS GUARD: if binary event imminent, swap entry for "wait until after"
@@ -6157,11 +6292,27 @@ function renderVerdictItem(v) {
   const sellVotes = v.votes.filter(x => x.dir === "sell");
   const tiltVotes = v.votes.filter(x => x.dir === "tilt");
   const decayedVotes = v.votes.filter(x => x.dir === "decayed");
+
+  // IV rank chip (Feature #9) — informational, not a vote.
+  // Rendered alongside vote chips so it's immediately visible.
+  const iv = ivRankFor(v.symbol);
+  let ivChipHtml = "";
+  if (iv && iv.iv_rank != null) {
+    const r = Math.round(iv.iv_rank);
+    let label;
+    if (iv.iv_band === "extreme") label = `IV ${r} · extreme — options pricing big move`;
+    else if (iv.iv_band === "high") label = `IV ${r} · elevated — options expensive`;
+    else if (iv.iv_band === "low") label = `IV ${r} · low — options cheap`;
+    else label = `IV ${r}`;
+    ivChipHtml = `<span class="iv-chip ${escAttr(iv.iv_band)}" title="ATM straddle IV percentile vs 252d HV distribution">${escAttr(label)}</span>`;
+  }
+
   const voteChips = [
     ...buyVotes.map(x => `<span class="vote-chip buy">✓ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
     ...sellVotes.map(x => `<span class="vote-chip sell">✗ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
     ...tiltVotes.map(x => `<span class="vote-chip tilt ${x.weight >= 0 ? 'pos' : 'neg'}">${x.weight >= 0 ? "↑" : "↓"} ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
     ...decayedVotes.map(x => `<span class="vote-chip decayed">⊘ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
+    ivChipHtml,
   ].join("");
 
   // ROUND 3 REFINEMENT: gate trade plan generation.
@@ -6213,6 +6364,58 @@ function renderVerdictItem(v) {
   // For conflicted or low-conviction: no plan, no empty state — the conflict
   // note above already explains. Stay quiet.
 
+  // ---- AI Analyze prompt (Feature #6 — on-demand only, surface staleness) ----
+  // If AI is stale/missing/running, surface a clear button on this card so the
+  // user can spend tokens on the specific symbol they care about right now,
+  // rather than auto-refreshing all holdings (which costs ~$1/day).
+  const aiStatus = aiAnalysisStatus(v.symbol);
+  let aiPromptHtml = "";
+  if (aiStatus === "running") {
+    aiPromptHtml = `<div class="ai-prompt running"><span class="ai-prompt-spinner">⟳</span> AI Analyze running for ${escAttr(v.symbol)}…</div>`;
+  } else if (aiStatus === "missing") {
+    aiPromptHtml = `<div class="ai-prompt missing">
+      <span class="ai-prompt-text">No AI analysis on this symbol — verdict is running on technicals alone.</span>
+      <button class="btn btn-sm ai-prompt-btn" data-act="analyze-symbol" data-symbol="${escAttr(v.symbol)}">Run AI Analyze</button>
+    </div>`;
+  } else if (aiStatus === "stale") {
+    const ai = aiStanceFor(v.symbol);
+    const days = ai ? Math.round(ai.ageDays) : "?";
+    aiPromptHtml = `<div class="ai-prompt stale">
+      <span class="ai-prompt-text">AI analysis is ${days}d old — weight reduced. Refresh?</span>
+      <button class="btn btn-sm btn-secondary ai-prompt-btn" data-act="analyze-symbol" data-symbol="${escAttr(v.symbol)}">Refresh</button>
+    </div>`;
+  }
+  // "fresh" → no prompt, the chip itself tells the story
+
+  // ---- Inversion result rendering (Feature #12) ----
+  // If the user previously clicked "Stress-test", show the counter-case inline.
+  const inv = state.inversionResults?.[v.symbol];
+  let inversionHtml = "";
+  if (inv) {
+    if (inv.loading) {
+      inversionHtml = `<div class="inversion-card loading"><span class="ai-prompt-spinner">⟳</span> Stress-testing this verdict…</div>`;
+    } else if (inv.error) {
+      inversionHtml = `<div class="inversion-card error">Inversion check failed: ${escAttr(inv.error)} <button class="btn btn-sm" data-act="dismiss-inversion" data-symbol="${escAttr(v.symbol)}">Dismiss</button></div>`;
+    } else {
+      inversionHtml = `<div class="inversion-card">
+        <div class="inversion-head">
+          <span class="inversion-label">⚖ Counter-case</span>
+          <button class="btn btn-sm inversion-dismiss" data-act="dismiss-inversion" data-symbol="${escAttr(v.symbol)}" title="Dismiss">×</button>
+        </div>
+        ${inv.headline ? `<div class="inversion-headline">${escAttr(inv.headline)}</div>` : ""}
+        ${inv.counter_argument ? `<div class="inversion-body">${escAttr(inv.counter_argument)}</div>` : ""}
+        ${Array.isArray(inv.key_risks) && inv.key_risks.length > 0 ? `<ul class="inversion-risks">${inv.key_risks.slice(0, 3).map(r => `<li>${escAttr(r)}</li>`).join("")}</ul>` : ""}
+      </div>`;
+    }
+  }
+
+  // Inversion trigger button — only show for actionable verdicts (ADD/TRIM/EXIT),
+  // not PRIME/HOLD (nothing yet to stress-test).
+  const showInversionBtn = ["ADD", "TRIM", "EXIT"].includes(v.action) && !inv;
+  const inversionBtnHtml = showInversionBtn
+    ? `<button class="btn btn-sm btn-secondary verdict-inversion-btn" data-act="stress-test-verdict" data-symbol="${escAttr(v.symbol)}" data-action="${escAttr(v.action)}">⚖ Stress-test this</button>`
+    : "";
+
   return `
     <div class="verdict-item ${actionClass}${v.conflicted ? ' conflicted' : ''}" data-act="open-asset" data-symbol="${escAttr(v.symbol)}">
       <div class="verdict-item-head">
@@ -6228,9 +6431,12 @@ function renderVerdictItem(v) {
         </div>
       </div>
       <div class="verdict-votes">${voteChips}</div>
+      ${aiPromptHtml}
       ${v.blocker ? `<div class="verdict-blocker">⚡ Unlock with: ${escAttr(v.blocker)}</div>` : ""}
       ${v.conflicted ? `<div class="verdict-conflict-note">Buy &amp; sell signals both firing — review the chart yourself before acting on this verdict</div>` : ""}
       ${planHtml}
+      ${inversionBtnHtml ? `<div class="verdict-inversion-row">${inversionBtnHtml}</div>` : ""}
+      ${inversionHtml}
     </div>
   `;
 }
@@ -6271,6 +6477,11 @@ function renderTradePlan(plan) {
           <span class="tp-label">Entry</span>
           <span class="tp-text">${escAttr(plan.entry?.text || "—")}</span>
         </div>
+        ${plan.ivAdvisory ? `
+        <div class="tp-row tp-iv-advisory">
+          <span class="tp-label">IV</span>
+          <span class="tp-text">${escAttr(plan.ivAdvisory)}</span>
+        </div>` : ""}
         ${plan.stop ? `
         <div class="tp-row">
           <span class="tp-label">Stop</span>
@@ -6425,9 +6636,24 @@ function renderOpportunityItem(o) {
 
   const buyVotes = o.votes.filter(x => x.dir === "buy");
   const tiltVotes = o.votes.filter(x => x.dir === "tilt");
+
+  // IV rank chip (informational)
+  const iv = ivRankFor(o.symbol);
+  let ivChipHtml = "";
+  if (iv && iv.iv_rank != null) {
+    const r = Math.round(iv.iv_rank);
+    let label;
+    if (iv.iv_band === "extreme") label = `IV ${r} · extreme`;
+    else if (iv.iv_band === "high") label = `IV ${r} · elevated`;
+    else if (iv.iv_band === "low") label = `IV ${r} · low`;
+    else label = `IV ${r}`;
+    ivChipHtml = `<span class="iv-chip ${escAttr(iv.iv_band)}" title="ATM IV percentile vs 252d HV">${escAttr(label)}</span>`;
+  }
+
   const voteChips = [
     ...buyVotes.map(x => `<span class="vote-chip buy">✓ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
     ...tiltVotes.map(x => `<span class="vote-chip tilt ${x.weight >= 0 ? 'pos' : 'neg'}">${x.weight >= 0 ? "↑" : "↓"} ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
+    ivChipHtml,
   ].join("");
 
   const onWatchlist = state.watchlist.some(w => w.symbol === o.symbol);
@@ -7427,124 +7653,8 @@ function renderDailyScan() {
 }
 
 // ============================================================================
-// DAILY WATCHOUTS — observational warnings on currently-held positions only.
-// Mixes 3 signal sources:
-//   1) Drawdown alerts:    position down > X% from cost basis
-//   2) Take-profit candidates: position up > Y% from cost basis
-//   3) Watchlist crossover: a position you OWN has a watchlist condition firing
+// (Watchouts feature removed. Will be replaced by Risk Triage in Session B.)
 // ============================================================================
-const WATCHOUT_DRAWDOWN_PCT = -8;   // flag if position is down 8%+ from cost
-const WATCHOUT_TAKEPROFIT_PCT = 15; // flag if position is up 15%+ from cost
-
-function computeWatchouts() {
-  const items = [];
-
-  for (const h of state.holdings) {
-    if (h.asset_class === "cash") continue;
-    const hm = holdingMetrics(h);
-    if (hm.pnlPct == null) continue;
-    const cur = state.prices[h.symbol]?.current_price;
-    if (!cur) continue;
-
-    // Drawdown
-    if (hm.pnlPct <= WATCHOUT_DRAWDOWN_PCT) {
-      items.push({
-        kind: "drawdown",
-        symbol: h.symbol,
-        severity: hm.pnlPct <= -15 ? "high" : "medium",
-        title: `${h.symbol} ${hm.pnlPct.toFixed(1)}% from cost`,
-        detail: `Held ${h.quantity} @ ~$${fmtUSD(h.avg_cost ?? h.cost_basis ?? cur)}, now $${fmtUSD(cur)}`,
-        sortKey: hm.pnlPct, // most negative first
-      });
-    }
-    // Take-profit
-    else if (hm.pnlPct >= WATCHOUT_TAKEPROFIT_PCT) {
-      items.push({
-        kind: "takeprofit",
-        symbol: h.symbol,
-        severity: hm.pnlPct >= 30 ? "high" : "medium",
-        title: `${h.symbol} +${hm.pnlPct.toFixed(1)}% from cost`,
-        detail: `Position up — consider trimming. Cost ~$${fmtUSD(h.avg_cost ?? h.cost_basis ?? cur)}, now $${fmtUSD(cur)}`,
-        sortKey: -hm.pnlPct, // biggest gains first
-      });
-    }
-  }
-
-  // Watchlist crossover: positions you OWN that have a watchlist condition firing
-  const heldSymbols = new Set(state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol));
-  for (const t of (state.triggers || [])) {
-    if (!heldSymbols.has(t.symbol)) continue;
-    items.push({
-      kind: "crossover",
-      symbol: t.symbol,
-      severity: "medium",
-      title: `${t.symbol} · watchlist condition firing`,
-      detail: `${describeTriggerCondition(t)} — you own this position`,
-      sortKey: 1000, // group at top within their bucket
-      triggerId: t.id,
-    });
-  }
-
-  // Sort: drawdown first (most negative), then crossover, then take-profit
-  const order = { drawdown: 0, crossover: 1, takeprofit: 2 };
-  items.sort((a, b) => {
-    const oa = order[a.kind], ob = order[b.kind];
-    if (oa !== ob) return oa - ob;
-    return a.sortKey - b.sortKey;
-  });
-  return items;
-}
-
-function describeTriggerCondition(trigger) {
-  if (trigger.detail) return trigger.detail;
-  if (trigger.condition_type) {
-    return trigger.condition_type.replace(/_/g, " ");
-  }
-  return "condition fired";
-}
-
-function renderWatchouts() {
-  if (!state.showWatchouts) return "";
-  const items = computeWatchouts();
-  if (items.length === 0) return "";
-
-  const iconFor = (kind) => {
-    if (kind === "drawdown") return "↓";
-    if (kind === "takeprofit") return "↑";
-    return "⚑";
-  };
-  const colorFor = (kind, severity) => {
-    if (kind === "drawdown") return severity === "high" ? "var(--red)" : "#c25a3a";
-    if (kind === "takeprofit") return "var(--green)";
-    return "var(--gold)";
-  };
-
-  // Show top 4, collapsible if more
-  const visibleCount = 4;
-  const visible = items.slice(0, visibleCount);
-  const hiddenCount = items.length - visibleCount;
-
-  const itemsHtml = visible.map(it => `
-    <div class="watchout-item" data-act="open-asset" data-symbol="${escAttr(it.symbol)}" style="border-left-color:${colorFor(it.kind, it.severity)};">
-      <div class="watchout-icon" style="color:${colorFor(it.kind, it.severity)};">${iconFor(it.kind)}</div>
-      <div class="watchout-body">
-        <div class="watchout-title">${escAttr(it.title)}</div>
-        <div class="watchout-detail">${escAttr(it.detail)}</div>
-      </div>
-    </div>
-  `).join("");
-
-  return `
-    <div class="watchouts-card">
-      <div class="watchouts-head">
-        <h3>Today's Watchouts</h3>
-        <span class="watchouts-count">${items.length}</span>
-      </div>
-      <div class="watchouts-list">${itemsHtml}</div>
-      ${hiddenCount > 0 ? `<div class="watchouts-more">+${hiddenCount} more</div>` : ""}
-    </div>
-  `;
-}
 
 function renderPortfolio() {
   const m = portfolioMetrics();
@@ -7633,7 +7743,6 @@ function renderPortfolio() {
       ${state.rawSignalsExpanded ? `
         ${renderPreSurgeCard()}
         ${renderDailyScan()}
-        ${renderWatchouts()}
         ${oppCard}
         ${portAnalysisCard}
       ` : ""}
@@ -9166,6 +9275,97 @@ async function runAnalysis(symbol) {
   } catch (e) {
     toast("Analysis failed: " + (e.message || "unknown error").slice(0, 80), 3000, "error");
     if (btn) { btn.innerHTML = "Try Again"; btn.disabled = false; }
+  }
+}
+
+// ============================================================================
+// AI ANALYZE FROM VERDICT CARD (Feature #6 modified — on-demand only)
+// Wraps runAnalysis with the verdict-card UX: mark the symbol as "running"
+// so the prompt-button on the verdict card shows a spinner, then re-render
+// to surface the result. The actual /analyze call is reused, so the cost
+// matches a manual analyze from the asset page (~$0.02 per call).
+// ============================================================================
+async function analyzeSymbolFromCard(symbol) {
+  if (!symbol) return;
+  if (!state.analyzingSymbols) state.analyzingSymbols = {};
+  if (state.analyzingSymbols[symbol]) return; // already running
+  state.analyzingSymbols[symbol] = true;
+  renderCurrentView();
+  try {
+    await runAnalysis(symbol);
+  } catch (e) {
+    toast("AI Analyze failed: " + (e.message || "unknown error").slice(0, 80), 3000, "error");
+  } finally {
+    delete state.analyzingSymbols[symbol];
+    renderCurrentView();
+  }
+}
+
+// ============================================================================
+// INVERSION CHECK / "STRESS-TEST THIS VERDICT" (Feature #12)
+// Sends one targeted /analyze call with a system-prompt inversion modifier
+// asking Claude to argue the OPPOSITE of the current verdict's action.
+// The result is rendered inline beneath the verdict card.
+//
+// Cost: one /analyze call per stress-test (~$0.02). User-triggered only.
+// ============================================================================
+async function stressTestVerdict(symbol, currentAction) {
+  if (!symbol) return;
+  if (!state.inversionResults) state.inversionResults = {};
+  if (state.inversionResults[symbol]?.loading) return;
+  state.inversionResults[symbol] = { loading: true };
+  renderCurrentView();
+
+  try {
+    const holding = state.holdings.find(h => h.symbol === symbol);
+    const idToken = await auth.currentUser.getIdToken();
+    const m = portfolioMetrics();
+    const portfolioContext = {
+      total_value: m.totalValue,
+      total_cost: m.totalCost,
+      total_pnl_pct: m.totalPnLPct,
+      allocation_by_class: m.alloc,
+    };
+
+    // The worker's /analyze endpoint accepts an inversion_mode hint we pass
+    // through in the body. The worker patches the system prompt accordingly.
+    // (Worker change documented in worker_index.js — see handleAnalyze)
+    const r = await fetch(`${WORKER_URL}/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        uid: state.uid, symbol,
+        holding: holding ? { quantity: holding.quantity, avg_cost: holding.avg_cost_unit } : null,
+        portfolio_context: portfolioContext,
+        inversion_mode: {
+          enabled: true,
+          current_action: currentAction || "ADD",
+          instruction: `The app's current verdict on ${symbol} is ${currentAction}. Your job is to make the STRONGEST case against this verdict. If verdict is ADD/PRIME, argue why this is wrong and the position should not be entered or held. If verdict is TRIM/EXIT, argue why this is wrong and the position should be kept or added. Be specific, cite data, name the bear/bull pivot. Don't hedge.`,
+        },
+        idToken,
+      }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const j = await r.json();
+    if (!j.analysis) throw new Error("No inversion result returned");
+
+    state.inversionResults[symbol] = {
+      headline: j.analysis.headline || `Counter-case for ${symbol}`,
+      counter_argument: j.analysis.counter_argument || j.analysis.recommended_action || "",
+      key_risks: Array.isArray(j.analysis.key_risks) ? j.analysis.key_risks : [],
+      generated_at: new Date().toISOString(),
+    };
+    renderCurrentView();
+  } catch (e) {
+    state.inversionResults[symbol] = { error: (e.message || "request failed").slice(0, 100) };
+    renderCurrentView();
+  }
+}
+
+function dismissInversion(symbol) {
+  if (state.inversionResults && state.inversionResults[symbol]) {
+    delete state.inversionResults[symbol];
+    renderCurrentView();
   }
 }
 
@@ -10978,12 +11178,6 @@ function toggleAnalysis(key) {
   }
 }
 
-function toggleWatchouts() {
-  state.showWatchouts = !state.showWatchouts;
-  localStorage.setItem("showWatchouts", state.showWatchouts ? "1" : "0");
-  renderCurrentView();
-}
-
 function renderSettings() {
   $("#topbarTitle").textContent = "Settings";
   const view = $("#view");
@@ -11003,19 +11197,8 @@ function renderSettings() {
           : `<button class="btn btn-secondary btn-sm" data-act="sign-out">Sign Out</button>`}
       </div>
       <div class="setting-row">
-        <div><div class="lbl">Theme</div><div class="sub">Day or night</div></div>
-        <div class="toggle ${state.theme === 'night' ? 'on' : ''}" data-act="toggle-theme"></div>
-      </div>
-      <div class="setting-row">
         <div><div class="lbl">Change PIN</div><div class="sub">Reset your local lock</div></div>
         <button class="btn btn-secondary btn-sm" data-act="reset-pin">Change</button>
-      </div>
-      <div class="setting-row">
-        <div>
-          <div class="lbl">Daily Watchouts</div>
-          <div class="sub">Show drawdown/profit alerts on Portfolio. Off by default.</div>
-        </div>
-        <div class="toggle ${state.showWatchouts ? 'on' : ''}" data-act="toggle-watchouts"></div>
       </div>
     </div>
     <div class="settings-group">
@@ -11050,12 +11233,6 @@ function renderSettings() {
       </p>
     </div>
   `;
-}
-function toggleTheme() {
-  state.theme = state.theme === "day" ? "night" : "day";
-  document.documentElement.setAttribute("data-theme", state.theme);
-  localStorage.setItem("theme", state.theme);
-  renderCurrentView();
 }
 function resetPin() {
   if (confirm("Reset PIN? You'll need to create a new one.")) {
@@ -11752,6 +11929,9 @@ document.addEventListener("click", (e) => {
       case "back-markets":           backToMarkets(); break;
       case "set-range":              setRange(target.dataset.range, symbol); break;
       case "run-analysis":           runAnalysis(symbol); break;
+      case "analyze-symbol":         analyzeSymbolFromCard(symbol); break;
+      case "stress-test-verdict":    stressTestVerdict(symbol, target.dataset.action); break;
+      case "dismiss-inversion":      dismissInversion(symbol); break;
       case "run-portfolio-analysis": runPortfolioAnalysis(); break;
       case "rescan":                 rescan(); break;
       case "open-trigger":           openTrigger(symbol, target.dataset.triggerId); break;
@@ -11799,7 +11979,6 @@ document.addEventListener("click", (e) => {
         $("#aw_name").value = target.dataset.name || "";
         $("#aw_search_results").classList.add("hidden");
         break;
-      case "toggle-theme":           toggleTheme(); break;
       case "reset-pin":              resetPin(); break;
       case "manual-refresh":         manualRefresh(); break;
       case "export-data":            exportData(); break;
@@ -11817,7 +11996,6 @@ document.addEventListener("click", (e) => {
       case "delete-journal":         deleteJournalEntry(target.dataset.id); break;
       case "add-curated":            addCuratedToWatchlist(target.dataset.symbol, target.dataset.name); break;
       case "analyze-from-discover":  analyzeFromDiscover(target.dataset.symbol, target.dataset.name); break;
-      case "toggle-watchouts":       toggleWatchouts(); break;
       case "refresh-discover":       refreshDiscover(); break;
       case "clear-discover":         clearDiscoverDynamic(); break;
       case "filter-theme":           toggleDiscoverThemeFilter(target.dataset.theme); break;
@@ -11833,7 +12011,6 @@ document.addEventListener("click", (e) => {
   }
 });
 
-$("#themeBtn").addEventListener("click", toggleTheme);
 $("#refreshBtn").addEventListener("click", manualRefresh);
 $("#modalBg").addEventListener("click", closeModal);
 
