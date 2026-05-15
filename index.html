@@ -1148,6 +1148,52 @@ body {
   flex-direction: column;
   gap: 6px;
 }
+.trade-plan-wrap {
+  margin-top: 8px;
+}
+.trade-plan-wrap.expanded .trade-plan {
+  margin-top: 4px;
+}
+.tp-toggle {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  letter-spacing: 0.04em;
+  transition: background 120ms;
+}
+.tp-toggle:hover {
+  background: var(--bg-elev);
+}
+.tp-toggle-chevron {
+  color: var(--ink-muted);
+  font-size: 9px;
+  width: 10px;
+  display: inline-block;
+}
+.tp-summary {
+  color: var(--ink-muted);
+  font-style: italic;
+  margin-left: 4px;
+}
+.tp-empty {
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-style: italic;
+  border-left: 2px dashed var(--rule-soft);
+}
 .tp-row {
   display: flex;
   gap: 10px;
@@ -3156,6 +3202,11 @@ const state = {
   // Raw signals section — collapsed by default so user sees decisions first, not noise.
   // localStorage-persisted so the toggle stays where you left it.
   rawSignalsExpanded: localStorage.getItem("rawSignalsExpanded") === "1",
+  // Trade plans per verdict are collapsed by default. Tap to expand.
+  // Map of `tp:SYMBOL:ACTION` or `tp:opp:SYMBOL:ACTION` → boolean. Ephemeral —
+  // resets on reload, which is correct because the underlying verdict can change
+  // and a stale expanded state would be misleading.
+  tradePlanExpanded: {},
   // Inline chart preview state for Ideas/ETF sections (no analysis call)
   previewChart: { symbol: null, name: null, range: "3M", loading: false, data: null },
   // Per-day per-recommendation "done" or "dismissed" tracking (localStorage-persisted)
@@ -5721,10 +5772,54 @@ function renderVerdictItem(v) {
     ...decayedVotes.map(x => `<span class="vote-chip decayed">⊘ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
   ].join("");
 
-  // Build trade plan (Round 3)
+  // ROUND 3 REFINEMENT: gate trade plan generation.
+  // Only generate a plan when the verdict is CLEAR enough to act on:
+  //   - Not conflicted (mixed signals = no plan, review chart instead)
+  //   - Not PRIME (by definition not actionable yet)
+  //   - At least 2 directional signals voting (single-signal verdicts are weak)
+  //   - Action is ADD / TRIM / EXIT (real action) — HOLD never gets a plan
+  const directionalVoteCount = buyVotes.length + sellVotes.length;
+  const planEligible = (
+    !v.conflicted &&
+    v.action !== "PRIME" &&
+    v.action !== "HOLD" &&
+    directionalVoteCount >= 2
+  );
   const holding = state.holdings.find(h => h.symbol === v.symbol);
-  const plan = holding ? buildTradePlan(v, holding) : null;
-  const planHtml = plan ? renderTradePlan(plan) : "";
+  const plan = (planEligible && holding) ? buildTradePlan(v, holding) : null;
+
+  // Collapse plan by default — tap to expand. State persisted per-symbol+action
+  // so it survives renders but resets when the verdict changes.
+  const planToggleKey = `tp:${v.symbol}:${v.action}`;
+  const planExpanded = !!state.tradePlanExpanded?.[planToggleKey];
+  let planHtml = "";
+  if (plan) {
+    const summary = renderTradePlanSummary(plan);
+    if (planExpanded) {
+      planHtml = `
+        <div class="trade-plan-wrap expanded" onclick="event.stopPropagation();">
+          <button class="tp-toggle" data-act="toggle-trade-plan" data-key="${escAttr(planToggleKey)}">
+            <span class="tp-toggle-chevron">▾</span> Trade plan
+          </button>
+          ${renderTradePlan(plan)}
+        </div>
+      `;
+    } else {
+      planHtml = `
+        <div class="trade-plan-wrap collapsed" onclick="event.stopPropagation();">
+          <button class="tp-toggle" data-act="toggle-trade-plan" data-key="${escAttr(planToggleKey)}">
+            <span class="tp-toggle-chevron">▸</span> Trade plan
+            <span class="tp-summary">${escAttr(summary)}</span>
+          </button>
+        </div>
+      `;
+    }
+  } else if (v.action === "PRIME") {
+    // Helpful empty state for PRIME — explains why no plan
+    planHtml = `<div class="tp-empty">Plan will appear when this primes into ADD.</div>`;
+  }
+  // For conflicted or low-conviction: no plan, no empty state — the conflict
+  // note above already explains. Stay quiet.
 
   return `
     <div class="verdict-item ${actionClass}${v.conflicted ? ' conflicted' : ''}" data-act="open-asset" data-symbol="${escAttr(v.symbol)}">
@@ -5746,6 +5841,30 @@ function renderVerdictItem(v) {
       ${planHtml}
     </div>
   `;
+}
+
+// One-line summary shown in the collapsed plan toggle. Just the headline:
+// where to buy/sell and the stop %. Enough to know if it's worth expanding.
+function renderTradePlanSummary(plan) {
+  if (!plan) return "";
+  if (plan.kind === "add" || plan.kind === "prime") {
+    const entryStyle = plan.entry?.style;
+    let entryShort = "";
+    if (entryStyle === "now") entryShort = "Buy now";
+    else if (entryStyle === "stagger") entryShort = "Stagger 1/3 + 1/3 + 1/3";
+    else if (entryStyle === "split") entryShort = "Split entry 50/50";
+    else if (entryStyle === "limit") entryShort = "Limit order";
+    else entryShort = "Entry";
+    const stopShort = plan.stop ? ` · stop ${plan.stop.distancePct.toFixed(1)}%` : "";
+    return `${entryShort}${stopShort}`;
+  }
+  if (plan.kind === "trim") {
+    return "Trim 25% · re-add conditions";
+  }
+  if (plan.kind === "exit") {
+    return "Full close · 4-week cool-down";
+  }
+  return "Tap for plan";
 }
 
 // Render the trade plan section inside a verdict item (Round 3).
@@ -5921,27 +6040,39 @@ function renderOpportunityItem(o) {
 
   const onWatchlist = state.watchlist.some(w => w.symbol === o.symbol);
 
-  // Build opportunity entry plan (Round 3) — only for CONSIDER/STARTER, not WATCH
+  // Build opportunity entry plan (Round 3) — only for CONSIDER/STARTER, not WATCH.
+  // Collapsed by default — tap to expand. Same UX pattern as held verdicts.
   const oppPlan = buildOpportunityPlan(o);
-  const oppPlanHtml = oppPlan ? `
-    <div class="trade-plan" onclick="event.stopPropagation();">
-      ${oppPlan.entry ? `
-      <div class="tp-row">
-        <span class="tp-label">Entry</span>
-        <span class="tp-text">${escAttr(oppPlan.entry.text)}</span>
-      </div>` : ""}
-      ${oppPlan.stop ? `
-      <div class="tp-row">
-        <span class="tp-label">Stop</span>
-        <span class="tp-text">${escAttr(oppPlan.stop.text)}</span>
-      </div>` : ""}
-      ${oppPlan.horizon ? `
-      <div class="tp-row">
-        <span class="tp-label">Horizon</span>
-        <span class="tp-text">${escAttr(oppPlan.horizon)}</span>
-      </div>` : ""}
-    </div>
-  ` : "";
+  const oppPlanToggleKey = `tp:opp:${o.symbol}:${o.action}`;
+  const oppPlanExpanded = !!state.tradePlanExpanded?.[oppPlanToggleKey];
+  let oppPlanHtml = "";
+  if (oppPlan) {
+    const stopShort = oppPlan.stop ? ` · stop -${Math.abs(((state.prices[o.symbol]?.current_price - oppPlan.stop.price) / state.prices[o.symbol]?.current_price) * 100).toFixed(1)}%` : "";
+    const entryShort = "Entry plan" + stopShort;
+    if (oppPlanExpanded) {
+      oppPlanHtml = `
+        <div class="trade-plan-wrap expanded" onclick="event.stopPropagation();">
+          <button class="tp-toggle" data-act="toggle-trade-plan" data-key="${escAttr(oppPlanToggleKey)}">
+            <span class="tp-toggle-chevron">▾</span> Trade plan
+          </button>
+          <div class="trade-plan">
+            ${oppPlan.entry ? `<div class="tp-row"><span class="tp-label">Entry</span><span class="tp-text">${escAttr(oppPlan.entry.text)}</span></div>` : ""}
+            ${oppPlan.stop ? `<div class="tp-row"><span class="tp-label">Stop</span><span class="tp-text">${escAttr(oppPlan.stop.text)}</span></div>` : ""}
+            ${oppPlan.horizon ? `<div class="tp-row"><span class="tp-label">Horizon</span><span class="tp-text">${escAttr(oppPlan.horizon)}</span></div>` : ""}
+          </div>
+        </div>
+      `;
+    } else {
+      oppPlanHtml = `
+        <div class="trade-plan-wrap collapsed" onclick="event.stopPropagation();">
+          <button class="tp-toggle" data-act="toggle-trade-plan" data-key="${escAttr(oppPlanToggleKey)}">
+            <span class="tp-toggle-chevron">▸</span> Trade plan
+            <span class="tp-summary">${escAttr(entryShort)}</span>
+          </button>
+        </div>
+      `;
+    }
+  }
 
   return `
     <div class="opp-item ${actionClass}" data-act="open-asset" data-symbol="${escAttr(o.symbol)}">
@@ -11254,6 +11385,15 @@ document.addEventListener("click", (e) => {
         try { localStorage.setItem("rawSignalsExpanded", state.rawSignalsExpanded ? "1" : "0"); } catch (e) {}
         renderCurrentView();
         break;
+      case "toggle-trade-plan": {
+        const key = target.dataset.key;
+        if (key) {
+          if (!state.tradePlanExpanded) state.tradePlanExpanded = {};
+          state.tradePlanExpanded[key] = !state.tradePlanExpanded[key];
+          renderCurrentView();
+        }
+        break;
+      }
       case "mark-rec-done":          markRecommendationDone(target.dataset.recKey); break;
       case "dismiss-rec":            dismissRecommendation(target.dataset.recKey); break;
       case "preview-chart":          togglePreviewChart(target.dataset.symbol, target.dataset.name); break;
