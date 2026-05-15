@@ -1162,6 +1162,12 @@ body {
 .iv-chip.medium { background: var(--bg-elev);        color: var(--ink-soft); border: 1px solid var(--rule); }
 .iv-chip.high   { background: rgba(176,141,60,0.10); color: var(--gold);     border: 1px solid rgba(176,141,60,0.3); }
 .iv-chip.extreme{ background: rgba(161,61,45,0.12);  color: var(--red);      border: 1px solid rgba(161,61,45,0.3); }
+.iv-chip.hv-fallback {
+  /* Subtly dim the HV-fallback variant so it's visually clear this is realized vol,
+     not the better forward-looking IV. Still readable, still color-banded. */
+  opacity: 0.75;
+  border-style: dashed;
+}
 .tp-row.tp-iv-advisory .tp-text {
   color: var(--gold);
   font-size: 11.5px;
@@ -5764,10 +5770,15 @@ function buildTradePlan(verdict, holding) {
   let ivAdvisory = null;
   if (ivData && (ivData.iv_band === "high" || ivData.iv_band === "extreme")) {
     const r = Math.round(ivData.iv_rank);
+    const isHv = ivData.source === "hv";
     if (ivData.iv_band === "extreme") {
-      ivAdvisory = `⚠ IV ${r} (extreme) — options market expects a big move. Consider smaller size or waiting for IV to compress.`;
+      ivAdvisory = isHv
+        ? `⚠ HV ${r} (extreme) — stock has been highly volatile recently. Consider smaller size; expect wide swings.`
+        : `⚠ IV ${r} (extreme) — options market expects a big move. Consider smaller size or waiting for IV to compress.`;
     } else {
-      ivAdvisory = `IV ${r} (elevated) — options are pricing in volatility. Smaller-than-usual size suggested.`;
+      ivAdvisory = isHv
+        ? `HV ${r} (elevated) — stock more volatile than usual. Smaller-than-usual size suggested.`
+        : `IV ${r} (elevated) — options are pricing in volatility. Smaller-than-usual size suggested.`;
     }
   }
 
@@ -6293,18 +6304,25 @@ function renderVerdictItem(v) {
   const tiltVotes = v.votes.filter(x => x.dir === "tilt");
   const decayedVotes = v.votes.filter(x => x.dir === "decayed");
 
-  // IV rank chip (Feature #9) — informational, not a vote.
-  // Rendered alongside vote chips so it's immediately visible.
+  // IV/HV rank chip (Feature #9) — informational, not a vote.
+  // Renders as "IV 67" when source=iv (real implied vol from options chain) or
+  // "HV 67" when source=hv (realized vol fallback when options unavailable).
+  // Both use the same percentile scale so the band coloring is identical.
   const iv = ivRankFor(v.symbol);
   let ivChipHtml = "";
   if (iv && iv.iv_rank != null) {
     const r = Math.round(iv.iv_rank);
+    const isHv = iv.source === "hv";
+    const prefix = isHv ? "HV" : "IV";
     let label;
-    if (iv.iv_band === "extreme") label = `IV ${r} · extreme — options pricing big move`;
-    else if (iv.iv_band === "high") label = `IV ${r} · elevated — options expensive`;
-    else if (iv.iv_band === "low") label = `IV ${r} · low — options cheap`;
-    else label = `IV ${r}`;
-    ivChipHtml = `<span class="iv-chip ${escAttr(iv.iv_band)}" title="ATM straddle IV percentile vs 252d HV distribution">${escAttr(label)}</span>`;
+    if (iv.iv_band === "extreme") label = isHv ? `${prefix} ${r} · extreme — stock moving big` : `${prefix} ${r} · extreme — options pricing big move`;
+    else if (iv.iv_band === "high") label = isHv ? `${prefix} ${r} · elevated — recently volatile` : `${prefix} ${r} · elevated — options expensive`;
+    else if (iv.iv_band === "low") label = isHv ? `${prefix} ${r} · low — recently quiet` : `${prefix} ${r} · low — options cheap`;
+    else label = `${prefix} ${r}`;
+    const title = isHv
+      ? "HV (realized vol) percentile — options data unavailable, using 20d realized vol vs 252d distribution"
+      : "ATM straddle IV percentile vs 252d HV distribution";
+    ivChipHtml = `<span class="iv-chip ${escAttr(iv.iv_band)}${isHv ? ' hv-fallback' : ''}" title="${escAttr(title)}">${escAttr(label)}</span>`;
   }
 
   const voteChips = [
@@ -6479,7 +6497,7 @@ function renderTradePlan(plan) {
         </div>
         ${plan.ivAdvisory ? `
         <div class="tp-row tp-iv-advisory">
-          <span class="tp-label">IV</span>
+          <span class="tp-label">Vol</span>
           <span class="tp-text">${escAttr(plan.ivAdvisory)}</span>
         </div>` : ""}
         ${plan.stop ? `
@@ -6642,12 +6660,15 @@ function renderOpportunityItem(o) {
   let ivChipHtml = "";
   if (iv && iv.iv_rank != null) {
     const r = Math.round(iv.iv_rank);
+    const isHv = iv.source === "hv";
+    const prefix = isHv ? "HV" : "IV";
     let label;
-    if (iv.iv_band === "extreme") label = `IV ${r} · extreme`;
-    else if (iv.iv_band === "high") label = `IV ${r} · elevated`;
-    else if (iv.iv_band === "low") label = `IV ${r} · low`;
-    else label = `IV ${r}`;
-    ivChipHtml = `<span class="iv-chip ${escAttr(iv.iv_band)}" title="ATM IV percentile vs 252d HV">${escAttr(label)}</span>`;
+    if (iv.iv_band === "extreme") label = `${prefix} ${r} · extreme`;
+    else if (iv.iv_band === "high") label = `${prefix} ${r} · elevated`;
+    else if (iv.iv_band === "low") label = `${prefix} ${r} · low`;
+    else label = `${prefix} ${r}`;
+    const title = isHv ? "HV (realized vol) percentile — options unavailable" : "ATM IV percentile vs 252d HV";
+    ivChipHtml = `<span class="iv-chip ${escAttr(iv.iv_band)}${isHv ? ' hv-fallback' : ''}" title="${escAttr(title)}">${escAttr(label)}</span>`;
   }
 
   const voteChips = [
