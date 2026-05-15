@@ -5797,7 +5797,7 @@ function renderVerdictItem(v) {
     const summary = renderTradePlanSummary(plan);
     if (planExpanded) {
       planHtml = `
-        <div class="trade-plan-wrap expanded" onclick="event.stopPropagation();">
+        <div class="trade-plan-wrap expanded">
           <button class="tp-toggle" data-act="toggle-trade-plan" data-key="${escAttr(planToggleKey)}">
             <span class="tp-toggle-chevron">▾</span> Trade plan
           </button>
@@ -5806,7 +5806,7 @@ function renderVerdictItem(v) {
       `;
     } else {
       planHtml = `
-        <div class="trade-plan-wrap collapsed" onclick="event.stopPropagation();">
+        <div class="trade-plan-wrap collapsed">
           <button class="tp-toggle" data-act="toggle-trade-plan" data-key="${escAttr(planToggleKey)}">
             <span class="tp-toggle-chevron">▸</span> Trade plan
             <span class="tp-summary">${escAttr(summary)}</span>
@@ -5874,7 +5874,7 @@ function renderTradePlan(plan) {
 
   if (plan.kind === "add" || plan.kind === "prime") {
     return `
-      <div class="trade-plan" onclick="event.stopPropagation();">
+      <div class="trade-plan">
         <div class="tp-row">
           <span class="tp-label">Entry</span>
           <span class="tp-text">${escAttr(plan.entry?.text || "—")}</span>
@@ -5905,7 +5905,7 @@ function renderTradePlan(plan) {
 
   if (plan.kind === "trim") {
     return `
-      <div class="trade-plan" onclick="event.stopPropagation();">
+      <div class="trade-plan">
         <div class="tp-row">
           <span class="tp-label">Exit</span>
           <span class="tp-text">${escAttr(plan.exit.text)}</span>
@@ -5920,7 +5920,7 @@ function renderTradePlan(plan) {
 
   if (plan.kind === "exit") {
     return `
-      <div class="trade-plan" onclick="event.stopPropagation();">
+      <div class="trade-plan">
         <div class="tp-row">
           <span class="tp-label">Exit</span>
           <span class="tp-text">${escAttr(plan.exit.text)}</span>
@@ -6051,7 +6051,7 @@ function renderOpportunityItem(o) {
     const entryShort = "Entry plan" + stopShort;
     if (oppPlanExpanded) {
       oppPlanHtml = `
-        <div class="trade-plan-wrap expanded" onclick="event.stopPropagation();">
+        <div class="trade-plan-wrap expanded">
           <button class="tp-toggle" data-act="toggle-trade-plan" data-key="${escAttr(oppPlanToggleKey)}">
             <span class="tp-toggle-chevron">▾</span> Trade plan
           </button>
@@ -6064,7 +6064,7 @@ function renderOpportunityItem(o) {
       `;
     } else {
       oppPlanHtml = `
-        <div class="trade-plan-wrap collapsed" onclick="event.stopPropagation();">
+        <div class="trade-plan-wrap collapsed">
           <button class="tp-toggle" data-act="toggle-trade-plan" data-key="${escAttr(oppPlanToggleKey)}">
             <span class="tp-toggle-chevron">▸</span> Trade plan
             <span class="tp-summary">${escAttr(entryShort)}</span>
@@ -6092,7 +6092,7 @@ function renderOpportunityItem(o) {
       <div class="opp-votes">${voteChips}</div>
       ${oppPlanHtml}
       ${!onWatchlist && o.action !== "STARTER" ? `
-      <div class="opp-quick-actions" onclick="event.stopPropagation();">
+      <div class="opp-quick-actions">
         <button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(o.symbol)}" data-name="${escAttr(o.symbol)}">+ Watch</button>
       </div>` : ""}
     </div>
