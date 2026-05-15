@@ -1112,6 +1112,32 @@ body {
   color: var(--ink-soft);
   line-height: 1.4;
 }
+.verdict-conflict-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  background: rgba(176,141,60,0.15);
+  color: var(--gold);
+  border: 1px solid rgba(176,141,60,0.4);
+  border-radius: 3px;
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.verdict-conflict-note {
+  margin-top: 8px; padding: 6px 10px;
+  background: rgba(176,141,60,0.05);
+  border-left: 2px dashed var(--gold);
+  border-radius: 4px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+  font-style: italic;
+}
+.verdict-item.conflicted {
+  border-left-width: 3px;
+  border-left-color: var(--gold);
+}
 .verdict-holds {
   padding: 10px 18px;
   border-top: 1px solid var(--rule-soft);
@@ -3481,6 +3507,57 @@ async function loadInitialData() {
   renderCurrentView();
   // Background scan after first render
   setTimeout(() => runScan().catch(() => {}), 1500);
+
+  // ROUND 1+1.5 AUTO-REFRESH:
+  // The verdict math depends on 5 signal sources — Daily Scan (always runs),
+  // AI Analyses (per-symbol manual), Macro, Pre-Surge, News, ETF momentum.
+  // The latter three previously only ran when the user pressed buttons, which
+  // meant the verdict was usually computed with 2-of-5 signals missing.
+  // Auto-run each one in the background after first render. Each fetcher has
+  // its own cache (Macro 6h, Pre-Surge 12h, News ~6h, ETF leaderboard ~24h)
+  // so this is cheap on repeat opens.
+  setTimeout(() => { autoRefreshSignals().catch(e => console.warn("auto-refresh:", e)); }, 2000);
+}
+
+// Background-fetch every signal the verdict depends on. Each individual
+// fetcher decides whether to use cache or hit network; we just kick them off.
+async function autoRefreshSignals() {
+  // Macro — fetchMacroRegime already returns cached if <6h old
+  try {
+    const cached = loadMacroCache();
+    if (!cached) {
+      const m = await fetchMacroRegime();
+      state.macro = m;
+      renderCurrentView();
+    } else {
+      state.macro = cached;
+    }
+  } catch (e) { console.warn("auto macro:", e.message || e); }
+
+  // Pre-Surge — only run if no cached scan from last 12h
+  try {
+    const lastRanAt = state.preSurgeRanAt ? new Date(state.preSurgeRanAt).getTime() : 0;
+    const ageH = (Date.now() - lastRanAt) / 3600000;
+    if (!state.preSurge || ageH > 12) {
+      await runPreSurge(); // already renders on completion
+    }
+  } catch (e) { console.warn("auto pre-surge:", e.message || e); }
+
+  // News — refreshNews uses its own freshness logic; only call if no cache
+  try {
+    if (!state.newsItems || !state.newsFetchedAt) {
+      await refreshNews();
+    }
+  } catch (e) { console.warn("auto news:", e.message || e); }
+
+  // ETF Leaderboard — used as opportunity candidates now
+  try {
+    if (!state.etfLeaderboard) {
+      await fetchEtfLeaderboard(false); // false = use cache if fresh
+    }
+  } catch (e) { console.warn("auto etf:", e.message || e); }
+
+  renderCurrentView();
 }
 
 async function loadHoldingsFromFirestore() {
@@ -4941,6 +5018,21 @@ function computeHeldVerdict(holding, cachedScanActions) {
     votes.push({ signal: "Macro", dir: "tilt", weight: -0.5, note: "regime headwind" });
   }
 
+  // --- NEWS catalyst (held names too — earnings beat, fraud, downgrade, etc.) ---
+  // Previously only fed Today's Opportunities; now also votes here so a major
+  // news catalyst on something you own can flip the verdict.
+  if (state.newsItems) {
+    const newsItem = state.newsItems.find(n => n.symbol === sym);
+    if (newsItem) {
+      const w = newsItem.urgency === "high" ? 2 : 1;
+      if (newsItem.direction === "long") {
+        votes.push({ signal: "News", dir: "buy", weight: w, note: newsItem.urgency === "high" ? "high-urgency catalyst" : "positive catalyst" });
+      } else if (newsItem.direction === "short" || newsItem.direction === "negative") {
+        votes.push({ signal: "News", dir: "sell", weight: w, note: newsItem.urgency === "high" ? "high-urgency risk" : "negative catalyst" });
+      }
+    }
+  }
+
   // --- Tally ---
   let net = 0;
   for (const v of votes) {
@@ -4948,6 +5040,14 @@ function computeHeldVerdict(holding, cachedScanActions) {
     if (v.dir === "sell") net -= v.weight;
     if (v.dir === "tilt") net += v.weight; // tilt weights already signed
   }
+
+  // --- CONFLICT DETECTION ---
+  // When buy-side and sell-side both have real weight (≥1 each), the verdict
+  // is a contested call, not a clean signal. Flag it so the user knows the
+  // math is averaging across a real disagreement, not a unanimous read.
+  const buyWeight  = votes.filter(v => v.dir === "buy").reduce((s, v) => s + v.weight, 0);
+  const sellWeight = votes.filter(v => v.dir === "sell").reduce((s, v) => s + v.weight, 0);
+  const conflicted = buyWeight >= 1 && sellWeight >= 1;
 
   // --- Classify ---
   let action, dollars = null, prime = false;
@@ -4987,7 +5087,7 @@ function computeHeldVerdict(holding, cachedScanActions) {
     symbol: sym,
     name: holding.name,
     asset_class: holding.asset_class,
-    action, dollars, votes, net, conviction, blocker, prime,
+    action, dollars, votes, net, conviction, blocker, prime, conflicted,
     scanAction, // for reference
   };
 }
@@ -5036,10 +5136,31 @@ function computeOpportunityVerdict(symbol, assetClassGuess) {
     }
   }
 
+  // --- ETF MOMENTUM (from leaderboard) ---
+  // ETFs in the leaderboard with strong return + positive 200ma trend + bounded drawdown
+  // are treated as opportunity candidates. Weight reflects strength: top-tier = 2, mid = 1.
+  if (state.etfLeaderboard) {
+    const etf = state.etfLeaderboard.find(e => e.symbol === symbol);
+    if (etf && !etf.error && etf.return_pct != null) {
+      // Strong: top-quartile return AND above 200ma AND drawdown bounded
+      const aboveTrend = etf.trend_200ma === true || etf.trend_200ma === "above";
+      const ddOK = etf.max_drawdown_pct == null || etf.max_drawdown_pct > -25; // not crashing
+      if (etf.return_pct >= 20 && aboveTrend && ddOK) {
+        votes.push({ signal: "ETF Momentum", dir: "buy", weight: 2, note: `+${etf.return_pct.toFixed(0)}% · above 200ma` });
+      } else if (etf.return_pct >= 10 && aboveTrend) {
+        votes.push({ signal: "ETF Momentum", dir: "buy", weight: 1, note: `+${etf.return_pct.toFixed(0)}% · trending` });
+      }
+    }
+  }
+
   // --- DISCOVER IDEAS (curated/dynamic) ---
+  // Reduced from weight 1 → 0.5 in Round 1: a curated-list mention alone shouldn't
+  // be enough to flag something as a WATCH opportunity. Now needs to combine
+  // with another signal (Pre-Surge near-threshold, watchlist firing, news,
+  // ETF momentum, or macro tailwind) to clear the threshold.
   const ideaSrc = findInDiscoverIdeas(symbol);
   if (ideaSrc) {
-    votes.push({ signal: "Idea", dir: "buy", weight: 1, note: ideaSrc.source });
+    votes.push({ signal: "Idea", dir: "buy", weight: 0.5, note: ideaSrc.source });
   }
 
   // --- MACRO tilt ---
@@ -5059,15 +5180,18 @@ function computeOpportunityVerdict(symbol, assetClassGuess) {
   }
 
   // --- Classify ---
+  // Raised thresholds in Round 1 to reduce noise. Previously net ≥ 0.5 cleared
+  // WATCH, which meant a single Motley-Fool mention was enough to flag a stock.
+  // Now WATCH requires two weak signals or one medium signal.
   let action, dollars = null;
   const portfolioValue = computeTotalPortfolioValue();
   if (net >= 4) {
     action = "STARTER";
     dollars = portfolioValue * 0.015; // 1.5% starter
-  } else if (net >= 2) {
+  } else if (net >= 2.5) {
     action = "CONSIDER";
     dollars = portfolioValue * 0.005; // 0.5% nibble
-  } else if (net >= 0.5) {
+  } else if (net >= 1) {
     action = "WATCH";
   } else {
     action = null; // not shown
@@ -5090,7 +5214,8 @@ function findInDiscoverIdeas(symbol) {
 }
 
 // Returns ranked list of all candidate opportunity symbols (not currently held)
-// from: Pre-Surge flags, Pre-Surge near-threshold, watchlist (non-held), news, curated.
+// from: Pre-Surge flags, Pre-Surge near-threshold, watchlist (non-held), news,
+// curated, and ETF leaderboard momentum (Round 1.5 addition).
 function getOpportunityUniverse() {
   const held = new Set(state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol));
   const candidates = new Set();
@@ -5113,6 +5238,13 @@ function getOpportunityUniverse() {
   // Curated ideas
   if (typeof CURATED_PICKS !== "undefined") {
     for (const p of CURATED_PICKS) candidates.add(p.symbol);
+  }
+  // ETF Leaderboard — Round 1.5: ETFs with strong momentum become candidates.
+  // The opportunity scorer will filter further by trend/drawdown/return strength.
+  for (const e of (state.etfLeaderboard || [])) {
+    if (!e.error && e.return_pct != null && e.return_pct >= 10) {
+      candidates.add(e.symbol);
+    }
   }
 
   // Filter out anything currently held
@@ -5186,7 +5318,7 @@ function renderTodaysVerdictCard() {
       </div>
       ${body}
       ${holdsLine}
-      <div class="verdict-footer">Synthesizes Daily Scan + AI Analysis + Pre-Surge + Macro into one weighted verdict per held symbol</div>
+      <div class="verdict-footer">Synthesizes Daily Scan + AI Analysis + Pre-Surge + Macro + News into one weighted verdict per held symbol</div>
     </div>
   `;
 }
@@ -5219,11 +5351,12 @@ function renderVerdictItem(v) {
   ].join("");
 
   return `
-    <div class="verdict-item ${actionClass}" data-act="open-asset" data-symbol="${escAttr(v.symbol)}">
+    <div class="verdict-item ${actionClass}${v.conflicted ? ' conflicted' : ''}" data-act="open-asset" data-symbol="${escAttr(v.symbol)}">
       <div class="verdict-item-head">
         <div class="vih-left">
           <span class="verdict-action-badge ${actionClass}">${actionLabel}</span>
           <span class="verdict-sym">${escAttr(v.symbol)}</span>
+          ${v.conflicted ? `<span class="verdict-conflict-badge" title="Buy and sell signals both present — math is averaging across real disagreement">⚠ Mixed signals</span>` : ""}
           ${dollarLine ? `<span class="verdict-dollars">· ${escAttr(dollarLine)}</span>` : ""}
         </div>
         <div class="vih-right">
@@ -5233,6 +5366,7 @@ function renderVerdictItem(v) {
       </div>
       <div class="verdict-votes">${voteChips}</div>
       ${v.blocker ? `<div class="verdict-blocker">⚡ Unlock with: ${escAttr(v.blocker)}</div>` : ""}
+      ${v.conflicted ? `<div class="verdict-conflict-note">Buy &amp; sell signals both firing — review the chart yourself before acting on this verdict</div>` : ""}
     </div>
   `;
 }
@@ -5311,7 +5445,7 @@ function renderTodaysOpportunitiesCard() {
       <div class="opps-list">
         ${top5.map(o => renderOpportunityItem(o)).join("")}
       </div>
-      <div class="opps-footer">Top 5 by conviction · Pre-Surge + Watchlist + News + Ideas + Macro</div>
+      <div class="opps-footer">Top 5 by conviction · Pre-Surge + Watchlist + News + ETF Momentum + Ideas + Macro</div>
     </div>
   `;
 }
@@ -7265,7 +7399,9 @@ async function addCuratedToWatchlist(symbol, name) {
     });
     await loadWatchlist();
     toast(`${symbol} added to watchlist`);
-    renderWatchlist();
+    // Re-render whichever view we're on so the button state updates immediately
+    // (was renderWatchlist() — broke when called from Today's Opportunities on Portfolio tab)
+    renderCurrentView();
   } catch (e) {
     toast(`Failed to add: ${e.message || e}`, 3000, "error");
   }
@@ -9936,8 +10072,14 @@ function resetPin() {
   }
 }
 async function manualRefresh() {
-  toast("Refreshing prices…");
+  toast("Refreshing prices & signals…");
   await refreshAllPrices();
+  renderCurrentView();
+  // Refresh all verdict-input signals too. Each respects its own cache TTL,
+  // so this is cheap if called within the cache window.
+  await autoRefreshSignals().catch(e => console.warn("manual auto-refresh:", e));
+  // Re-run watchlist scan to update firing conditions
+  await runScan().catch(() => {});
   toast("Refreshed");
   renderCurrentView();
 }
