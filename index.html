@@ -957,6 +957,241 @@ body {
 .journal-del:hover { color: var(--red); border-color: var(--red); }
 .journal-del:active { transform: scale(0.92); }
 
+/* ===== TODAY'S VERDICT CARD ===== */
+.verdict-card {
+  margin: 12px 20px 0;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+}
+.verdict-card::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: var(--ink);
+}
+.verdict-head {
+  display: flex; justify-content: space-between; align-items: start;
+  gap: 12px; padding: 14px 18px 8px;
+}
+.verdict-head h3 {
+  font-family: var(--display); font-size: 16px; font-weight: 500;
+  letter-spacing: -0.005em; margin-bottom: 2px;
+}
+.verdict-sub {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-muted); letter-spacing: 0.04em;
+}
+.verdict-list {
+  display: flex; flex-direction: column;
+  border-top: 1px solid var(--rule-soft);
+}
+.verdict-item {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--rule-soft);
+  cursor: pointer;
+  transition: background .12s;
+}
+.verdict-item:last-child { border-bottom: none; }
+.verdict-item:hover { background: var(--bg-elev); }
+.verdict-item.add::before    { /* uses ::before only on card */ }
+.verdict-item-head {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 10px; margin-bottom: 8px;
+}
+.vih-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.vih-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.verdict-action-badge {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  padding: 4px 8px; border-radius: 4px;
+  letter-spacing: 0.08em;
+}
+.verdict-action-badge.add   { background: var(--green); color: var(--bg); }
+.verdict-action-badge.trim  { background: var(--gold); color: var(--bg); }
+.verdict-action-badge.exit  { background: var(--red); color: var(--bg); }
+.verdict-action-badge.prime { background: var(--bg-elev); color: var(--gold); border: 1px solid var(--gold); }
+.verdict-action-badge.hold  { background: var(--bg-elev); color: var(--ink-muted); border: 1px solid var(--rule); }
+.verdict-sym {
+  font-family: var(--display); font-size: 15px; font-weight: 600;
+}
+.verdict-dollars {
+  font-family: var(--mono); font-size: 12px;
+  color: var(--ink-soft);
+}
+.verdict-net {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-muted);
+}
+.verdict-del {
+  background: transparent; border: none;
+  color: var(--ink-muted); cursor: pointer;
+  width: 26px; height: 26px; border-radius: 50%;
+  font-size: 18px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.verdict-del:hover, .verdict-del:active {
+  background: rgba(161,61,45,0.12); color: var(--red);
+}
+.verdict-votes {
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.vote-chip {
+  font-family: var(--mono); font-size: 10.5px;
+  padding: 3px 7px; border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+.vote-chip.buy  { background: rgba(74,122,74,0.12);  color: var(--green); border: 1px solid rgba(74,122,74,0.3); }
+.vote-chip.sell { background: rgba(161,61,45,0.12);  color: var(--red);   border: 1px solid rgba(161,61,45,0.3); }
+.vote-chip.tilt { background: var(--bg-elev);         color: var(--ink-soft); border: 1px solid var(--rule-soft); }
+.verdict-blocker {
+  margin-top: 8px; padding: 6px 10px;
+  background: rgba(176,141,60,0.08);
+  border-left: 2px solid var(--gold);
+  border-radius: 4px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+.verdict-holds {
+  padding: 10px 18px;
+  border-top: 1px solid var(--rule-soft);
+  background: var(--bg-elev);
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-muted);
+  line-height: 1.4;
+}
+.verdict-empty {
+  padding: 14px 18px;
+  border-top: 1px solid var(--rule-soft);
+}
+.verdict-empty-headline {
+  font-family: var(--display); font-size: 14px;
+  margin-bottom: 6px;
+  color: var(--ink);
+}
+.verdict-empty-closest {
+  font-family: var(--mono); font-size: 12px;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+.verdict-empty-hint {
+  font-size: 12px; color: var(--ink-muted);
+  font-style: italic;
+}
+.verdict-footer {
+  padding: 8px 18px;
+  border-top: 1px solid var(--rule-soft);
+  font-family: var(--mono); font-size: 9.5px;
+  color: var(--ink-muted); text-align: center;
+  letter-spacing: 0.04em;
+}
+
+/* ===== TODAY'S OPPORTUNITIES CARD ===== */
+.opps-card {
+  margin: 12px 20px 0;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+}
+.opps-card::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: var(--green);
+}
+.opps-card.empty::before { background: var(--ink-muted); }
+.opps-head {
+  display: flex; justify-content: space-between; align-items: start;
+  gap: 12px; padding: 14px 18px 8px;
+}
+.opps-head h3 {
+  font-family: var(--display); font-size: 16px; font-weight: 500;
+  letter-spacing: -0.005em; margin-bottom: 2px;
+}
+.opps-sub {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-muted); letter-spacing: 0.04em;
+}
+.opps-empty-body {
+  padding: 8px 20px 14px;
+  font-size: 12.5px; color: var(--ink-soft);
+  line-height: 1.55;
+}
+.opps-list {
+  display: flex; flex-direction: column;
+  border-top: 1px solid var(--rule-soft);
+}
+.opp-item {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--rule-soft);
+  cursor: pointer;
+  transition: background .12s;
+}
+.opp-item:last-child { border-bottom: none; }
+.opp-item:hover { background: var(--bg-elev); }
+.opp-item-head {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 10px; margin-bottom: 6px;
+}
+.oih-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.oih-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.opp-action-badge {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  padding: 4px 8px; border-radius: 4px;
+  letter-spacing: 0.08em;
+}
+.opp-action-badge.starter   { background: var(--green); color: var(--bg); }
+.opp-action-badge.consider  { background: var(--gold); color: var(--bg); }
+.opp-action-badge.watch     { background: var(--bg-elev); color: var(--ink-soft); border: 1px solid var(--rule); }
+.opp-sym {
+  font-family: var(--display); font-size: 15px; font-weight: 600;
+}
+.opp-price {
+  font-family: var(--mono); font-size: 11.5px;
+  color: var(--ink-soft);
+}
+.opp-tag.onlist {
+  font-family: var(--mono); font-size: 9.5px;
+  padding: 2px 6px; border-radius: 3px;
+  background: rgba(74,122,74,0.12); color: var(--green);
+  border: 1px solid var(--green);
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.opp-net {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-muted);
+}
+.opp-del {
+  background: transparent; border: none;
+  color: var(--ink-muted); cursor: pointer;
+  width: 26px; height: 26px; border-radius: 50%;
+  font-size: 18px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.opp-del:hover, .opp-del:active {
+  background: rgba(161,61,45,0.12); color: var(--red);
+}
+.opp-action-line {
+  font-family: var(--mono); font-size: 12px;
+  color: var(--ink-soft); margin-bottom: 6px;
+}
+.opp-votes {
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.opp-quick-actions {
+  margin-top: 8px;
+  display: flex; gap: 6px;
+}
+.opps-footer {
+  padding: 8px 18px;
+  border-top: 1px solid var(--rule-soft);
+  font-family: var(--mono); font-size: 9.5px;
+  color: var(--ink-muted); text-align: center;
+  letter-spacing: 0.04em;
+}
+
 /* ===== MACRO REGIME CARD ===== */
 .macro-card {
   margin: 12px 20px 0;
@@ -4522,6 +4757,527 @@ function getHeldSymbolsMissingBreakouts() {
   return result;
 }
 
+// ============================================================================
+// UNIFIED DECISION ENGINE
+// Replaces the cognitive overhead of reading 6 separate cards. Synthesizes
+// every signal into one weighted vote per symbol → one action verdict.
+//
+// Two outputs:
+//   • Today's Verdict — for symbols ALREADY HELD (add / trim / hold / exit)
+//   • Today's Opportunities — for symbols NOT held (open / watch / skip)
+//
+// Design principles:
+//   - Honest about uncertainty: missing signals lower conviction, never inflate it
+//   - Show the reasoning: every verdict lists which signals voted which way
+//   - Diagnostic on empty: "why nothing today" beats silent empty card
+//   - PRIME tier: "one signal away from action" preserves the pipeline view
+// ============================================================================
+
+// Helper: given a symbol, return the macro verdict ("favored" | "headwind" | null)
+function macroVerdictFor(symbol, assetClass) {
+  if (!state.macro || !state.macro.classified) return null;
+  return symbolMacroVerdict(symbol, assetClass, state.macro.classified.regime);
+}
+
+// Helper: is symbol currently flagged by Pre-Surge?
+function preSurgeFlagFor(symbol) {
+  if (!state.preSurge) return null;
+  return state.preSurge.find(f => f.symbol === symbol) || null;
+}
+
+// Helper: top-N pre-surge candidates (including below-threshold for opportunities scoring)
+function preSurgeScoreFor(symbol) {
+  if (!state.preSurgeAllScored) return null;
+  return state.preSurgeAllScored.find(f => f.symbol === symbol) || null;
+}
+
+// Helper: short-interest DTC for symbol (or null)
+function dtcFor(symbol) {
+  return state.shortInterest?.[symbol]?.dtc ?? null;
+}
+
+// Helper: latest AI stance for symbol
+function aiStanceFor(symbol) {
+  const a = state.analyses[symbol];
+  if (!a || !a.stance) return null;
+  return { stance: String(a.stance).toUpperCase(), conviction: a.conviction, confidence: a.confidence };
+}
+
+// ----------------------------------------------------------------------------
+// HELD-SYMBOL VERDICT — what to do with what we own
+// Returns: { symbol, name, action, conviction, dollars, votes, blocker, prime }
+// ----------------------------------------------------------------------------
+function computeHeldVerdict(holding, cachedScanActions) {
+  const sym = holding.symbol;
+  const votes = []; // { signal, dir: 'buy'|'sell'|'tilt', weight, note }
+
+  // --- DAILY SCAN signal (use cache if provided to avoid O(N²)) ---
+  const scanActions = cachedScanActions || computeDailyScan();
+  const scanAction = scanActions.find(a => a.symbol === sym);
+  if (scanAction) {
+    if (scanAction.kind === "add") {
+      const w = scanAction.recency === "stronger" ? 2 : 1;
+      votes.push({ signal: "Daily Scan", dir: "buy", weight: w, note: scanAction.recency === "stronger" ? "add · STRONGER" : "add" });
+    } else if (scanAction.kind === "trim") {
+      votes.push({ signal: "Daily Scan", dir: "sell", weight: 1, note: "trim" });
+    }
+  }
+
+  // --- AI ANALYSIS stance ---
+  const ai = aiStanceFor(sym);
+  if (ai) {
+    if (["ACCUMULATE"].includes(ai.stance)) {
+      votes.push({ signal: "AI Analyze", dir: "buy", weight: 2, note: ai.stance });
+    } else if (["HOLD"].includes(ai.stance)) {
+      votes.push({ signal: "AI Analyze", dir: "buy", weight: 0.5, note: "HOLD (mild)" }); // HOLD is mildly supportive vs nothing
+    } else if (["TRIM"].includes(ai.stance)) {
+      votes.push({ signal: "AI Analyze", dir: "sell", weight: 2, note: ai.stance });
+    } else if (["EXIT", "AVOID"].includes(ai.stance)) {
+      votes.push({ signal: "AI Analyze", dir: "sell", weight: 3, note: ai.stance });
+    }
+  }
+
+  // --- PRE-SURGE flag ---
+  const ps = preSurgeFlagFor(sym);
+  if (ps) {
+    const dtc = dtcFor(sym);
+    if (dtc != null && dtc >= 10) {
+      votes.push({ signal: "Pre-Surge", dir: "buy", weight: 3, note: `composite ${ps.composite} · DTC ${dtc.toFixed(1)}` });
+    } else {
+      votes.push({ signal: "Pre-Surge", dir: "buy", weight: 2, note: `composite ${ps.composite}` });
+    }
+  }
+
+  // --- MACRO tilt ---
+  const macroV = macroVerdictFor(sym, holding.asset_class);
+  if (macroV === "favored") {
+    votes.push({ signal: "Macro", dir: "tilt", weight: 0.5, note: "regime tailwind" });
+  } else if (macroV === "headwind") {
+    votes.push({ signal: "Macro", dir: "tilt", weight: -0.5, note: "regime headwind" });
+  }
+
+  // --- Tally ---
+  let net = 0;
+  for (const v of votes) {
+    if (v.dir === "buy")  net += v.weight;
+    if (v.dir === "sell") net -= v.weight;
+    if (v.dir === "tilt") net += v.weight; // tilt weights already signed
+  }
+
+  // --- Classify ---
+  let action, dollars = null, prime = false;
+  const baseSize = scanAction?.buySize?.dollars || 0;
+  if (net >= 2) {
+    action = "ADD";
+    dollars = baseSize;
+  } else if (net >= 0.5 && net < 2) {
+    // PRIME tier — one signal from action
+    action = "PRIME";
+    dollars = baseSize * 0.5;
+    prime = true;
+  } else if (net <= -3) {
+    action = "EXIT";
+  } else if (net <= -1) {
+    action = "TRIM";
+  } else {
+    action = "HOLD";
+  }
+
+  // Confidence band — % of available signals participating directionally
+  const availableSignals = 4; // scan + AI + Pre-Surge + macro (always conceivably available)
+  const participatingCount = votes.filter(v => v.dir === "buy" || v.dir === "sell").length;
+  const conviction = participatingCount / availableSignals;
+
+  // Diagnostic: when PRIME, what flip would push to ACT?
+  let blocker = null;
+  if (action === "PRIME") {
+    const missing = [];
+    if (!ps) missing.push("Pre-Surge ≥70");
+    if (!ai) missing.push("Run AI Analyze");
+    if (macroV === "headwind") missing.push("Macro flip");
+    blocker = missing.length > 0 ? missing.slice(0, 2).join(" OR ") : "Stronger scan signal";
+  }
+
+  return {
+    symbol: sym,
+    name: holding.name,
+    asset_class: holding.asset_class,
+    action, dollars, votes, net, conviction, blocker, prime,
+    scanAction, // for reference
+  };
+}
+
+// ----------------------------------------------------------------------------
+// NEW-OPPORTUNITY VERDICT — what to open in (symbols NOT currently held)
+// Returns: { symbol, action, conviction, votes, dollars, blocker }
+// ----------------------------------------------------------------------------
+function computeOpportunityVerdict(symbol, assetClassGuess) {
+  const votes = [];
+
+  // --- PRE-SURGE (the strongest opportunity signal) ---
+  const ps = preSurgeFlagFor(symbol);
+  if (ps) {
+    const dtc = dtcFor(symbol);
+    if (dtc != null && dtc >= 10) {
+      votes.push({ signal: "Pre-Surge", dir: "buy", weight: 3, note: `composite ${ps.composite} · SQUEEZE-PRONE DTC ${dtc.toFixed(1)}` });
+    } else if (ps.composite >= 80) {
+      votes.push({ signal: "Pre-Surge", dir: "buy", weight: 3, note: `composite ${ps.composite}` });
+    } else {
+      votes.push({ signal: "Pre-Surge", dir: "buy", weight: 2, note: `composite ${ps.composite}` });
+    }
+  } else {
+    // Below threshold but still scored — partial credit if composite ≥ 60
+    const psBelow = preSurgeScoreFor(symbol);
+    if (psBelow && psBelow.composite >= 60) {
+      votes.push({ signal: "Pre-Surge", dir: "buy", weight: 1, note: `near-threshold ${psBelow.composite}` });
+    }
+  }
+
+  // --- WATCHLIST condition fired (for symbols on watchlist) ---
+  const watchEntry = state.watchlist.find(w => w.symbol === symbol);
+  if (watchEntry) {
+    const snap = state.watchlistSnapshot[symbol];
+    const fired = snap?.triggers?.length > 0;
+    if (fired) {
+      votes.push({ signal: "Watchlist", dir: "buy", weight: 1, note: `${snap.triggers.length} condition firing` });
+    }
+  }
+
+  // --- NEWS big-opportunity ---
+  if (state.newsItems) {
+    const n = state.newsItems.find(item => item.symbol === symbol && item.direction === "long");
+    if (n) {
+      votes.push({ signal: "News", dir: "buy", weight: 2, note: n.urgency === "high" ? "high-urgency catalyst" : "catalyst flagged" });
+    }
+  }
+
+  // --- DISCOVER IDEAS (curated/dynamic) ---
+  const ideaSrc = findInDiscoverIdeas(symbol);
+  if (ideaSrc) {
+    votes.push({ signal: "Idea", dir: "buy", weight: 1, note: ideaSrc.source });
+  }
+
+  // --- MACRO tilt ---
+  const macroV = macroVerdictFor(symbol, assetClassGuess || guessAssetClass(symbol));
+  if (macroV === "favored") {
+    votes.push({ signal: "Macro", dir: "tilt", weight: 0.5, note: "regime tailwind" });
+  } else if (macroV === "headwind") {
+    votes.push({ signal: "Macro", dir: "tilt", weight: -0.5, note: "regime headwind" });
+  }
+
+  // --- Tally ---
+  let net = 0;
+  for (const v of votes) {
+    if (v.dir === "buy")  net += v.weight;
+    if (v.dir === "sell") net -= v.weight;
+    if (v.dir === "tilt") net += v.weight;
+  }
+
+  // --- Classify ---
+  let action, dollars = null;
+  const portfolioValue = computeTotalPortfolioValue();
+  if (net >= 4) {
+    action = "STARTER";
+    dollars = portfolioValue * 0.015; // 1.5% starter
+  } else if (net >= 2) {
+    action = "CONSIDER";
+    dollars = portfolioValue * 0.005; // 0.5% nibble
+  } else if (net >= 0.5) {
+    action = "WATCH";
+  } else {
+    action = null; // not shown
+  }
+
+  return { symbol, action, votes, net, dollars };
+}
+
+// Helper for opportunity scoring: find symbol in static curated + dynamic ideas
+function findInDiscoverIdeas(symbol) {
+  if (typeof CURATED_PICKS !== "undefined") {
+    const c = CURATED_PICKS.find(p => p.symbol === symbol);
+    if (c) return { source: `${c.source.split(",")[0]}`, thesis: c.thesis };
+  }
+  if (state.discoverDynamic) {
+    const d = state.discoverDynamic.find(p => p.symbol === symbol);
+    if (d) return { source: d.source || "Live idea", thesis: d.thesis };
+  }
+  return null;
+}
+
+// Returns ranked list of all candidate opportunity symbols (not currently held)
+// from: Pre-Surge flags, Pre-Surge near-threshold, watchlist (non-held), news, curated.
+function getOpportunityUniverse() {
+  const held = new Set(state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol));
+  const candidates = new Set();
+
+  // Pre-Surge flagged
+  for (const f of (state.preSurge || [])) candidates.add(f.symbol);
+  // Pre-Surge near-threshold (composite ≥ 60)
+  for (const f of (state.preSurgeAllScored || [])) {
+    if (f.composite >= 60) candidates.add(f.symbol);
+  }
+  // Watchlist with firing conditions
+  for (const w of state.watchlist) {
+    const snap = state.watchlistSnapshot[w.symbol];
+    if (snap?.triggers?.length > 0) candidates.add(w.symbol);
+  }
+  // News long-opportunities with a real symbol
+  for (const n of (state.newsItems || [])) {
+    if (n.symbol && n.direction === "long") candidates.add(n.symbol);
+  }
+  // Curated ideas
+  if (typeof CURATED_PICKS !== "undefined") {
+    for (const p of CURATED_PICKS) candidates.add(p.symbol);
+  }
+
+  // Filter out anything currently held
+  return Array.from(candidates).filter(s => !held.has(s));
+}
+
+// ----------------------------------------------------------------------------
+// RENDER: Today's Verdict card (held symbols)
+// ----------------------------------------------------------------------------
+function renderTodaysVerdictCard() {
+  // Only consider non-cash holdings
+  const heldNonCash = state.holdings.filter(h => h.asset_class !== "cash");
+  if (heldNonCash.length === 0) {
+    return ""; // no holdings = no verdict (seed state)
+  }
+
+  // Compute daily scan ONCE per render (was O(N²) when called per-holding)
+  const cachedScan = computeDailyScan();
+
+  const verdicts = heldNonCash.map(h => computeHeldVerdict(h, cachedScan));
+  // Filter out dismissed
+  const visible = verdicts.filter(v => {
+    const key = recKeyFor(v.symbol, v.action.toLowerCase(), "verdict");
+    return getRecStatus(key) !== "dismissed";
+  });
+
+  // Sort: ACT first (TRIM/EXIT/ADD), then PRIME, then HOLD
+  const actionOrder = { EXIT: 0, TRIM: 1, ADD: 2, PRIME: 3, HOLD: 4 };
+  visible.sort((a, b) => (actionOrder[a.action] ?? 9) - (actionOrder[b.action] ?? 9));
+
+  const actItems = visible.filter(v => ["ADD", "TRIM", "EXIT"].includes(v.action));
+  const primeItems = visible.filter(v => v.action === "PRIME");
+  const holdItems = visible.filter(v => v.action === "HOLD");
+
+  let body;
+  if (actItems.length === 0 && primeItems.length === 0) {
+    // No action and no prime — show the closest call as a diagnostic
+    const closest = visible.slice().sort((a, b) => Math.abs(b.net) - Math.abs(a.net))[0];
+    body = `
+      <div class="verdict-empty">
+        <div class="verdict-empty-headline">No high-conviction actions on your book today.</div>
+        ${closest ? `
+        <div class="verdict-empty-closest">
+          Closest call: <b>${escAttr(closest.symbol)}</b> net ${closest.net >= 0 ? "+" : ""}${closest.net.toFixed(1)}
+          (${closest.votes.length} signal${closest.votes.length === 1 ? "" : "s"} active)
+        </div>
+        <div class="verdict-empty-hint">Hold positions. Don't force trades on conflicting signal days.</div>
+        ` : ""}
+      </div>
+    `;
+  } else {
+    const itemHtml = [...actItems, ...primeItems].map(v => renderVerdictItem(v)).join("");
+    body = `<div class="verdict-list">${itemHtml}</div>`;
+  }
+
+  // Hold items in a collapsed footer
+  const holdsLine = holdItems.length > 0
+    ? `<div class="verdict-holds">${holdItems.length} on HOLD: ${holdItems.map(v => escAttr(v.symbol)).join(", ")}</div>`
+    : "";
+
+  const actCount = actItems.length;
+  const primeCount = primeItems.length;
+
+  return `
+    <div class="verdict-card">
+      <div class="verdict-head">
+        <div>
+          <h3>Today's Verdict · Your Book</h3>
+          <div class="verdict-sub">${actCount} act · ${primeCount} prime · ${holdItems.length} hold</div>
+        </div>
+      </div>
+      ${body}
+      ${holdsLine}
+      <div class="verdict-footer">Synthesizes Daily Scan + AI Analysis + Pre-Surge + Macro into one weighted verdict per held symbol</div>
+    </div>
+  `;
+}
+
+function renderVerdictItem(v) {
+  const actionClass = v.action.toLowerCase();
+  const actionLabel = {
+    ADD: "ADD", TRIM: "TRIM", EXIT: "EXIT",
+    PRIME: "PRIME", HOLD: "HOLD",
+  }[v.action] || v.action;
+  const recKey = recKeyFor(v.symbol, v.action.toLowerCase(), "verdict");
+
+  // Dollar line varies by action
+  let dollarLine = "";
+  if (v.action === "ADD" && v.dollars > 0) dollarLine = `Add ~$${fmtUSD(v.dollars, 0)}`;
+  else if (v.action === "PRIME" && v.dollars > 0) dollarLine = `Half-size if triggered: ~$${fmtUSD(v.dollars, 0)}`;
+  else if (v.action === "TRIM") dollarLine = "Trim 15-25% on strength";
+  else if (v.action === "EXIT") dollarLine = "Close position on strength";
+
+  // Vote summary line
+  const buyVotes = v.votes.filter(x => x.dir === "buy");
+  const sellVotes = v.votes.filter(x => x.dir === "sell");
+  const tiltVotes = v.votes.filter(x => x.dir === "tilt");
+  const voteChips = [
+    ...buyVotes.map(x => `<span class="vote-chip buy">✓ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
+    ...sellVotes.map(x => `<span class="vote-chip sell">✗ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
+    ...tiltVotes.map(x => `<span class="vote-chip tilt">${x.weight >= 0 ? "+" : ""} ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
+  ].join("");
+
+  return `
+    <div class="verdict-item ${actionClass}" data-act="open-asset" data-symbol="${escAttr(v.symbol)}">
+      <div class="verdict-item-head">
+        <div class="vih-left">
+          <span class="verdict-action-badge ${actionClass}">${actionLabel}</span>
+          <span class="verdict-sym">${escAttr(v.symbol)}</span>
+          ${dollarLine ? `<span class="verdict-dollars">· ${escAttr(dollarLine)}</span>` : ""}
+        </div>
+        <div class="vih-right">
+          <span class="verdict-net">net ${v.net >= 0 ? "+" : ""}${v.net.toFixed(1)}</span>
+          <button class="verdict-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" title="Hide">×</button>
+        </div>
+      </div>
+      <div class="verdict-votes">${voteChips}</div>
+      ${v.blocker ? `<div class="verdict-blocker">⚡ Unlock with: ${escAttr(v.blocker)}</div>` : ""}
+    </div>
+  `;
+}
+
+// ----------------------------------------------------------------------------
+// RENDER: Today's Opportunities card (new entries, not currently held)
+// ----------------------------------------------------------------------------
+function renderTodaysOpportunitiesCard() {
+  const universe = getOpportunityUniverse();
+  if (universe.length === 0) {
+    // No raw candidates at all — likely scanner / watchlist data not loaded
+    const needsScan = !state.preSurgeAllScored && !state.preSurge;
+    return `
+      <div class="opps-card empty">
+        <div class="opps-head">
+          <div>
+            <h3>Today's Opportunities · New Entries</h3>
+            <div class="opps-sub">Synthesizes Pre-Surge + Watchlist + News + Ideas + Macro</div>
+          </div>
+          ${needsScan ? `<button class="btn btn-sm" data-act="run-presurge">Run Pre-Surge</button>` : ""}
+        </div>
+        <div class="opps-empty-body">
+          ${needsScan
+            ? "Pre-Surge hasn't been run yet. Tap to scan ~165 symbols for the strongest entry setups."
+            : "No actionable new entries today. Focus on managing existing positions."}
+        </div>
+      </div>
+    `;
+  }
+
+  // Score all candidates
+  const allScored = universe.map(s => computeOpportunityVerdict(s));
+  // Filter to those with action (non-null)
+  const actionable = allScored.filter(o => o.action !== null);
+  // Dismissed filter
+  const visible = actionable.filter(o => {
+    const key = recKeyFor(o.symbol, "opportunity", "opps");
+    return getRecStatus(key) !== "dismissed";
+  });
+
+  // Sort by net desc, cap to top 5
+  visible.sort((a, b) => b.net - a.net);
+  const top5 = visible.slice(0, 5);
+
+  if (top5.length === 0) {
+    // Some candidates exist but none crossed the threshold — show closest miss
+    const closestMiss = allScored.filter(o => o.action === null).sort((a, b) => b.net - a.net)[0];
+    return `
+      <div class="opps-card">
+        <div class="opps-head">
+          <div>
+            <h3>Today's Opportunities · New Entries</h3>
+            <div class="opps-sub">${universe.length} candidates scanned · 0 actionable</div>
+          </div>
+        </div>
+        <div class="opps-empty-body">
+          No new entries cross the action threshold today.
+          ${closestMiss ? `<br/>Closest: <b>${escAttr(closestMiss.symbol)}</b> net +${closestMiss.net.toFixed(1)} (need +0.5 to enter WATCH tier).` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  const starterCount = top5.filter(o => o.action === "STARTER").length;
+  const considerCount = top5.filter(o => o.action === "CONSIDER").length;
+  const watchCount = top5.filter(o => o.action === "WATCH").length;
+
+  return `
+    <div class="opps-card">
+      <div class="opps-head">
+        <div>
+          <h3>Today's Opportunities · New Entries</h3>
+          <div class="opps-sub">${starterCount} starter · ${considerCount} consider · ${watchCount} watch</div>
+        </div>
+      </div>
+      <div class="opps-list">
+        ${top5.map(o => renderOpportunityItem(o)).join("")}
+      </div>
+      <div class="opps-footer">Top 5 by conviction · Pre-Surge + Watchlist + News + Ideas + Macro</div>
+    </div>
+  `;
+}
+
+function renderOpportunityItem(o) {
+  const actionClass = o.action.toLowerCase();
+  const recKey = recKeyFor(o.symbol, "opportunity", "opps");
+  let actionLine = "";
+  if (o.action === "STARTER" && o.dollars > 0) {
+    actionLine = `Starter ~$${fmtUSD(o.dollars, 0)} (~1.5% of portfolio)`;
+  } else if (o.action === "CONSIDER" && o.dollars > 0) {
+    actionLine = `Nibble ~$${fmtUSD(o.dollars, 0)} (~0.5%)`;
+  } else if (o.action === "WATCH") {
+    actionLine = "Add to watchlist · re-evaluate when signal strengthens";
+  }
+
+  // Show current price + macro tag
+  const price = state.prices[o.symbol]?.current_price;
+  const priceStr = price ? `$${fmtUSD(price)}` : "";
+
+  const buyVotes = o.votes.filter(x => x.dir === "buy");
+  const tiltVotes = o.votes.filter(x => x.dir === "tilt");
+  const voteChips = [
+    ...buyVotes.map(x => `<span class="vote-chip buy">✓ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
+    ...tiltVotes.map(x => `<span class="vote-chip tilt">${x.weight >= 0 ? "+" : ""} ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
+  ].join("");
+
+  const onWatchlist = state.watchlist.some(w => w.symbol === o.symbol);
+
+  return `
+    <div class="opp-item ${actionClass}" data-act="open-asset" data-symbol="${escAttr(o.symbol)}">
+      <div class="opp-item-head">
+        <div class="oih-left">
+          <span class="opp-action-badge ${actionClass}">${escAttr(o.action)}</span>
+          <span class="opp-sym">${escAttr(o.symbol)}</span>
+          ${priceStr ? `<span class="opp-price">${priceStr}</span>` : ""}
+          ${onWatchlist ? `<span class="opp-tag onlist">on watchlist</span>` : ""}
+        </div>
+        <div class="oih-right">
+          <span class="opp-net">net +${o.net.toFixed(1)}</span>
+          <button class="opp-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" title="Hide">×</button>
+        </div>
+      </div>
+      ${actionLine ? `<div class="opp-action-line">${escAttr(actionLine)}</div>` : ""}
+      <div class="opp-votes">${voteChips}</div>
+      ${!onWatchlist && o.action !== "STARTER" ? `
+      <div class="opp-quick-actions" onclick="event.stopPropagation();">
+        <button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(o.symbol)}" data-name="${escAttr(o.symbol)}">+ Watch</button>
+      </div>` : ""}
+    </div>
+  `;
+}
+
 function renderBreakoutPrompt() {
   if (state.breakoutPromptDismissed) return "";
   const missing = getHeldSymbolsMissingBreakouts();
@@ -5650,6 +6406,10 @@ function renderPortfolio() {
     ${renderBreakoutPrompt()}
 
     ${renderMacroRegimeCard()}
+
+    ${renderTodaysVerdictCard()}
+
+    ${renderTodaysOpportunitiesCard()}
 
     ${renderPreSurgeCard()}
 
