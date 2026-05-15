@@ -387,6 +387,15 @@ body {
 .watch-suggest-strip.contradicts .wss-action {
   color: var(--gold);
 }
+.watch-suggest-strip.pointer {
+  background: var(--bg-elev);
+  border-color: var(--rule-soft);
+  border-style: dashed;
+}
+.watch-suggest-strip.pointer .wss-action {
+  color: var(--ink-muted);
+  font-style: italic;
+}
 .wss-action {
   font-family: var(--display); font-weight: 500; font-size: 12.5px;
   color: var(--green); flex: 1; min-width: 0;
@@ -957,6 +966,50 @@ body {
 .journal-del:hover { color: var(--red); border-color: var(--red); }
 .journal-del:active { transform: scale(0.92); }
 
+/* ===== RAW SIGNALS SECTION (collapsible — old cards demoted under Verdict) ===== */
+.raw-signals-section {
+  margin: 16px 20px 0;
+}
+.raw-signals-toggle {
+  width: 100%;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg-elev);
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  transition: background .15s;
+}
+.raw-signals-toggle:hover { background: var(--bg-card); }
+.rst-arrow {
+  font-family: var(--mono); font-size: 10px;
+  color: var(--ink-muted); flex-shrink: 0;
+}
+.rst-label {
+  font-family: var(--display); font-size: 13px; font-weight: 500;
+  color: var(--ink);
+}
+.rst-sub {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-muted);
+  margin-left: auto;
+  text-align: right;
+  letter-spacing: 0.02em;
+}
+@media (max-width: 600px) {
+  .rst-sub { display: none; }
+}
+.raw-signals-section .scan-card,
+.raw-signals-section .watchout-card,
+.raw-signals-section .opp-card,
+.raw-signals-section .ai-card,
+.raw-signals-section .presurge-card {
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 12px;
+}
+
 /* ===== TODAY'S VERDICT CARD ===== */
 .verdict-card {
   margin: 12px 20px 0;
@@ -1044,6 +1097,12 @@ body {
 .vote-chip.buy  { background: rgba(74,122,74,0.12);  color: var(--green); border: 1px solid rgba(74,122,74,0.3); }
 .vote-chip.sell { background: rgba(161,61,45,0.12);  color: var(--red);   border: 1px solid rgba(161,61,45,0.3); }
 .vote-chip.tilt { background: var(--bg-elev);         color: var(--ink-soft); border: 1px solid var(--rule-soft); }
+.vote-chip.decayed {
+  background: transparent;
+  color: var(--ink-muted);
+  border: 1px dashed var(--rule-soft);
+  font-style: italic;
+}
 .verdict-blocker {
   margin-top: 8px; padding: 6px 10px;
   background: rgba(176,141,60,0.08);
@@ -3037,6 +3096,9 @@ const state = {
   macroLoading: false,
   // Short-interest data — bulk DTC for SCAN_UNIVERSE. Bi-monthly Finra data, cached 24h.
   shortInterest: loadShortInterestCache() || null, // { SYM: { dtc, shortPctFloat, ... } } | null
+  // Raw signals section — collapsed by default so user sees decisions first, not noise.
+  // localStorage-persisted so the toggle stays where you left it.
+  rawSignalsExpanded: localStorage.getItem("rawSignalsExpanded") === "1",
   // Inline chart preview state for Ideas/ETF sections (no analysis call)
   previewChart: { symbol: null, name: null, range: "3M", loading: false, data: null },
   // Per-day per-recommendation "done" or "dismissed" tracking (localStorage-persisted)
@@ -4796,11 +4858,30 @@ function dtcFor(symbol) {
   return state.shortInterest?.[symbol]?.dtc ?? null;
 }
 
-// Helper: latest AI stance for symbol
+// Helper: latest AI stance for symbol — also returns age-based weight multiplier
+// so stale analyses don't outvote fresh Daily Scan signals.
+// Decay schedule: full weight 0-2d, linear taper to 0 at 14d.
 function aiStanceFor(symbol) {
   const a = state.analyses[symbol];
   if (!a || !a.stance) return null;
-  return { stance: String(a.stance).toUpperCase(), conviction: a.conviction, confidence: a.confidence };
+  const ts = a.generated_at;
+  let ageDays = 999;
+  if (ts) {
+    const ageMs = Date.now() - new Date(ts).getTime();
+    ageDays = ageMs / 86400000;
+  }
+  // Linear decay: full weight 0-2 days, half at 7d, zero at 14d+
+  let weightMult = 1;
+  if (ageDays <= 2)       weightMult = 1.0;
+  else if (ageDays >= 14) weightMult = 0;
+  else                    weightMult = 1 - ((ageDays - 2) / 12); // taper 2d→14d
+  return {
+    stance: String(a.stance).toUpperCase(),
+    conviction: a.conviction,
+    confidence: a.confidence,
+    ageDays,
+    weightMult,
+  };
 }
 
 // ----------------------------------------------------------------------------
@@ -4823,18 +4904,22 @@ function computeHeldVerdict(holding, cachedScanActions) {
     }
   }
 
-  // --- AI ANALYSIS stance ---
+  // --- AI ANALYSIS stance (decay-weighted by analysis age) ---
   const ai = aiStanceFor(sym);
-  if (ai) {
+  if (ai && ai.weightMult > 0.05) { // skip if fully decayed
+    const ageNote = ai.ageDays > 7 ? ` (${Math.round(ai.ageDays)}d old)` : "";
     if (["ACCUMULATE"].includes(ai.stance)) {
-      votes.push({ signal: "AI Analyze", dir: "buy", weight: 2, note: ai.stance });
+      votes.push({ signal: "AI Analyze", dir: "buy", weight: 2 * ai.weightMult, note: ai.stance + ageNote });
     } else if (["HOLD"].includes(ai.stance)) {
-      votes.push({ signal: "AI Analyze", dir: "buy", weight: 0.5, note: "HOLD (mild)" }); // HOLD is mildly supportive vs nothing
+      votes.push({ signal: "AI Analyze", dir: "buy", weight: 0.5 * ai.weightMult, note: "HOLD (mild)" + ageNote });
     } else if (["TRIM"].includes(ai.stance)) {
-      votes.push({ signal: "AI Analyze", dir: "sell", weight: 2, note: ai.stance });
+      votes.push({ signal: "AI Analyze", dir: "sell", weight: 2 * ai.weightMult, note: ai.stance + ageNote });
     } else if (["EXIT", "AVOID"].includes(ai.stance)) {
-      votes.push({ signal: "AI Analyze", dir: "sell", weight: 3, note: ai.stance });
+      votes.push({ signal: "AI Analyze", dir: "sell", weight: 3 * ai.weightMult, note: ai.stance + ageNote });
     }
+  } else if (ai && ai.weightMult <= 0.05) {
+    // Track as "decayed — needs refresh" so user knows what's missing, but it doesn't vote
+    votes.push({ signal: "AI Analyze", dir: "decayed", weight: 0, note: `stale (${Math.round(ai.ageDays)}d) — refresh to vote` });
   }
 
   // --- PRE-SURGE flag ---
@@ -5125,10 +5210,12 @@ function renderVerdictItem(v) {
   const buyVotes = v.votes.filter(x => x.dir === "buy");
   const sellVotes = v.votes.filter(x => x.dir === "sell");
   const tiltVotes = v.votes.filter(x => x.dir === "tilt");
+  const decayedVotes = v.votes.filter(x => x.dir === "decayed");
   const voteChips = [
     ...buyVotes.map(x => `<span class="vote-chip buy">✓ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
     ...sellVotes.map(x => `<span class="vote-chip sell">✗ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
     ...tiltVotes.map(x => `<span class="vote-chip tilt">${x.weight >= 0 ? "+" : ""} ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
+    ...decayedVotes.map(x => `<span class="vote-chip decayed">⊘ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
   ].join("");
 
   return `
@@ -6411,15 +6498,20 @@ function renderPortfolio() {
 
     ${renderTodaysOpportunitiesCard()}
 
-    ${renderPreSurgeCard()}
-
-    ${renderDailyScan()}
-
-    ${renderWatchouts()}
-
-    ${oppCard}
-
-    ${portAnalysisCard}
+    <div class="raw-signals-section">
+      <button class="raw-signals-toggle" data-act="toggle-raw-signals">
+        <span class="rst-arrow">${state.rawSignalsExpanded ? "▼" : "▶"}</span>
+        <span class="rst-label">Raw Signals</span>
+        <span class="rst-sub">${state.rawSignalsExpanded ? "Hide" : "Show"} the underlying scan, AI, and Pre-Surge data the Verdict synthesizes</span>
+      </button>
+      ${state.rawSignalsExpanded ? `
+        ${renderPreSurgeCard()}
+        ${renderDailyScan()}
+        ${renderWatchouts()}
+        ${oppCard}
+        ${portAnalysisCard}
+      ` : ""}
+    </div>
 
     <div class="section-head" style="padding: 0 20px; margin-top: 20px;">
       <h2>Holdings</h2>
@@ -6595,44 +6687,40 @@ function renderWatchlist() {
     const trendClass = snap?.trend === "above_200ma" ? "above" : "below";
 
     // Suggested entry strip — only when a condition has actually fired
-    // BUT: suppress when the daily scan is telling us to TRIM this same symbol.
-    // The user's mental model is "if I'm told to trim it, don't also tell me to buy."
+    // AND the symbol isn't already being handled by Today's Verdict / Today's
+    // Opportunities on the Portfolio tab. We don't want THREE places telling
+    // the user to buy the same name.
     let suggestStrip = "";
+    const heldHere = state.holdings.some(h => h.symbol === w.symbol && h.asset_class !== "cash");
+    // If held: decision is on the Portfolio tab via Today's Verdict — suppress.
+    // If not held but has firing condition: decision is via Today's Opportunities — suppress.
+    // We keep the strip ONLY when the symbol has NO trigger firing (just a tracking row).
+    if (hasTrigger && snap?.current_price && !heldHere) {
+      // Symbol has firing condition AND isn't held → handled by Today's Opportunities.
+      // Show a soft pointer instead of duplicating the action.
+      suggestStrip = `
+        <div class="watch-suggest-strip pointer">
+          <span class="wss-action">↑ Action on Portfolio → Today's Opportunities</span>
+        </div>
+      `;
+    } else if (hasTrigger && snap?.current_price && heldHere) {
+      // Held + firing condition → handled by Today's Verdict
+      suggestStrip = `
+        <div class="watch-suggest-strip pointer">
+          <span class="wss-action">↑ Action on Portfolio → Today's Verdict</span>
+        </div>
+      `;
+    }
+    // Legacy: keep the "contradicts" override for the rare case where scan says trim
+    // on the same symbol — preserves the safety check
     if (hasTrigger && snap?.current_price) {
-      const heldHere = state.holdings.some(h => h.symbol === w.symbol && h.asset_class !== "cash");
-      // Check if the symbol is being recommended for TRIM in today's scan
       const scanContradicts = (computeDailyScan() || []).some(a => a.symbol === w.symbol && a.kind === "trim");
       if (scanContradicts) {
         suggestStrip = `
           <div class="watch-suggest-strip contradicts">
-            <span class="wss-action">Daily scan suggests TRIM</span>
-            <span class="wss-price">Review the scan card before buying more</span>
+            <span class="wss-action">⚠ Daily scan suggests TRIM — review before buying</span>
           </div>
         `;
-      } else {
-        const kind = heldHere ? "add" : "open";
-        const recKey = recKeyFor(w.symbol, kind, "watch");
-        const recState = getRecStatus(recKey);
-        if (recState === "dismissed") {
-          suggestStrip = ""; // hide entirely
-        } else {
-          const setup = snap.setup_score || 0;
-          const strength = setup >= 70 ? 1.5 : 1.0;
-          const size = suggestBuySize(w.symbol, kind, strength);
-          if (size.dollars > 0) {
-            const isDone = recState === "done";
-            suggestStrip = `
-              <div class="watch-suggest-strip ${isDone ? 'done' : ''}">
-                <span class="wss-action">${isDone ? '✓ Logged · ' : ''}${kind === "add" ? "Add" : "Enter"} ~$${fmtUSD(size.dollars, 0)} (~${size.pct.toFixed(1)}%)</span>
-                <span class="wss-price">at $${fmtUSD(snap.current_price)}</span>
-                ${isDone
-                  ? `<button class="wss-log done" disabled>✓</button>`
-                  : `<button class="wss-log" data-act="log-trade" data-symbol="${escAttr(w.symbol)}" data-rec-key="${escAttr(recKey)}">Log</button>`}
-                <button class="wss-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" title="Hide this suggestion">×</button>
-              </div>
-            `;
-          }
-        }
       }
     }
 
@@ -10550,6 +10638,11 @@ document.addEventListener("click", (e) => {
       case "run-presurge":           runPreSurge(); break;
       case "toggle-presurge-debug":  state.preSurgeDebug = !state.preSurgeDebug; renderCurrentView(); break;
       case "refresh-macro":          refreshMacro(); break;
+      case "toggle-raw-signals":
+        state.rawSignalsExpanded = !state.rawSignalsExpanded;
+        try { localStorage.setItem("rawSignalsExpanded", state.rawSignalsExpanded ? "1" : "0"); } catch (e) {}
+        renderCurrentView();
+        break;
       case "mark-rec-done":          markRecommendationDone(target.dataset.recKey); break;
       case "dismiss-rec":            dismissRecommendation(target.dataset.recKey); break;
       case "preview-chart":          togglePreviewChart(target.dataset.symbol, target.dataset.name); break;
