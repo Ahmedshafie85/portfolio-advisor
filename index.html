@@ -3808,9 +3808,14 @@ function classifyMacroRegime(raw) {
   if (dxyCloses.length < 50 || tnxCloses.length < 50) return null;
 
   const dxyCur  = raw.dxy.current ?? dxyCloses[dxyCloses.length - 1];
-  const tnxCur  = raw.tnx.current ?? tnxCloses[tnxCloses.length - 1];
-  // ^TNX is quoted yield × 100 — e.g. raw 45.0 = 4.50% real yield
-  const tnxDisplayPct = tnxCur / 10;
+  const tnxRaw  = raw.tnx.current ?? tnxCloses[tnxCloses.length - 1];
+
+  // Yahoo's ^TNX historically returns the yield × 10 (e.g. 45.0 for 4.50%).
+  // But the convention has flipped sources/dates in the past — some endpoints
+  // return the raw yield (4.5). Self-detect: real 10Y yields trade 1-8% these
+  // last 40 years, so a value > 15 must be the ×10 convention.
+  const tnxScaleDivisor = tnxRaw > 15 ? 10 : 1;
+  const tnxDisplayPct = tnxRaw / tnxScaleDivisor;
 
   // DXY: 252d percentile rank (low = weak dollar regime = bullish risk/metals)
   const dxy252 = pctileRank(dxyCloses.slice(-252), dxyCur);
@@ -3820,9 +3825,13 @@ function classifyMacroRegime(raw) {
     ? (dxyCloses[dxyCloses.length - 1] - dxyCloses[dxyCloses.length - 20]) / dxyCloses[dxyCloses.length - 20] * 100
     : null;
 
-  // 10Y: 50d change in yield (bps roughly) — falling yield = long-duration tailwind
+  // 10Y: 50d change in yield (in real % points). Use the same scaling
+  // divisor we detected for the current value so the math is consistent
+  // regardless of which ^TNX convention Yahoo is currently using.
   const tnxAgo50 = tnxCloses.length >= 50 ? tnxCloses[tnxCloses.length - 50] : null;
-  const tnx50Change = tnxAgo50 != null ? (tnxCur - tnxAgo50) / 10 : null; // in real % points
+  const tnx50Change = tnxAgo50 != null
+    ? (tnxRaw - tnxAgo50) / tnxScaleDivisor
+    : null;
 
   // Classify into one of 4 archetypes
   const dxyFalling = (dxy20Slope != null && dxy20Slope < -1.5) || (dxy252 != null && dxy252 < 25);
@@ -3856,6 +3865,32 @@ function classifyMacroRegime(raw) {
     regimeBlurb = "Risk-off regime — both real rates and dollar headwinds against most asset classes. Cash and short-duration win.";
     favors = ["Cash / short-duration bonds", "Financials (rising yields help margins)", "Dollar-positive defensive"];
     against = ["Metals (ISLN, IGLN, PPLT)", "Long-duration growth (QQQ, tech)", "EM", "Crypto", "MSTR"];
+  } else if (dxyFalling) {
+    // Dollar clearly falling, yields ambiguous — risk-on bias for metals + crypto
+    regime = "weak_dollar_only";
+    regimeLabel = "Weak Dollar · Yields Range-Bound";
+    regimeBlurb = "Dollar weakness alone is a tailwind for metals and dollar-denominated risk. Yield direction unclear — long-duration growth gets a partial pass.";
+    favors = ["Metals (ISLN, IGLN, PPLT)", "EM equities (EIMI, INDA)", "Crypto (BTC, ETH, MSTR)"];
+    against = ["Dollar-positive defensive"];
+  } else if (dxyRising) {
+    regime = "strong_dollar_only";
+    regimeLabel = "Strong Dollar · Yields Range-Bound";
+    regimeBlurb = "Dollar strength is a headwind for everything dollar-denominated. Metals, EM, and commodities lag; cash and US-positive sectors hold up.";
+    favors = ["Cash", "US-domestic large caps", "Financials"];
+    against = ["Metals (ISLN, IGLN, PPLT)", "EM", "Crypto", "Commodities"];
+  } else if (yieldsFalling) {
+    // Yields clearly falling, dollar flat — duration trade
+    regime = "duration_rally";
+    regimeLabel = "Falling Yields · Dollar Range-Bound";
+    regimeBlurb = "Pure duration tailwind. Long-duration growth, long Treasuries, gold (real-yield drop) outperform.";
+    favors = ["Long-duration tech (QQQ, MSFT, NVDA)", "Long Treasuries (TLT, IEF)", "Gold (IGLN, GLD)", "REITs"];
+    against = ["Financials", "Short-duration value"];
+  } else if (yieldsRising) {
+    regime = "duration_pain";
+    regimeLabel = "Rising Yields · Dollar Range-Bound";
+    regimeBlurb = "Yield rise is a pure headwind for long-duration assets. Financials and value cyclicals tend to outperform.";
+    favors = ["Financials (JPM, GS)", "Energy", "Short-duration value"];
+    against = ["Long-duration tech", "Long Treasuries (TLT)", "Gold", "REITs"];
   } else {
     regime = "neutral";
     regimeLabel = "Range-Bound";
@@ -3867,7 +3902,7 @@ function classifyMacroRegime(raw) {
   return {
     regime, regimeLabel, regimeBlurb, favors, against,
     dxy: { current: dxyCur, pctile_252d: dxy252, pctile_50d: dxy50, slope_20d_pct: dxy20Slope, day_change_pct: raw.dxy.day_change_pct },
-    tnx: { current: tnxCur, display_pct: tnxDisplayPct, change_50d_pp: tnx50Change, day_change_pct: raw.tnx.day_change_pct },
+    tnx: { current: tnxRaw, display_pct: tnxDisplayPct, change_50d_pp: tnx50Change, day_change_pct: raw.tnx.day_change_pct },
   };
 }
 
@@ -3941,6 +3976,21 @@ function symbolMacroVerdict(symbol, assetClass, regime) {
     case "risk_off":
       if (isFin) return "favored";
       if (isMetal || isCrypto || isLDT || isEM) return "headwind";
+      return null;
+    case "weak_dollar_only":
+      if (isMetal || isCrypto || isEM) return "favored";
+      return null;
+    case "strong_dollar_only":
+      if (isMetal || isCrypto || isEM) return "headwind";
+      if (isFin) return "favored";
+      return null;
+    case "duration_rally":
+      if (isLDT || isLT || isMetal) return "favored";
+      if (isFin) return "headwind";
+      return null;
+    case "duration_pain":
+      if (isFin || isEnergy) return "favored";
+      if (isLDT || isLT || isMetal) return "headwind";
       return null;
     case "neutral":
     default:
@@ -4985,7 +5035,7 @@ function renderMacroRegimeCard() {
         </div>` : ""}
       </div>
 
-      <div class="macro-footer">Cached 6h · DXY pctile vs 252d · 10Y yield change in % points</div>
+      <div class="macro-footer">Heuristic regime mapping · DXY pctile vs 252d · 10Y yield change in % points · Refresh cached 6h · For orientation, not signal</div>
     </div>
   `;
 }
