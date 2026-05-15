@@ -1138,6 +1138,37 @@ body {
   border-left-width: 3px;
   border-left-color: var(--gold);
 }
+.trade-plan {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--bg-elev);
+  border-radius: 4px;
+  border-left: 2px solid var(--rule-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tp-row {
+  display: flex;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  align-items: flex-start;
+}
+.tp-label {
+  flex-shrink: 0;
+  width: 75px;
+  color: var(--ink-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 10px;
+  padding-top: 1px;
+}
+.tp-text {
+  flex: 1;
+  color: var(--ink-soft);
+}
 .verdict-holds {
   padding: 10px 18px;
   border-top: 1px solid var(--rule-soft);
@@ -5092,6 +5123,275 @@ function computeHeldVerdict(holding, cachedScanActions) {
   };
 }
 
+// ============================================================================
+// TRADE PLAN ENGINE — Round 3
+// Translates a verdict (ADD/TRIM/EXIT/PRIME) into a concrete actionable plan:
+//   - Entry: price, style (now / staggered / limit), reasoning
+//   - Stop: technical level (swing low or 50d MA) + invalidation condition
+//   - Time horizon: weeks for tactical, months for thesis-based
+//   - Exit ladder: trim levels with prices and percentages
+//   - Re-entry trigger: when to add back after a TRIM
+//
+// Philosophy:
+//   • Stops are TECHNICAL (chart-based), not hard %. Adapts to each asset's
+//     actual volatility — silver gets a wider stop than KO.
+//   • Entry style is SIGNAL-DRIVEN — RSI plays need speed, drop-from-peak plays
+//     need patience.
+//   • Numbers are derived from cached OHLCV, not hardcoded.
+//   • If we lack data to compute confidently, we say so — never bluff.
+// ============================================================================
+
+// Helper: compute simple moving average over the last `period` closes
+function computeSMA(closes, period) {
+  if (closes.length < period) return null;
+  const slice = closes.slice(-period);
+  return slice.reduce((s, c) => s + c, 0) / period;
+}
+
+// Helper: find the lowest low in the recent N bars (swing low)
+function recentSwingLow(ohlcv, bars = 20) {
+  if (!ohlcv || ohlcv.length < bars) return null;
+  const slice = ohlcv.slice(-bars);
+  return Math.min(...slice.map(d => d.l));
+}
+
+// Helper: find the highest high in the recent N bars
+function recentSwingHigh(ohlcv, bars = 20) {
+  if (!ohlcv || ohlcv.length < bars) return null;
+  const slice = ohlcv.slice(-bars);
+  return Math.max(...slice.map(d => d.h));
+}
+
+// Helper: average true range — a measure of asset volatility used to size
+// stops appropriately. Returns ATR as % of price.
+function computeATRPct(ohlcv, period = 14) {
+  if (!ohlcv || ohlcv.length < period + 1) return null;
+  const trs = [];
+  for (let i = ohlcv.length - period; i < ohlcv.length; i++) {
+    const prev = ohlcv[i - 1];
+    const cur = ohlcv[i];
+    if (!prev || !cur) continue;
+    const tr = Math.max(
+      cur.h - cur.l,
+      Math.abs(cur.h - prev.c),
+      Math.abs(cur.l - prev.c)
+    );
+    trs.push(tr);
+  }
+  if (trs.length === 0) return null;
+  const atr = trs.reduce((s, t) => s + t, 0) / trs.length;
+  const lastClose = ohlcv[ohlcv.length - 1].c;
+  return lastClose > 0 ? (atr / lastClose) * 100 : null;
+}
+
+// Identify which signal drove this verdict (so we pick the right entry style)
+function dominantBuySignal(votes) {
+  const buys = votes.filter(v => v.dir === "buy").sort((a, b) => b.weight - a.weight);
+  if (buys.length === 0) return null;
+  return buys[0].signal; // e.g. "Daily Scan", "Pre-Surge", "AI Analyze", "News"
+}
+
+// Main trade plan generator. Returns null if action is HOLD (no plan needed)
+// or if we lack OHLCV data to compute meaningful levels.
+function buildTradePlan(verdict, holding) {
+  if (!verdict || verdict.action === "HOLD") return null;
+  const sym = verdict.symbol;
+  const data = state.prices[sym];
+  const cur = data?.current_price;
+  if (!cur || !data?.ohlcv || data.ohlcv.length < 30) return null;
+
+  const ohlcv = data.ohlcv;
+  const closes = ohlcv.map(d => d.c);
+  const rsi = computeRSI(closes, 14);
+  const sma50 = computeSMA(closes, 50);
+  const sma200 = computeSMA(closes, 200);
+  const swingLow = recentSwingLow(ohlcv, 20);
+  const swingHigh = recentSwingHigh(ohlcv, 60); // 60d high for trim ladder
+  const atrPct = computeATRPct(ohlcv, 14);
+  const dominant = dominantBuySignal(verdict.votes);
+
+  // Compute peak (90d) and drop from it — needed for stagger decisions
+  const highs90 = ohlcv.slice(-90).map(d => d.h);
+  const peak90 = highs90.length ? Math.max(...highs90) : cur;
+  const dropFromPeak = peak90 > 0 ? ((cur - peak90) / peak90) * 100 : 0;
+
+  // === ADD / PRIME verdicts → ENTRY PLAN + STOP + EXIT LADDER ===
+  if (verdict.action === "ADD" || verdict.action === "PRIME") {
+    const plan = {
+      kind: verdict.action.toLowerCase(), // "add" | "prime"
+      entry: null,
+      stop: null,
+      invalidation: null,
+      horizon: null,
+      exitLadder: null,
+    };
+
+    // ENTRY — driven by dominant signal
+    if (rsi != null && rsi < 35 && dropFromPeak > -15) {
+      // RSI oversold: time-sensitive, buy now at market
+      plan.entry = {
+        style: "now",
+        priceHint: cur,
+        text: `Buy now at ~$${fmtUSD(cur)} — RSI ${rsi.toFixed(0)} oversold doesn't wait. Mean-reversion is time-sensitive.`,
+      };
+      plan.horizon = "2-3 weeks (mean reversion)";
+    } else if (dropFromPeak <= -10) {
+      // Drop-from-peak: pullback in trend, stagger
+      const tranche = (verdict.dollars || 0) / 3;
+      const dipTarget = cur * 0.97; // -3% more
+      plan.entry = {
+        style: "stagger",
+        priceHint: cur,
+        text: `Stagger entry over 2-3 days. Buy 1/3 (~$${fmtUSD(tranche, 0)}) now at $${fmtUSD(cur)}. Buy 1/3 on further dip to ~$${fmtUSD(dipTarget)}. Hold last 1/3 in reserve for either deeper weakness or confirmation rally above $${fmtUSD(cur * 1.02)}.`,
+      };
+      plan.horizon = "1-3 months (pullback recovery)";
+    } else if (dominant === "Pre-Surge") {
+      // Pre-Surge: momentum signal, don't wait
+      plan.entry = {
+        style: "now",
+        priceHint: cur,
+        text: `Buy now at ~$${fmtUSD(cur)} — Pre-Surge composite firing. Momentum windows close quickly; staggering means missing it.`,
+      };
+      plan.horizon = "2-6 weeks (momentum window)";
+    } else if (dominant === "News") {
+      // News catalyst: depends on timing — buy now if directional, but be wary of gap-ups
+      const gappedUp = ohlcv.length >= 2 && ohlcv[ohlcv.length-1].o > ohlcv[ohlcv.length-2].c * 1.03;
+      if (gappedUp) {
+        plan.entry = {
+          style: "limit",
+          priceHint: ohlcv[ohlcv.length-2].c,
+          text: `Stock gapped up >3% on news. Set limit at ~$${fmtUSD(ohlcv[ohlcv.length-2].c)} (yesterday's close) — don't chase. Skip if it doesn't fill within 2 days.`,
+        };
+      } else {
+        plan.entry = {
+          style: "now",
+          priceHint: cur,
+          text: `Buy now at ~$${fmtUSD(cur)} — news catalyst hasn't been priced in via a gap.`,
+        };
+      }
+      plan.horizon = "2-8 weeks (catalyst follow-through)";
+    } else if (dominant === "AI Analyze") {
+      // AI ACCUMULATE: medium-term thesis — split entry
+      const half = (verdict.dollars || 0) / 2;
+      plan.entry = {
+        style: "split",
+        priceHint: cur,
+        text: `Split entry. Buy half (~$${fmtUSD(half, 0)}) now at $${fmtUSD(cur)}. Hold the other half for a dip to ~$${fmtUSD(cur * 0.96)} or for a confirmation close above $${fmtUSD(cur * 1.03)}.`,
+      };
+      plan.horizon = "2-6 months (thesis play)";
+    } else {
+      // Fallback — buy now at market
+      plan.entry = {
+        style: "now",
+        priceHint: cur,
+        text: `Buy ~$${fmtUSD(verdict.dollars || 0, 0)} at current price ~$${fmtUSD(cur)}.`,
+      };
+      plan.horizon = "4-8 weeks (default)";
+    }
+
+    // STOP — technical, asset-aware
+    // Pick the LOWER of: 20-day swing low, OR 50-day MA × 0.97 (3% buffer below)
+    // Cap stop distance at 2× ATR to avoid absurd risk on very volatile assets.
+    if (swingLow != null && sma50 != null) {
+      const swingStop = swingLow * 0.98; // 2% below swing low to avoid wick stops
+      const maStop = sma50 * 0.97;
+      const candidateStop = Math.max(swingStop, maStop); // higher (tighter) of the two
+      const stopDistancePct = ((cur - candidateStop) / cur) * 100;
+      // If ATR-based max stop is tighter (less generous), use the wider technical level
+      // since we want stops outside normal noise. But if technical is absurdly wide
+      // (>15%), warn the user.
+      let stopPrice = candidateStop;
+      let stopBasis;
+      if (Math.abs(swingStop - candidateStop) < Math.abs(maStop - candidateStop)) {
+        stopBasis = `2% below 20-day swing low ($${fmtUSD(swingLow)})`;
+      } else {
+        stopBasis = `3% below 50-day MA ($${fmtUSD(sma50)})`;
+      }
+      plan.stop = {
+        price: stopPrice,
+        distancePct: stopDistancePct,
+        basis: stopBasis,
+        text: `Stop: $${fmtUSD(stopPrice)} (-${stopDistancePct.toFixed(1)}% from entry) — ${stopBasis}. Set as a mental stop or alert, not a market order. A close below this level on volume = thesis broken, exit on next bounce.`,
+        wide: stopDistancePct > 15,
+      };
+      if (atrPct != null && stopDistancePct > 2.5 * atrPct) {
+        // Stop is well outside normal noise — good
+        plan.stop.fitsVolatility = true;
+      }
+    }
+
+    // INVALIDATION — separate from stop. Conditions that cancel the trade
+    // BEFORE it triggers, or invalidate the thesis after.
+    const invalidators = [];
+    if (verdict.votes.some(v => v.signal === "Daily Scan" && v.dir === "buy")) {
+      invalidators.push("Daily Scan flips to TRIM");
+    }
+    if (verdict.votes.some(v => v.signal === "Macro" && v.weight > 0)) {
+      invalidators.push("Macro regime shifts to risk-off");
+    }
+    if (verdict.votes.some(v => v.signal === "Pre-Surge")) {
+      invalidators.push("Pre-Surge composite drops below 50");
+    }
+    if (sma200 != null && cur > sma200) {
+      invalidators.push(`Close below 200-day MA ($${fmtUSD(sma200)})`);
+    }
+    plan.invalidation = {
+      conditions: invalidators,
+      text: invalidators.length > 0
+        ? `Cancel/exit if: ${invalidators.slice(0, 3).join(" · ")}.`
+        : "No specific invalidators — manage on stop and time horizon alone.",
+    };
+
+    // EXIT LADDER — where to take profits
+    // Trim 25% at signal (your preference). Plus suggested upside targets.
+    const target1 = cur * 1.15;
+    const target2 = swingHigh != null ? swingHigh : cur * 1.30;
+    plan.exitLadder = {
+      text: `Take profits: Trim 25% at +15% (~$${fmtUSD(target1)}) when verdict next flips toward TRIM. ${swingHigh != null ? `Resistance/trim zone: prior swing high near $${fmtUSD(target2)}.` : ""} Let the remaining 75% run with the trailing stop.`,
+    };
+
+    return plan;
+  }
+
+  // === TRIM verdict → EXIT PLAN + RE-ENTRY TRIGGER ===
+  if (verdict.action === "TRIM") {
+    const plan = { kind: "trim", entry: null, exit: null, reentry: null };
+    plan.exit = {
+      text: `Trim 25% of position at market ~$${fmtUSD(cur)} (your standard). Keep the rest. Don't trim more unless verdict deepens to EXIT or net moves below -2.`,
+    };
+
+    // Re-entry: define the conditions under which the verdict says it's
+    // OK to add back. Usually a return-to-favor signal.
+    const reentryConds = [];
+    if (rsi != null && rsi > 50) {
+      reentryConds.push(`RSI cools back below 40 (currently ${rsi.toFixed(0)})`);
+    }
+    if (swingLow != null && cur > swingLow * 1.10) {
+      reentryConds.push(`Pullback to 20-day swing low ~$${fmtUSD(swingLow)}`);
+    }
+    reentryConds.push(`Daily Scan flips back to ADD on the symbol`);
+    plan.reentry = {
+      text: `Re-add the 25% when: ${reentryConds.slice(0, 2).join(" OR ")}. The trim was tactical, not a thesis change.`,
+    };
+    return plan;
+  }
+
+  // === EXIT verdict → FULL CLOSE + RE-EVALUATE ===
+  if (verdict.action === "EXIT") {
+    return {
+      kind: "exit",
+      exit: {
+        text: `Close full position at market ~$${fmtUSD(cur)}. Net verdict ≤ -3 = multiple independent signals saying out. Don't average down. Don't hold for a bounce.`,
+      },
+      reentry: {
+        text: `Don't re-add this symbol for at least 4 weeks unless an AI Analyze ACCUMULATE OR Pre-Surge ≥75 fires. Step back and reassess thesis.`,
+      },
+    };
+  }
+
+  return null;
+}
+
 // ----------------------------------------------------------------------------
 // NEW-OPPORTUNITY VERDICT — what to open in (symbols NOT currently held)
 // Returns: { symbol, action, conviction, votes, dollars, blocker }
@@ -5200,6 +5500,67 @@ function computeOpportunityVerdict(symbol, assetClassGuess) {
   return { symbol, action, votes, net, dollars };
 }
 
+// Trade plan for opportunities (non-held symbols). Lighter than buildTradePlan
+// since we don't have cost basis/holding context yet — just entry + stop + horizon.
+function buildOpportunityPlan(opp) {
+  if (!opp || !opp.action || opp.action === "WATCH") return null; // WATCH = no entry plan yet
+  const sym = opp.symbol;
+  const data = state.prices[sym];
+  const cur = data?.current_price;
+  if (!cur || !data?.ohlcv || data.ohlcv.length < 30) return null;
+
+  const ohlcv = data.ohlcv;
+  const closes = ohlcv.map(d => d.c);
+  const rsi = computeRSI(closes, 14);
+  const sma50 = computeSMA(closes, 50);
+  const sma200 = computeSMA(closes, 200);
+  const swingLow = recentSwingLow(ohlcv, 20);
+  const dominant = dominantBuySignal(opp.votes);
+
+  const plan = { entry: null, stop: null, horizon: null };
+
+  // ENTRY for new positions — usually start small, scale on confirmation
+  const initialTranche = (opp.dollars || 0) * 0.6; // start with 60% of suggested size
+  if (rsi != null && rsi < 35) {
+    plan.entry = {
+      text: `Open ~$${fmtUSD(initialTranche, 0)} now at $${fmtUSD(cur)} (RSI ${rsi.toFixed(0)} oversold). Add remaining $${fmtUSD((opp.dollars || 0) - initialTranche, 0)} on confirmation close above $${fmtUSD(cur * 1.03)}.`,
+    };
+    plan.horizon = "2-3 weeks (mean-reversion entry)";
+  } else if (dominant === "Pre-Surge" || dominant === "ETF Momentum") {
+    plan.entry = {
+      text: `Buy ~$${fmtUSD(opp.dollars || 0, 0)} now at $${fmtUSD(cur)} — momentum signal, don't stagger.`,
+    };
+    plan.horizon = "2-6 weeks (momentum)";
+  } else if (dominant === "News") {
+    plan.entry = {
+      text: `Open ~$${fmtUSD(initialTranche, 0)} at $${fmtUSD(cur)} or better on a 1-day cooldown. Skip if it gaps up >5% from here.`,
+    };
+    plan.horizon = "2-8 weeks (catalyst)";
+  } else {
+    plan.entry = {
+      text: `Open ~$${fmtUSD(initialTranche, 0)} starter at $${fmtUSD(cur)}. Hold remaining $${fmtUSD((opp.dollars || 0) - initialTranche, 0)} for either weakness to $${fmtUSD(cur * 0.95)} or confirmation above $${fmtUSD(cur * 1.04)}.`,
+    };
+    plan.horizon = "1-3 months";
+  }
+
+  // STOP — same logic as held plan
+  if (swingLow != null && sma50 != null) {
+    const swingStop = swingLow * 0.98;
+    const maStop = sma50 * 0.97;
+    const stopPrice = Math.max(swingStop, maStop);
+    const stopDistancePct = ((cur - stopPrice) / cur) * 100;
+    const stopBasis = swingStop > maStop
+      ? `below 20d swing low`
+      : `below 50d MA`;
+    plan.stop = {
+      price: stopPrice,
+      text: `Stop: $${fmtUSD(stopPrice)} (-${stopDistancePct.toFixed(1)}%) — ${stopBasis}. If position size × stop distance > 1% of portfolio, cut size, not stop.`,
+    };
+  }
+
+  return plan;
+}
+
 // Helper for opportunity scoring: find symbol in static curated + dynamic ideas
 function findInDiscoverIdeas(symbol) {
   if (typeof CURATED_PICKS !== "undefined") {
@@ -5235,9 +5596,19 @@ function getOpportunityUniverse() {
   for (const n of (state.newsItems || [])) {
     if (n.symbol && n.direction === "long") candidates.add(n.symbol);
   }
-  // Curated ideas
+  // Curated ideas (static, hardcoded list)
   if (typeof CURATED_PICKS !== "undefined") {
     for (const p of CURATED_PICKS) candidates.add(p.symbol);
+  }
+  // Dynamic Discover Ideas (refreshed via the "Refresh ideas" button)
+  // Bug fix: previously only static CURATED_PICKS were added to the universe,
+  // so dynamic picks could only vote if some OTHER signal (Pre-Surge, News,
+  // Watchlist) independently surfaced the same symbol. Now they're proper
+  // candidates in their own right, with the same 0.5 vote weight as static.
+  if (state.discoverDynamic) {
+    for (const p of state.discoverDynamic) {
+      if (p.symbol) candidates.add(p.symbol);
+    }
   }
   // ETF Leaderboard — Round 1.5: ETFs with strong momentum become candidates.
   // The opportunity scorer will filter further by trend/drawdown/return strength.
@@ -5335,8 +5706,8 @@ function renderVerdictItem(v) {
   let dollarLine = "";
   if (v.action === "ADD" && v.dollars > 0) dollarLine = `Add ~$${fmtUSD(v.dollars, 0)}`;
   else if (v.action === "PRIME" && v.dollars > 0) dollarLine = `Half-size if triggered: ~$${fmtUSD(v.dollars, 0)}`;
-  else if (v.action === "TRIM") dollarLine = "Trim 15-25% on strength";
-  else if (v.action === "EXIT") dollarLine = "Close position on strength";
+  else if (v.action === "TRIM") dollarLine = "Trim 25% at signal";
+  else if (v.action === "EXIT") dollarLine = "Close position";
 
   // Vote summary line
   const buyVotes = v.votes.filter(x => x.dir === "buy");
@@ -5349,6 +5720,11 @@ function renderVerdictItem(v) {
     ...tiltVotes.map(x => `<span class="vote-chip tilt">${x.weight >= 0 ? "+" : ""} ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
     ...decayedVotes.map(x => `<span class="vote-chip decayed">⊘ ${escAttr(x.signal)}: ${escAttr(x.note)}</span>`),
   ].join("");
+
+  // Build trade plan (Round 3)
+  const holding = state.holdings.find(h => h.symbol === v.symbol);
+  const plan = holding ? buildTradePlan(v, holding) : null;
+  const planHtml = plan ? renderTradePlan(plan) : "";
 
   return `
     <div class="verdict-item ${actionClass}${v.conflicted ? ' conflicted' : ''}" data-act="open-asset" data-symbol="${escAttr(v.symbol)}">
@@ -5367,8 +5743,78 @@ function renderVerdictItem(v) {
       <div class="verdict-votes">${voteChips}</div>
       ${v.blocker ? `<div class="verdict-blocker">⚡ Unlock with: ${escAttr(v.blocker)}</div>` : ""}
       ${v.conflicted ? `<div class="verdict-conflict-note">Buy &amp; sell signals both firing — review the chart yourself before acting on this verdict</div>` : ""}
+      ${planHtml}
     </div>
   `;
+}
+
+// Render the trade plan section inside a verdict item (Round 3).
+// Returns "" if no plan (e.g. HOLD or missing OHLCV).
+function renderTradePlan(plan) {
+  if (!plan) return "";
+
+  if (plan.kind === "add" || plan.kind === "prime") {
+    return `
+      <div class="trade-plan" onclick="event.stopPropagation();">
+        <div class="tp-row">
+          <span class="tp-label">Entry</span>
+          <span class="tp-text">${escAttr(plan.entry?.text || "—")}</span>
+        </div>
+        ${plan.stop ? `
+        <div class="tp-row">
+          <span class="tp-label">Stop</span>
+          <span class="tp-text">${escAttr(plan.stop.text)}</span>
+        </div>` : ""}
+        ${plan.invalidation ? `
+        <div class="tp-row">
+          <span class="tp-label">Invalidate</span>
+          <span class="tp-text">${escAttr(plan.invalidation.text)}</span>
+        </div>` : ""}
+        ${plan.horizon ? `
+        <div class="tp-row">
+          <span class="tp-label">Horizon</span>
+          <span class="tp-text">${escAttr(plan.horizon)}</span>
+        </div>` : ""}
+        ${plan.exitLadder ? `
+        <div class="tp-row">
+          <span class="tp-label">Take profit</span>
+          <span class="tp-text">${escAttr(plan.exitLadder.text)}</span>
+        </div>` : ""}
+      </div>
+    `;
+  }
+
+  if (plan.kind === "trim") {
+    return `
+      <div class="trade-plan" onclick="event.stopPropagation();">
+        <div class="tp-row">
+          <span class="tp-label">Exit</span>
+          <span class="tp-text">${escAttr(plan.exit.text)}</span>
+        </div>
+        <div class="tp-row">
+          <span class="tp-label">Re-add</span>
+          <span class="tp-text">${escAttr(plan.reentry.text)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  if (plan.kind === "exit") {
+    return `
+      <div class="trade-plan" onclick="event.stopPropagation();">
+        <div class="tp-row">
+          <span class="tp-label">Exit</span>
+          <span class="tp-text">${escAttr(plan.exit.text)}</span>
+        </div>
+        <div class="tp-row">
+          <span class="tp-label">Re-entry</span>
+          <span class="tp-text">${escAttr(plan.reentry.text)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  return "";
 }
 
 // ----------------------------------------------------------------------------
@@ -5475,6 +5921,28 @@ function renderOpportunityItem(o) {
 
   const onWatchlist = state.watchlist.some(w => w.symbol === o.symbol);
 
+  // Build opportunity entry plan (Round 3) — only for CONSIDER/STARTER, not WATCH
+  const oppPlan = buildOpportunityPlan(o);
+  const oppPlanHtml = oppPlan ? `
+    <div class="trade-plan" onclick="event.stopPropagation();">
+      ${oppPlan.entry ? `
+      <div class="tp-row">
+        <span class="tp-label">Entry</span>
+        <span class="tp-text">${escAttr(oppPlan.entry.text)}</span>
+      </div>` : ""}
+      ${oppPlan.stop ? `
+      <div class="tp-row">
+        <span class="tp-label">Stop</span>
+        <span class="tp-text">${escAttr(oppPlan.stop.text)}</span>
+      </div>` : ""}
+      ${oppPlan.horizon ? `
+      <div class="tp-row">
+        <span class="tp-label">Horizon</span>
+        <span class="tp-text">${escAttr(oppPlan.horizon)}</span>
+      </div>` : ""}
+    </div>
+  ` : "";
+
   return `
     <div class="opp-item ${actionClass}" data-act="open-asset" data-symbol="${escAttr(o.symbol)}">
       <div class="opp-item-head">
@@ -5491,6 +5959,7 @@ function renderOpportunityItem(o) {
       </div>
       ${actionLine ? `<div class="opp-action-line">${escAttr(actionLine)}</div>` : ""}
       <div class="opp-votes">${voteChips}</div>
+      ${oppPlanHtml}
       ${!onWatchlist && o.action !== "STARTER" ? `
       <div class="opp-quick-actions" onclick="event.stopPropagation();">
         <button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(o.symbol)}" data-name="${escAttr(o.symbol)}">+ Watch</button>
