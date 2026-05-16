@@ -3175,20 +3175,6 @@ function getRecStatus(recKey) {
   return state.recStatus[recKey]?.status || null;
 }
 
-// Cache config constants — declared here (before `state`) because their
-// load*Cache() functions are invoked during state initialization below.
-// `const` is not hoisted into a usable form, so referencing these from a
-// loader before this point throws a temporal-dead-zone ReferenceError.
-const IV_RANK_CACHE_KEY = "ivRank_v2";
-const IV_RANK_LEGACY_KEYS = ["ivRank_v1"];
-const IV_RANK_TTL_HOURS = 4;
-const MACRO_CACHE_KEY = "macroRegime_v1";
-const MACRO_TTL_HOURS = 6;
-const SHORT_INTEREST_CACHE_KEY = "shortInterest_v1";
-const SHORT_INTEREST_TTL_HOURS = 24;
-const CALENDAR_CACHE_KEY = "calendarData_v1";
-const CALENDAR_TTL_HOURS = 24; // worker side caches 6h already
-
 const state = {
   uid: null,
   pinAttempts: 0,
@@ -4307,6 +4293,9 @@ function computeRSSeries(targetCloses, benchCloses) {
 // Data refresh: localStorage TTL of 6 hours (macro moves slowly).
 // ============================================================================
 
+const MACRO_CACHE_KEY = "macroRegime_v1";
+const MACRO_TTL_HOURS = 6;
+
 function loadMacroCache() {
   try {
     const raw = localStorage.getItem(MACRO_CACHE_KEY);
@@ -4537,6 +4526,9 @@ function symbolMacroVerdict(symbol, assetClass, regime) {
 // SHORT INTEREST — Days-to-Cover for SCAN_UNIVERSE
 // Cached for 24h since FINRA short data is bi-monthly anyway.
 // ============================================================================
+const SHORT_INTEREST_CACHE_KEY = "shortInterest_v1";
+const SHORT_INTEREST_TTL_HOURS = 24;
+
 function loadShortInterestCache() {
   try {
     const raw = localStorage.getItem(SHORT_INTEREST_CACHE_KEY);
@@ -4588,6 +4580,9 @@ async function fetchShortInterestForUniverse(symbols) {
 // to ±2 hard-capped). It nudges conviction but does NOT flip action labels.
 // A single calendar date should never override Daily Scan + AI + Pre-Surge.
 // ============================================================================
+
+const CALENDAR_CACHE_KEY = "calendarData_v1";
+const CALENDAR_TTL_HOURS = 24; // worker side caches 6h already
 
 function loadCalendarCache() {
   try {
@@ -4651,6 +4646,10 @@ function calendarFor(symbol) {
 //   v1 → v2 (May 2026): worker v1.7 added `source` field for IV/HV distinction.
 //   Old v1 cache lacks this field. Any cached entry without `source` is treated
 //   as invalid and the whole cache is discarded so we re-fetch from the new worker.
+const IV_RANK_CACHE_KEY = "ivRank_v2";
+const IV_RANK_LEGACY_KEYS = ["ivRank_v1"];
+const IV_RANK_TTL_HOURS = 4;
+
 function loadIvRankCache() {
   // Clean up legacy keys so stale data doesn't sit in localStorage forever.
   // Runs once per page load; localStorage.removeItem on a missing key is a no-op.
@@ -4968,6 +4967,76 @@ function computeTimingVote(symbol, assetClass) {
     note: chipLabel,
     sources, // kept for debugging; UI uses note
   };
+}
+
+// ----------------------------------------------------------------------------
+// IV VOTE — penalize entries when implied/realized vol is elevated and there's
+// NO earnings catalyst to justify the elevated vol.
+//
+// Why a separate vote from Timing:
+//   - Timing already handles earnings-imminent (-0.5 weight). If IV is high
+//     BECAUSE of earnings, Timing has it covered — IV vote would double-count.
+//   - The case this catches is different: IV elevated for *no obvious reason*.
+//     Examples: stock just ran 15% in a week, sector rotation, macro fear.
+//     Entering here means paying up — you're chasing volatility, not entering
+//     a quiet setup that's about to expand.
+//
+// Logic:
+//   - If earnings within 7 days exist → skip this vote (Timing already firing)
+//   - If macro event within 3 days → skip (already penalized by Timing macro source)
+//   - IV/HV rank ≥ 90 (extreme): -0.4 weight
+//   - IV/HV rank ≥ 75 (elevated, stricter than chip threshold): -0.2 weight
+//   - IV/HV rank ≤ 15 (compressed): +0.2 weight (often precedes expansion)
+//   - Otherwise: no vote
+//
+// Weight chosen to be smaller than Timing (±0.5) so two simultaneous fires
+// (Timing -0.5 + IV -0.4) can't combine to override a 1.0+ buy vote.
+// ----------------------------------------------------------------------------
+function computeIvVote(symbol) {
+  const iv = ivRankFor(symbol);
+  if (!iv || iv.iv_rank == null) return null;
+
+  // Skip if earnings imminent — Timing handles this case
+  const cal = calendarFor(symbol);
+  if (cal?.earnings_date) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const earn = new Date(cal.earnings_date + "T00:00:00");
+    const daysOut = Math.round((earn.getTime() - today.getTime()) / 86400000);
+    if (daysOut >= 0 && daysOut <= 7) return null; // Timing owns this
+  }
+
+  // Skip if macro event imminent — Timing handles this case too
+  const macros = upcomingMacroEvents(3);
+  if (macros.length > 0) return null;
+
+  const r = iv.iv_rank;
+  const prefix = iv.source === "hv" ? "HV" : "IV";
+
+  if (r >= 90) {
+    return {
+      signal: "Vol",
+      dir: "tilt",
+      weight: -0.4,
+      note: `${prefix} ${Math.round(r)} extreme — paying up for vol`,
+    };
+  }
+  if (r >= 75) {
+    return {
+      signal: "Vol",
+      dir: "tilt",
+      weight: -0.2,
+      note: `${prefix} ${Math.round(r)} elevated — entry expensive`,
+    };
+  }
+  if (r <= 15) {
+    return {
+      signal: "Vol",
+      dir: "tilt",
+      weight: 0.2,
+      note: `${prefix} ${Math.round(r)} compressed — coiled`,
+    };
+  }
+  return null;
 }
 
 // ============================================================================
@@ -5617,6 +5686,13 @@ function computeHeldVerdict(holding, cachedScanActions) {
     votes.push(timing);
   }
 
+  // --- VOL vote (IV/HV rank — entry cost when no event nearby) ---
+  // Skipped automatically when earnings/macro within window (Timing owns those).
+  const volVote = computeIvVote(sym);
+  if (volVote) {
+    votes.push(volVote);
+  }
+
   // --- Tally ---
   let net = 0;
   for (const v of votes) {
@@ -6084,6 +6160,12 @@ function computeOpportunityVerdict(symbol, assetClassGuess) {
     votes.push(timing);
   }
 
+  // --- VOL vote (IV/HV rank as entry cost when no event nearby) ---
+  const volVote = computeIvVote(symbol);
+  if (volVote) {
+    votes.push(volVote);
+  }
+
   // --- Tally ---
   let net = 0;
   for (const v of votes) {
@@ -6302,7 +6384,7 @@ function renderTodaysVerdictCard() {
       </div>
       ${body}
       ${holdsLine}
-      <div class="verdict-footer">Synthesizes Daily Scan + AI Analysis + Pre-Surge + Macro + News + Timing into one weighted verdict per held symbol</div>
+      <div class="verdict-footer">Synthesizes Daily Scan + AI Analysis + Pre-Surge + Macro + News + Timing + Vol into one weighted verdict per held symbol</div>
     </div>
   `;
 }
@@ -6332,9 +6414,15 @@ function renderVerdictItem(v) {
   // Renders as "IV 67" when source=iv (real implied vol from options chain) or
   // "HV 67" when source=hv (realized vol fallback when options unavailable).
   // Both use the same percentile scale so the band coloring is identical.
+  //
+  // SUPPRESSED when the Vol vote is firing — that vote chip carries the same
+  // info plus shows it's affecting the verdict score, so showing both would
+  // be redundant. The standalone chip only appears for symbols where vol is
+  // in the "normal" range (15-75) and not actively voting.
   const iv = ivRankFor(v.symbol);
+  const volVoteFiring = v.votes.some(x => x.signal === "Vol");
   let ivChipHtml = "";
-  if (iv && iv.iv_rank != null) {
+  if (iv && iv.iv_rank != null && !volVoteFiring) {
     const r = Math.round(iv.iv_rank);
     const isHv = iv.source === "hv";
     const prefix = isHv ? "HV" : "IV";
@@ -6655,7 +6743,7 @@ function renderTodaysOpportunitiesCard() {
       <div class="opps-list">
         ${top5.map(o => renderOpportunityItem(o)).join("")}
       </div>
-      <div class="opps-footer">Top 5 by conviction · Pre-Surge + Watchlist + News + ETF Momentum + Ideas + Macro + Timing</div>
+      <div class="opps-footer">Top 5 by conviction · Pre-Surge + Watchlist + News + ETF Momentum + Ideas + Macro + Timing + Vol</div>
     </div>
   `;
 }
@@ -6679,10 +6767,11 @@ function renderOpportunityItem(o) {
   const buyVotes = o.votes.filter(x => x.dir === "buy");
   const tiltVotes = o.votes.filter(x => x.dir === "tilt");
 
-  // IV rank chip (informational)
+  // IV rank chip (informational) — suppressed if Vol vote is firing
   const iv = ivRankFor(o.symbol);
+  const volVoteFiring = o.votes.some(x => x.signal === "Vol");
   let ivChipHtml = "";
-  if (iv && iv.iv_rank != null) {
+  if (iv && iv.iv_rank != null && !volVoteFiring) {
     const r = Math.round(iv.iv_rank);
     const isHv = iv.source === "hv";
     const prefix = isHv ? "HV" : "IV";
