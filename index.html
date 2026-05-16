@@ -87,7 +87,7 @@ body {
 
 .tabs {
   position: fixed; bottom: 0; left: 0; right: 0;
-  display: grid; grid-template-columns: repeat(7, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   background: var(--bg);
   border-top: 1px solid var(--rule);
   padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
@@ -95,15 +95,63 @@ body {
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
 }
 .tab {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 8px 2px; border: none; background: transparent;
   color: var(--ink-muted);
-  font-family: var(--sans); font-size: 9.5px; font-weight: 500; letter-spacing: 0.04em;
+  font-family: var(--sans); font-size: 11px; font-weight: 500; letter-spacing: 0.03em;
   cursor: pointer; transition: color .15s; border-radius: 10px;
 }
 .tab.active { color: var(--ink); }
 .tab svg { width: 22px; height: 22px; stroke-width: 1.5; pointer-events: none; }
 .tab.active svg { stroke-width: 2; }
+
+/* Sub-tab bar inside Discover and Signals.
+   Sits below the topbar, scrolls with content (not sticky). */
+.subtabs {
+  display: flex; gap: 4px; padding: 12px 16px 4px;
+  border-bottom: 1px solid var(--rule-soft);
+  margin-bottom: 14px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.subtabs::-webkit-scrollbar { display: none; }
+.subtab {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border: none; background: transparent;
+  color: var(--ink-muted);
+  font-family: var(--sans); font-size: 13px; font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer; border-radius: 999px;
+  transition: background .15s, color .15s;
+  white-space: nowrap;
+}
+.subtab:hover { color: var(--ink-soft); }
+.subtab.active {
+  background: var(--ink); color: var(--bg);
+}
+
+/* "All quiet" pill — shown on Portfolio when there's nothing urgent to surface.
+   Tap to jump to Signals where the demoted cards live. */
+.attention-quiet {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 16px 4px; padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.attention-quiet:hover { background: var(--bg-elev); border-color: var(--rule); }
+.attention-quiet-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green-soft);
+  flex-shrink: 0;
+}
+.attention-quiet-text { flex: 1; }
+.attention-quiet-arrow { color: var(--ink-muted); font-size: 14px; }
 
 .section-head {
   display: flex; justify-content: space-between; align-items: baseline;
@@ -2963,32 +3011,15 @@ body {
         <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
       </svg>Portfolio
     </button>
-    <button class="tab" data-view="markets">
+    <button class="tab" data-view="discover">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/>
-      </svg>Markets
+        <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+      </svg>Discover
     </button>
-    <button class="tab" data-view="watchlist">
+    <button class="tab" data-view="signals">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>
-      </svg>Watchlist
-    </button>
-    <button class="tab" data-view="journal">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 4h13a3 3 0 0 1 3 3v13a3 3 0 0 1-3 3H4z"/><path d="M8 8h8M8 12h8M8 16h5"/>
-      </svg>Journal
-    </button>
-    <button class="tab" data-view="news">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M8 8h8M8 12h8M8 16h5"/><path d="M20 7v10a3 3 0 0 0 3 3"/>
-      </svg>News
-    </button>
-    <button class="tab" data-view="bot">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="4" y="7" width="16" height="12" rx="2"/>
-        <path d="M9 3v4M15 3v4M9 13v.01M15 13v.01M9 17h6"/>
-      </svg>Bot
+        <path d="M2 12h3l3-9 4 18 3-9h7"/>
+      </svg>Signals
     </button>
     <button class="tab" data-view="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
@@ -3933,7 +3964,7 @@ async function runScan() {
         for (const item of j.results) state.watchlistSnapshot[item.symbol] = item;
         state.lastScanAt = new Date().toISOString();
         await loadTriggers();
-        if (state.currentView === "portfolio" || state.currentView === "watchlist") renderCurrentView();
+        if (state.currentView === "portfolio" || state.currentView === "discover") renderCurrentView();
         return j;
       }
     }
@@ -3963,7 +3994,7 @@ async function runScan() {
       }
     }
   }
-  if (state.currentView === "portfolio" || state.currentView === "watchlist") renderCurrentView();
+  if (state.currentView === "portfolio" || state.currentView === "discover") renderCurrentView();
   return { results: Object.values(state.watchlistSnapshot) };
 }
 
@@ -5649,17 +5680,45 @@ function computePortfolioRisk() {
 // ============================================================================
 // VIEWS
 // ============================================================================
+// ----------------------------------------------------------------------------
+// Router — 4 top-level views:
+//   portfolio, discover, signals, settings.
+// Legacy view names (markets, watchlist, journal, news, bot) are remapped
+// so existing setView() calls and deep links keep working:
+//   markets, watchlist  -> discover
+//   news, bot, journal  -> signals
+// Sub-content is rendered inside the parent view via state.discoverTab /
+// state.signalsTab so the original render functions are reused unchanged.
+// ----------------------------------------------------------------------------
 function renderCurrentView() {
   const v = state.currentView;
-  if (v === "portfolio") renderPortfolio();
-  else if (v === "markets") renderMarkets();
-  else if (v === "watchlist") renderWatchlist();
-  else if (v === "journal") renderJournal();
-  else if (v === "news") renderNews();
-  else if (v === "bot") renderBot();
-  else if (v === "settings") renderSettings();
+  if (v === "portfolio") return renderPortfolio();
+  if (v === "discover")  return renderDiscover();
+  if (v === "signals")   return renderSignals();
+  if (v === "settings")  return renderSettings();
+  // Legacy fallthrough — shouldn't fire after setView() normalisation but
+  // keeps any stale state from breaking the app.
+  if (v === "markets" || v === "watchlist") { state.currentView = "discover"; return renderDiscover(); }
+  if (v === "journal" || v === "news" || v === "bot") { state.currentView = "signals"; return renderSignals(); }
+  state.currentView = "portfolio";
+  renderPortfolio();
 }
 function setView(v) {
+  // Remap legacy view names to the new 4-tab structure. Sub-tab is remembered
+  // so e.g. setView("watchlist") still lands the user on the watchlist content.
+  const LEGACY_TO_NEW = {
+    markets:   { view: "discover", sub: "markets" },
+    watchlist: { view: "discover", sub: "watchlist" },
+    journal:   { view: "signals",  sub: "journal" },
+    news:      { view: "signals",  sub: "news" },
+    bot:       { view: "signals",  sub: "bot" },
+  };
+  const mapped = LEGACY_TO_NEW[v];
+  if (mapped) {
+    if (mapped.view === "discover") state.discoverTab = mapped.sub;
+    if (mapped.view === "signals")  state.signalsTab  = mapped.sub;
+    v = mapped.view;
+  }
   state.currentView = v;
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === v));
   state.selectedSymbol = null;
@@ -8072,8 +8131,8 @@ function renderPortfolio() {
     </div>`;
   }
 
-  const oppCard = renderOpportunityPulse();
-  const portAnalysisCard = renderPortAnalysisInlineCard();
+  const oppCard = "";
+  const portAnalysisCard = "";
 
   let holdingsHtml = "";
   if (state.holdings.length === 0) {
@@ -8127,29 +8186,7 @@ function renderPortfolio() {
       <div class="alloc-legend">${allocLegend}</div>
     </div>
 
-    ${renderBreakoutPrompt()}
-
-    ${renderMacroRegimeCard()}
-
-    ${renderRiskCard()}
-
-    ${renderTodaysVerdictCard()}
-
-    ${renderTodaysOpportunitiesCard()}
-
-    <div class="raw-signals-section">
-      <button class="raw-signals-toggle" data-act="toggle-raw-signals">
-        <span class="rst-arrow">${state.rawSignalsExpanded ? "▼" : "▶"}</span>
-        <span class="rst-label">Raw Signals</span>
-        <span class="rst-sub">${state.rawSignalsExpanded ? "Hide" : "Show"} the underlying scan, AI, and Pre-Surge data the Verdict synthesizes</span>
-      </button>
-      ${state.rawSignalsExpanded ? `
-        ${renderPreSurgeCard()}
-        ${renderDailyScan()}
-        ${oppCard}
-        ${portAnalysisCard}
-      ` : ""}
-    </div>
+    ${renderAttentionSlot()}
 
     <div class="section-head" style="padding: 0 20px; margin-top: 20px;">
       <h2>Holdings</h2>
@@ -8158,6 +8195,29 @@ function renderPortfolio() {
     <div class="holdings">${holdingsHtml}</div>
   `;
   $("#topbarTitle").textContent = "Portfolio";
+}
+
+// ----------------------------------------------------------------------------
+// Attention slot — picks ONE thing worth surfacing on the home screen.
+// Priority: breakout prompt > risk warning > today's verdict.
+// If nothing qualifies, renders a tiny "all quiet" pill linking to Signals.
+// Everything that used to crowd the portfolio screen now lives in Signals.
+// ----------------------------------------------------------------------------
+function renderAttentionSlot() {
+  const breakout = renderBreakoutPrompt();
+  if (breakout && breakout.trim()) return breakout;
+
+  const risk = renderRiskCard();
+  if (risk && risk.trim()) return risk;
+
+  const verdict = renderTodaysVerdictCard();
+  if (verdict && verdict.trim()) return verdict;
+
+  return `<div class="attention-quiet" data-act="open-signals">
+    <span class="attention-quiet-dot"></span>
+    <span class="attention-quiet-text">All quiet. Tap to see macro, scans, and opportunities.</span>
+    <span class="attention-quiet-arrow">→</span>
+  </div>`;
 }
 
 // ----------------------------------------------------------------------------
@@ -8461,13 +8521,15 @@ function renderWatchlist() {
       .catch(() => {})
       .finally(() => {
         state._snapFetching = false;
-        if (state.currentView === "watchlist" && !state.selectedSymbol) renderWatchlist();
+        if (state.currentView === "discover" && state.discoverTab === "watchlist" && !state.selectedSymbol) renderDiscover();
       });
   }
 }
 
 function openWatchItem(symbol) {
   state.selectedSymbol = symbol;
+  state.currentView = "discover";
+  state.discoverTab = "watchlist";
   renderWatchDetail(symbol);
 }
 
@@ -8971,10 +9033,11 @@ async function addCuratedToWatchlist(symbol, name) {
 async function analyzeFromDiscover(symbol, name) {
   if (!symbol) return;
   toast(`Loading ${symbol}…`, 1500);
-  // Switch to markets view, then render asset detail (renderAssetDetail handles unknown symbols)
-  state.currentView = "markets";
+  // Switch to Discover (markets sub-tab), then render asset detail.
+  state.currentView = "discover";
+  state.discoverTab = "markets";
   state.selectedSymbol = symbol;
-  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === "markets"));
+  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === "discover"));
   await renderAssetDetail(symbol);
   // After view is rendered, trigger the analysis (with sanity check)
   setTimeout(() => {
@@ -9195,7 +9258,10 @@ function renderWatchDetail(symbol) {
 
 function backToWatchlist() {
   state.selectedSymbol = null;
-  renderWatchlist();
+  state.discoverTab = "watchlist";
+  state.currentView = "discover";
+  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === "discover"));
+  renderDiscover();
 }
 
 async function rescan() {
@@ -9248,18 +9314,24 @@ function renderMarketsList() {
 function openAsset(symbol, fromView) {
   state.selectedSymbol = symbol;
   if (fromView) state._fromView = fromView;
-  state.currentView = "markets";
-  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === "markets"));
-  renderAssetDetail(symbol);
+  state.currentView = "discover";
+  state.discoverTab = (fromView === "watchlist") ? "watchlist" : "markets";
+  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === "discover"));
+  // Detail renderer writes into #view directly; pass through.
+  if (state.discoverTab === "watchlist") renderWatchDetail(symbol);
+  else renderAssetDetail(symbol);
 }
 function backToMarkets() {
   state.selectedSymbol = null;
   if (state._fromView === "watchlist") {
     state._fromView = null;
-    setView("watchlist");
-    return;
+    state.discoverTab = "watchlist";
+  } else {
+    state.discoverTab = "markets";
   }
-  renderMarketsList();
+  state.currentView = "discover";
+  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === "discover"));
+  renderDiscover();
 }
 
 async function renderAssetDetail(symbol) {
@@ -9992,6 +10064,91 @@ async function loadJournal() {
     .orderBy("date", "desc").limit(100).get();
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
+
+// ============================================================================
+// DISCOVER — Markets + Watchlist merged. Sub-tab switcher at the top.
+// state.discoverTab: "markets" | "watchlist" (default "markets").
+// Asset detail drill-downs continue to use renderMarkets() / renderWatchlist()
+// internals because they handle state.selectedSymbol routing.
+// ============================================================================
+function renderDiscover() {
+  // Detail-view passthrough: if a symbol is selected, defer to the existing
+  // detail renderers — they already handle their own back-navigation.
+  if (state.selectedSymbol) {
+    if (state.discoverTab === "watchlist") return renderWatchDetail(state.selectedSymbol);
+    return renderAssetDetail(state.selectedSymbol);
+  }
+  if (!state.discoverTab) state.discoverTab = "markets";
+  const sub = state.discoverTab;
+  $("#topbarTitle").textContent = "Discover";
+  const view = $("#view");
+  view.innerHTML = `
+    <div class="subtabs">
+      <button class="subtab ${sub === 'markets' ? 'active' : ''}" data-act="discover-sub" data-sub="markets">Markets</button>
+      <button class="subtab ${sub === 'watchlist' ? 'active' : ''}" data-act="discover-sub" data-sub="watchlist">Watchlist</button>
+    </div>
+    <div id="discoverBody"></div>
+  `;
+  // The legacy renderers write directly into #view. Temporarily point them at
+  // a child container so the subtab bar stays visible.
+  const body = $("#discoverBody");
+  const realView = view;
+  // Monkey-patch $("#view") just for this render — simpler than refactoring
+  // the legacy functions. We swap the id, run the renderer, swap it back.
+  realView.id = "view-outer";
+  body.id = "view";
+  try {
+    if (sub === "watchlist") renderWatchlist();
+    else renderMarketsList();
+  } finally {
+    body.id = "discoverBody";
+    realView.id = "view";
+  }
+}
+
+// ============================================================================
+// SIGNALS — everything the app surfaces TO the user that isn't a holding.
+// Sub-tabs: News, Scans (macro + daily scan + pre-surge + opportunities),
+// Journal, Bot. state.signalsTab default "news".
+// ============================================================================
+function renderSignals() {
+  if (!state.signalsTab) state.signalsTab = "news";
+  const sub = state.signalsTab;
+  $("#topbarTitle").textContent = "Signals";
+  const view = $("#view");
+  view.innerHTML = `
+    <div class="subtabs">
+      <button class="subtab ${sub === 'news' ? 'active' : ''}" data-act="signals-sub" data-sub="news">News</button>
+      <button class="subtab ${sub === 'scans' ? 'active' : ''}" data-act="signals-sub" data-sub="scans">Scans</button>
+      <button class="subtab ${sub === 'journal' ? 'active' : ''}" data-act="signals-sub" data-sub="journal">Journal</button>
+      <button class="subtab ${sub === 'bot' ? 'active' : ''}" data-act="signals-sub" data-sub="bot">Bot</button>
+    </div>
+    <div id="signalsBody"></div>
+  `;
+  const body = $("#signalsBody");
+  const realView = view;
+  realView.id = "view-outer";
+  body.id = "view";
+  try {
+    if (sub === "news")    { renderNews(); }
+    else if (sub === "journal") { renderJournal(); }
+    else if (sub === "bot")     { renderBot(); }
+    else { // "scans" — the demoted home-screen cards live here
+      body.innerHTML = `
+        ${renderMacroRegimeCard()}
+        ${renderTodaysOpportunitiesCard()}
+        ${renderPreSurgeCard()}
+        ${renderDailyScan()}
+        ${renderOpportunityPulse()}
+        ${renderPortAnalysisInlineCard()}
+      `;
+    }
+  } finally {
+    body.id = "signalsBody";
+    realView.id = "view";
+  }
+}
+
 async function renderJournal() {
   $("#topbarTitle").textContent = "Trade Journal";
   const view = $("#view");
@@ -12473,6 +12630,18 @@ document.addEventListener("click", (e) => {
       case "open-watch":             openWatchItem(symbol); break;
       case "back-watch":             backToWatchlist(); break;
       case "back-markets":           backToMarkets(); break;
+      case "discover-sub":
+        state.discoverTab = target.dataset.sub || "markets";
+        state.selectedSymbol = null;
+        renderCurrentView();
+        break;
+      case "signals-sub":
+        state.signalsTab = target.dataset.sub || "news";
+        renderCurrentView();
+        break;
+      case "open-signals":
+        setView("signals");
+        break;
       case "set-range":              setRange(target.dataset.range, symbol); break;
       case "run-analysis":           runAnalysis(symbol); break;
       case "analyze-symbol":         analyzeSymbolFromCard(symbol); break;
