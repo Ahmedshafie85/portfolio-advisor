@@ -4296,20 +4296,26 @@ function computeRSSeries(targetCloses, benchCloses) {
 const MACRO_CACHE_KEY = "macroRegime_v1";
 const MACRO_TTL_HOURS = 6;
 
+// IMPORTANT: cache key/TTL inlined inside functions to avoid TDZ on state init.
+// (Same pattern as the calendar and IV-rank cache loaders below.)
+
 function loadMacroCache() {
+  const CACHE_KEY = "macroRegime_v1";
+  const TTL_HOURS = 6;
   try {
-    const raw = localStorage.getItem(MACRO_CACHE_KEY);
+    const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const c = JSON.parse(raw);
     if (!c.fetchedAt) return null;
     const ageH = (Date.now() - new Date(c.fetchedAt).getTime()) / 3600000;
-    if (ageH > MACRO_TTL_HOURS) return null;
+    if (ageH > TTL_HOURS) return null;
     return c;
   } catch (e) { return null; }
 }
 function saveMacroCache(payload) {
+  const CACHE_KEY = "macroRegime_v1";
   try {
-    localStorage.setItem(MACRO_CACHE_KEY, JSON.stringify({
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
       ...payload, fetchedAt: new Date().toISOString(),
     }));
   } catch (e) {}
@@ -4526,23 +4532,26 @@ function symbolMacroVerdict(symbol, assetClass, regime) {
 // SHORT INTEREST — Days-to-Cover for SCAN_UNIVERSE
 // Cached for 24h since FINRA short data is bi-monthly anyway.
 // ============================================================================
-const SHORT_INTEREST_CACHE_KEY = "shortInterest_v1";
-const SHORT_INTEREST_TTL_HOURS = 24;
+
+// IMPORTANT: cache key/TTL inlined inside functions to avoid TDZ on state init.
 
 function loadShortInterestCache() {
+  const CACHE_KEY = "shortInterest_v1";
+  const TTL_HOURS = 24;
   try {
-    const raw = localStorage.getItem(SHORT_INTEREST_CACHE_KEY);
+    const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const c = JSON.parse(raw);
     if (!c.fetchedAt) return null;
     const ageH = (Date.now() - new Date(c.fetchedAt).getTime()) / 3600000;
-    if (ageH > SHORT_INTEREST_TTL_HOURS) return null;
+    if (ageH > TTL_HOURS) return null;
     return c.results || null;
   } catch (e) { return null; }
 }
 function saveShortInterestCache(results) {
+  const CACHE_KEY = "shortInterest_v1";
   try {
-    localStorage.setItem(SHORT_INTEREST_CACHE_KEY, JSON.stringify({
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
       results, fetchedAt: new Date().toISOString(),
     }));
   } catch (e) {}
@@ -4581,23 +4590,32 @@ async function fetchShortInterestForUniverse(symbols) {
 // A single calendar date should never override Daily Scan + AI + Pre-Surge.
 // ============================================================================
 
-const CALENDAR_CACHE_KEY = "calendarData_v1";
-const CALENDAR_TTL_HOURS = 24; // worker side caches 6h already
+// IMPORTANT: cache key and TTL inlined inside the functions, NOT declared at
+// module scope. Reason: state initialization calls loadCalendarCache() during
+// the object literal evaluation, but top-level `const`s declared after the
+// state object are in the temporal dead zone at that point. Inlining inside
+// the function makes them evaluated at call time. Until May 2026 this bug
+// was silently failing (try/catch swallowed the ReferenceError, calendar
+// cache always returned null on first load), so the fix here also restores
+// the actual cache hit behavior.
 
 function loadCalendarCache() {
+  const CACHE_KEY = "calendarData_v1";
+  const TTL_HOURS = 24; // worker side caches 6h already
   try {
-    const raw = localStorage.getItem(CALENDAR_CACHE_KEY);
+    const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const c = JSON.parse(raw);
     if (!c.fetchedAt) return null;
     const ageH = (Date.now() - new Date(c.fetchedAt).getTime()) / 3600000;
-    if (ageH > CALENDAR_TTL_HOURS) return null;
+    if (ageH > TTL_HOURS) return null;
     return c.results || null;
   } catch (e) { return null; }
 }
 function saveCalendarCache(results) {
+  const CACHE_KEY = "calendarData_v1";
   try {
-    localStorage.setItem(CALENDAR_CACHE_KEY, JSON.stringify({
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
       results, fetchedAt: new Date().toISOString(),
     }));
   } catch (e) {}
@@ -4646,23 +4664,31 @@ function calendarFor(symbol) {
 //   v1 → v2 (May 2026): worker v1.7 added `source` field for IV/HV distinction.
 //   Old v1 cache lacks this field. Any cached entry without `source` is treated
 //   as invalid and the whole cache is discarded so we re-fetch from the new worker.
-const IV_RANK_CACHE_KEY = "ivRank_v2";
-const IV_RANK_LEGACY_KEYS = ["ivRank_v1"];
-const IV_RANK_TTL_HOURS = 4;
+//
+// IMPORTANT: constants are inlined inside the functions below, NOT declared at
+// module scope. Reason: state initialization (line ~3160) calls loadIvRankCache().
+// If these were top-level `const`s declared here (after state init), accessing
+// them from inside the function during state init would hit the temporal dead
+// zone and crash boot. Inlining inside the function makes them evaluated at
+// call time, not module-load time, which is what we need.
 
 function loadIvRankCache() {
+  const CACHE_KEY = "ivRank_v2";
+  const LEGACY_KEYS = ["ivRank_v1"];
+  const TTL_HOURS = 4;
+
   // Clean up legacy keys so stale data doesn't sit in localStorage forever.
   // Runs once per page load; localStorage.removeItem on a missing key is a no-op.
-  for (const k of IV_RANK_LEGACY_KEYS) {
+  for (const k of LEGACY_KEYS) {
     try { localStorage.removeItem(k); } catch (e) {}
   }
   try {
-    const raw = localStorage.getItem(IV_RANK_CACHE_KEY);
+    const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const c = JSON.parse(raw);
     if (!c.fetchedAt) return null;
     const ageH = (Date.now() - new Date(c.fetchedAt).getTime()) / 3600000;
-    if (ageH > IV_RANK_TTL_HOURS) return null;
+    if (ageH > TTL_HOURS) return null;
     if (!c.results || typeof c.results !== "object") return null;
     // Shape validation: every non-null entry must have a `source` field.
     // If any entry fails this, the cache is from an old worker version and
@@ -4672,7 +4698,7 @@ function loadIvRankCache() {
       if (entry === null) continue; // null is fine — symbol legitimately has no data
       if (!entry.source || (entry.source !== "iv" && entry.source !== "hv")) {
         // Old-shape cache detected → invalidate everything
-        try { localStorage.removeItem(IV_RANK_CACHE_KEY); } catch (e) {}
+        try { localStorage.removeItem(CACHE_KEY); } catch (e) {}
         return null;
       }
     }
@@ -4680,8 +4706,9 @@ function loadIvRankCache() {
   } catch (e) { return null; }
 }
 function saveIvRankCache(results) {
+  const CACHE_KEY = "ivRank_v2";
   try {
-    localStorage.setItem(IV_RANK_CACHE_KEY, JSON.stringify({
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
       results, fetchedAt: new Date().toISOString(),
     }));
   } catch (e) {}
