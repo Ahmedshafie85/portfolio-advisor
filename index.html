@@ -1003,6 +1003,52 @@ body {
   content: ""; position: absolute; left: 0; top: 0; bottom: 0;
   width: 3px; background: var(--ink);
 }
+/* ===== PORTFOLIO RISK CARD ===== */
+.risk-card {
+  margin: 12px 20px 0;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+}
+.risk-card::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px; background: var(--gold);
+}
+.risk-head { padding: 14px 18px 8px; }
+.risk-head h3 {
+  font-family: var(--display); font-size: 16px; font-weight: 500;
+  letter-spacing: -0.005em; margin-bottom: 2px;
+}
+.risk-sub {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-muted); letter-spacing: 0.04em;
+}
+.risk-list { display: flex; flex-direction: column; border-top: 1px solid var(--rule-soft); }
+.risk-row { padding: 12px 18px; border-bottom: 1px solid var(--rule-soft); }
+.risk-row:last-child { border-bottom: none; }
+.risk-row-warn { background: rgba(161,61,45,0.05); }
+.risk-row-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; }
+.risk-tag {
+  font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 4px;
+}
+.risk-tag.warn  { background: var(--red);   color: var(--bg); }
+.risk-tag.over  { background: var(--gold);  color: var(--bg); }
+.risk-tag.under { background: var(--bg-elev); color: var(--ink-soft); border: 1px solid var(--rule); }
+.risk-row-pct {
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted);
+  letter-spacing: 0.03em;
+}
+.risk-row-text { font-size: 12.5px; color: var(--ink-soft); line-height: 1.45; }
+.risk-row-text b { color: var(--ink); font-weight: 600; }
+.risk-footer {
+  padding: 9px 18px; font-family: var(--mono); font-size: 10px;
+  color: var(--ink-muted); border-top: 1px solid var(--rule-soft);
+  background: var(--bg-elev); letter-spacing: 0.02em;
+}
 .verdict-head {
   display: flex; justify-content: space-between; align-items: start;
   gap: 12px; padding: 14px 18px 8px;
@@ -1291,6 +1337,8 @@ body {
   flex: 1;
   color: var(--ink-soft);
 }
+.tp-row-warn .tp-text { color: var(--red); }
+.tp-row-warn .tp-label { color: var(--red-soft); }
 .verdict-holds {
   padding: 10px 18px;
   border-top: 1px solid var(--rule-soft);
@@ -5506,6 +5554,99 @@ function portfolioMetrics() {
 }
 
 // ============================================================================
+// PORTFOLIO RISK ANALYSIS — allocation drift + correlation/concentration.
+// Pure client-side: no network, no AI. Runs on every portfolio render.
+//
+// 1. DRIFT: compares current asset-class weights against a target model.
+//    The default target is a moderate-growth mix; the user can override it
+//    via localStorage key "targetAlloc" (JSON map of class→fraction).
+//    Any class more than DRIFT_TOLERANCE off target is flagged with the
+//    concrete rebalancing action.
+//
+// 2. CONCENTRATION: groups holdings into "correlated clusters" — positions
+//    that really move as one bet (e.g. BTC + ETH + MSTR = one crypto bet).
+//    If any cluster exceeds CLUSTER_WARN_PCT of the portfolio it's flagged,
+//    because the allocation strip's per-class view hides this.
+// ============================================================================
+const DEFAULT_TARGET_ALLOC = {
+  etf: 0.55, us_stock: 0.20, crypto: 0.10, metal: 0.10, cash: 0.05,
+};
+const DRIFT_TOLERANCE  = 0.07; // 7 percentage points off target = flag
+const CLUSTER_WARN_PCT = 35;   // a single correlated bet over 35% = flag
+
+function getTargetAlloc() {
+  try {
+    const raw = localStorage.getItem("targetAlloc");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed;
+    }
+  } catch (e) {}
+  return DEFAULT_TARGET_ALLOC;
+}
+
+// Map a holding to its correlation cluster. These are deliberately broad —
+// the point is to surface "this is really one bet", not precise factor models.
+function correlationCluster(h) {
+  const sym = (h.symbol || "").toUpperCase();
+  const cls = h.asset_class;
+  // MSTR trades as a leveraged Bitcoin proxy → belongs in the crypto bet.
+  if (cls === "crypto" || sym === "MSTR") return "Crypto / digital assets";
+  if (cls === "metal")  return "Precious metals";
+  if (cls === "cash")   return "Cash";
+  // Tech / AI / semis names and ETFs cluster together.
+  const techish = ["QQQ","SMH","SOXX","VGT","XLK","NVDA","AMD","AVGO","TSM","MSFT","AAPL","GOOGL","META","AMZN","SWRD"];
+  if (techish.includes(sym)) return "Tech / AI / semis";
+  if (cls === "etf") return "Broad equity ETFs";
+  return "Individual equities";
+}
+
+function computePortfolioRisk() {
+  const pm = portfolioMetrics();
+  const total = pm.totalValue;
+  if (total <= 0) return { drift: [], clusters: [], total: 0 };
+
+  // --- DRIFT ---
+  const target = getTargetAlloc();
+  const drift = [];
+  const classes = new Set([...Object.keys(target), ...Object.keys(pm.alloc)]);
+  for (const cls of classes) {
+    const curFrac = (pm.alloc[cls] || 0) / total;
+    const tgtFrac = target[cls] || 0;
+    const delta = curFrac - tgtFrac;
+    if (Math.abs(delta) >= DRIFT_TOLERANCE) {
+      const deltaDollars = delta * total;
+      drift.push({
+        cls,
+        curPct: curFrac * 100,
+        tgtPct: tgtFrac * 100,
+        deltaPct: delta * 100,
+        action: delta > 0
+          ? `Overweight ${cls} by ${(delta * 100).toFixed(1)}pp — consider trimming ~$${fmtUSD(Math.abs(deltaDollars), 0)} back toward target.`
+          : `Underweight ${cls} by ${(Math.abs(delta) * 100).toFixed(1)}pp — consider adding ~$${fmtUSD(Math.abs(deltaDollars), 0)} to reach target.`,
+      });
+    }
+  }
+  drift.sort((a, b) => Math.abs(b.deltaPct) - Math.abs(a.deltaPct));
+
+  // --- CONCENTRATION CLUSTERS ---
+  const clusterMap = {};
+  for (const h of state.holdings) {
+    const m = holdingMetrics(h);
+    if (m.value == null) continue;
+    const c = correlationCluster(h);
+    if (!clusterMap[c]) clusterMap[c] = { name: c, value: 0, symbols: [] };
+    clusterMap[c].value += m.value;
+    clusterMap[c].symbols.push(h.symbol);
+  }
+  const clusters = Object.values(clusterMap)
+    .map(c => ({ ...c, pct: (c.value / total) * 100 }))
+    .sort((a, b) => b.pct - a.pct);
+
+  return { drift, clusters, total };
+}
+
+// ============================================================================
 // VIEWS
 // ============================================================================
 function renderCurrentView() {
@@ -5589,7 +5730,13 @@ function dtcFor(symbol) {
 
 // Helper: latest AI stance for symbol — also returns age-based weight multiplier
 // so stale analyses don't outvote fresh Daily Scan signals.
-// Decay schedule: full weight 0-2d, linear taper to 0 at 14d.
+//
+// Decay is CONVICTION-AWARE. A high-conviction call is a 6-12 month thesis —
+// it shouldn't expire in a week. A low-conviction call is tactical and decays
+// fast. Schedules (full weight → zero):
+//   high conviction:   full 0-14d,  taper 14d→90d   (thesis play)
+//   medium conviction: full 0-5d,   taper 5d→30d
+//   low conviction:    full 0-2d,   taper 2d→14d    (tactical, original schedule)
 function aiStanceFor(symbol) {
   const a = state.analyses[symbol];
   if (!a || !a.stance) return null;
@@ -5599,17 +5746,24 @@ function aiStanceFor(symbol) {
     const ageMs = Date.now() - new Date(ts).getTime();
     ageDays = ageMs / 86400000;
   }
-  // Linear decay: full weight 0-2 days, half at 7d, zero at 14d+
+  const conv = String(a.conviction || "medium").toLowerCase();
+  // [fullUntil, zeroAt] days
+  let fullUntil, zeroAt;
+  if (conv === "high")      { fullUntil = 14; zeroAt = 90; }
+  else if (conv === "low")  { fullUntil = 2;  zeroAt = 14; }
+  else                      { fullUntil = 5;  zeroAt = 30; }
+
   let weightMult = 1;
-  if (ageDays <= 2)       weightMult = 1.0;
-  else if (ageDays >= 14) weightMult = 0;
-  else                    weightMult = 1 - ((ageDays - 2) / 12); // taper 2d→14d
+  if (ageDays <= fullUntil)      weightMult = 1.0;
+  else if (ageDays >= zeroAt)    weightMult = 0;
+  else                           weightMult = 1 - ((ageDays - fullUntil) / (zeroAt - fullUntil));
   return {
     stance: String(a.stance).toUpperCase(),
     conviction: a.conviction,
     confidence: a.confidence,
     ageDays,
     weightMult,
+    decayZeroAt: zeroAt,
   };
 }
 
@@ -5617,10 +5771,10 @@ function aiStanceFor(symbol) {
 // Returns one of: "fresh" | "stale" | "missing" | "running"
 // Used to drive the inline "Run AI Analyze" prompt on verdict cards.
 //
-// Thresholds tuned to match the decay schedule in aiStanceFor:
-//   - 0-7 days  → "fresh" (full or near-full weight)
-//   - 7-14 days → "stale" (weight tapering, refresh recommended)
-//   - >14 days OR missing → "missing"/null (zero weight, refresh required for AI vote)
+// Thresholds are conviction-aware to match aiStanceFor's decay schedule:
+//   - within the "full weight" window → "fresh"
+//   - in the taper window             → "stale" (refresh recommended)
+//   - past zero-weight point OR missing → "missing"
 function aiAnalysisStatus(symbol) {
   if (state.analyzingSymbols && state.analyzingSymbols[symbol]) return "running";
   const a = state.analyses[symbol];
@@ -5628,8 +5782,13 @@ function aiAnalysisStatus(symbol) {
   const ts = a.generated_at;
   if (!ts) return "missing";
   const ageDays = (Date.now() - new Date(ts).getTime()) / 86400000;
-  if (ageDays >= 14) return "missing"; // effectively gone
-  if (ageDays >= 7) return "stale";
+  const conv = String(a.conviction || "medium").toLowerCase();
+  let fullUntil, zeroAt;
+  if (conv === "high")      { fullUntil = 14; zeroAt = 90; }
+  else if (conv === "low")  { fullUntil = 2;  zeroAt = 14; }
+  else                      { fullUntil = 5;  zeroAt = 30; }
+  if (ageDays >= zeroAt)    return "missing"; // effectively gone
+  if (ageDays >= fullUntil) return "stale";
   return "fresh";
 }
 
@@ -6059,6 +6218,27 @@ function buildTradePlan(verdict, holding) {
     plan.exitLadder = {
       text: `Take profits: Trim 25% at +15% (~$${fmtUSD(target1)}) when verdict next flips toward TRIM. ${swingHigh != null ? `Resistance/trim zone: prior swing high near $${fmtUSD(target2)}.` : ""} Let the remaining 75% run with the trailing stop.`,
     };
+
+    // === REWARD-TO-RISK CHECK ===
+    // A trade is only worth taking if the upside meaningfully outweighs the
+    // downside. We measure first-target reward (+15%) against the technical
+    // stop distance. Below MIN_REWARD_RISK (2:1) the plan is flagged so the
+    // user sees the math BEFORE committing capital.
+    if (plan.stop && plan.stop.price > 0) {
+      const entryPrice = plan.entry?.priceHint || cur;
+      const rr = rewardRiskRatio(entryPrice, plan.stop.price, target1);
+      if (rr != null) {
+        plan.rewardRisk = {
+          ratio: rr,
+          target: target1,
+          stop: plan.stop.price,
+          ok: rr >= MIN_REWARD_RISK,
+          text: rr >= MIN_REWARD_RISK
+            ? `Reward:risk ≈ ${rr.toFixed(1)}:1 — first target (+15%) vs stop (-${plan.stop.distancePct.toFixed(1)}%). Acceptable.`
+            : `⚠ Reward:risk only ≈ ${rr.toFixed(1)}:1 — below the 2:1 minimum. The stop is too far from entry for the +15% target to justify it. Wait for a lower entry, a tighter level, or skip.`,
+        };
+      }
+    }
 
     return plan;
   }
@@ -6659,6 +6839,11 @@ function renderTradePlan(plan) {
           <span class="tp-label">Take profit</span>
           <span class="tp-text">${escAttr(plan.exitLadder.text)}</span>
         </div>` : ""}
+        ${plan.rewardRisk ? `
+        <div class="tp-row${plan.rewardRisk.ok ? "" : " tp-row-warn"}">
+          <span class="tp-label">R:R</span>
+          <span class="tp-text">${escAttr(plan.rewardRisk.text)}</span>
+        </div>` : ""}
       </div>
     `;
   }
@@ -6972,25 +7157,69 @@ function getCashAvailable() {
   const cashH = state.holdings.find(h => h.asset_class === "cash" && h.symbol === "CASH");
   return cashH?.quantity || 0;
 }
-// Suggested buy size for a symbol:
-//   base = 2% of portfolio for new entries, 1% for adds to existing
-//   * conviction multiplier (high=1.5x, medium=1x, low=0.5x)
-//   * signal-strength bump (-15% off peak = bigger size, etc.)
-// Capped at 50% of available cash to prevent over-allocation in any single trade.
-function suggestBuySize(symbol, kind, signalStrength = 1.0) {
+// ---- RISK-BASED POSITION SIZING ----------------------------------------
+// MAX_RISK_PER_TRADE: the fraction of total portfolio we're willing to LOSE
+// on a single trade if its stop is hit. This is the professional "1% rule" —
+// the position size is derived FROM the stop, not the other way round.
+//   shares  = (portfolio * riskFrac) / stopDistancePerShare
+//   dollars = shares * entryPrice
+// A wide stop (volatile asset) → smaller position. A tight stop → larger.
+// This keeps the dollar loss constant regardless of the asset's volatility.
+const MAX_RISK_PER_TRADE = 0.01;   // risk 1% of portfolio per trade
+const MIN_REWARD_RISK    = 2.0;    // require ≥2:1 reward-to-risk to greenlight
+
+// Suggested buy size for a symbol.
+//   When `stopDistancePct` is supplied (>0), size is RISK-BASED:
+//     dollars = (portfolio * MAX_RISK_PER_TRADE) / (stopDistancePct/100)
+//   When no stop is known, falls back to the legacy conviction-weighted
+//     %-of-portfolio model so nothing breaks for callers that lack a stop.
+//   Either way the result is capped at 50% of available cash.
+function suggestBuySize(symbol, kind, signalStrength = 1.0, stopDistancePct = null) {
   const total = computeTotalPortfolioValue();
   const cash = getCashAvailable();
-  if (total <= 0 || cash <= 0) return { dollars: 0, pct: 0 };
+  if (total <= 0 || cash <= 0) return { dollars: 0, pct: 0, basis: "none" };
   const a = state.analyses?.[symbol];
   const conv = (a?.conviction || "").toLowerCase();
   const convMult = conv === "high" ? 1.5 : conv === "low" ? 0.5 : 1.0;
-  const basePct = kind === "open" ? 0.02 : 0.01; // 2% for new, 1% for add
-  let pct = basePct * convMult * signalStrength;
-  let dollars = total * pct;
-  // Cap at 50% of available cash so we don't accidentally deploy everything in one buy
+
+  let dollars, basis;
+  if (stopDistancePct != null && stopDistancePct > 0.1) {
+    // RISK-BASED: position sized so a stop-out loses ~MAX_RISK_PER_TRADE of portfolio.
+    const riskBudget = total * MAX_RISK_PER_TRADE * convMult * signalStrength;
+    dollars = riskBudget / (stopDistancePct / 100);
+    // Hard ceiling: never let a single risk-sized position exceed 15% of portfolio,
+    // no matter how tight the stop — protects against a too-tight stop blowing up size.
+    const maxPosition = total * 0.15;
+    if (dollars > maxPosition) dollars = maxPosition;
+    basis = "risk";
+  } else {
+    // LEGACY fallback: conviction-weighted % of portfolio.
+    const basePct = kind === "open" ? 0.02 : 0.01;
+    dollars = total * basePct * convMult * signalStrength;
+    basis = "legacy";
+  }
+
+  // Cap at 50% of available cash so we don't deploy everything in one buy
   if (dollars > cash * 0.5) dollars = cash * 0.5;
-  if (dollars < 50) return { dollars: 0, pct: 0 }; // too small to bother
-  return { dollars, pct: (dollars / total) * 100 };
+  if (dollars < 50) return { dollars: 0, pct: 0, basis }; // too small to bother
+  return {
+    dollars,
+    pct: (dollars / total) * 100,
+    basis,
+    riskDollars: stopDistancePct != null && stopDistancePct > 0.1
+      ? dollars * (stopDistancePct / 100) : null,
+  };
+}
+
+// Reward-to-risk ("R-multiple") for a planned trade.
+//   entry, stop, target are absolute prices. Returns the ratio or null.
+//   ratio < MIN_REWARD_RISK means the trade is not worth the risk.
+function rewardRiskRatio(entry, stop, target) {
+  if (!(entry > 0) || !(stop > 0) || !(target > 0)) return null;
+  const risk = entry - stop;
+  const reward = target - entry;
+  if (risk <= 0 || reward <= 0) return null;
+  return reward / risk;
 }
 
 function computeDailyScan() {
@@ -7009,6 +7238,7 @@ function computeDailyScan() {
 
     // Compute fresh indicators
     let rsi = null, dropFromPeak = null;
+    let stopDistPct = null; // estimated stop distance for risk-based sizing
     if (data.ohlcv && data.ohlcv.length >= 30) {
       const closes = data.ohlcv.map(d => d.c);
       const highs = data.ohlcv.map(d => d.h);
@@ -7018,12 +7248,22 @@ function computeDailyScan() {
         const peak = Math.max(...slice90);
         dropFromPeak = peak > 0 ? ((cur - peak) / peak) * 100 : 0;
       }
+      // Stop estimate: 2% below the 20-day swing low, or 3% below 50d MA,
+      // whichever is tighter (higher). Mirrors buildTradePlan's stop logic so
+      // scan sizing and the trade plan agree.
+      const swingLow = recentSwingLow(data.ohlcv, 20);
+      const sma50v = computeSMA(closes, 50);
+      if (swingLow != null && sma50v != null && cur > 0) {
+        const candidateStop = Math.max(swingLow * 0.98, sma50v * 0.97);
+        const d = ((cur - candidateStop) / cur) * 100;
+        if (d > 0.1 && d < 50) stopDistPct = d;
+      }
     }
 
     // Rule 1: ADD — held position with dip or RSI oversold (THIS IS THE LEAD)
     if (rsi != null && rsi < 40 && hm.pnlPct != null && hm.pnlPct > -12) {
       const strength = rsi < 30 ? 1.5 : 1.0;
-      const size = suggestBuySize(h.symbol, "add", strength);
+      const size = suggestBuySize(h.symbol, "add", strength, stopDistPct);
       if (size.dollars > 0) {
         actions.push({
           symbol: h.symbol, kind: "add",
@@ -7036,7 +7276,7 @@ function computeDailyScan() {
       }
     } else if (dropFromPeak != null && dropFromPeak <= -10 && hm.pnlPct != null && hm.pnlPct > -12) {
       const strength = dropFromPeak <= -15 ? 1.5 : 1.0;
-      const size = suggestBuySize(h.symbol, "add", strength);
+      const size = suggestBuySize(h.symbol, "add", strength, stopDistPct);
       if (size.dollars > 0) {
         actions.push({
           symbol: h.symbol, kind: "add",
@@ -7891,6 +8131,8 @@ function renderPortfolio() {
 
     ${renderMacroRegimeCard()}
 
+    ${renderRiskCard()}
+
     ${renderTodaysVerdictCard()}
 
     ${renderTodaysOpportunitiesCard()}
@@ -7916,6 +8158,61 @@ function renderPortfolio() {
     <div class="holdings">${holdingsHtml}</div>
   `;
   $("#topbarTitle").textContent = "Portfolio";
+}
+
+// ----------------------------------------------------------------------------
+// RENDER: Portfolio Risk card — allocation drift + correlation concentration.
+// Shows only when there's something worth flagging; silent when balanced.
+// ----------------------------------------------------------------------------
+function renderRiskCard() {
+  if (!state.holdings || state.holdings.length === 0) return "";
+  const risk = computePortfolioRisk();
+  if (risk.total <= 0) return "";
+
+  const overConcentrated = risk.clusters.filter(c => c.pct >= CLUSTER_WARN_PCT && c.name !== "Cash");
+  const hasDrift = risk.drift.length > 0;
+  if (!hasDrift && overConcentrated.length === 0) return ""; // nothing to flag
+
+  let rows = "";
+
+  if (overConcentrated.length > 0) {
+    for (const c of overConcentrated) {
+      rows += `<div class="risk-row risk-row-warn">
+        <div class="risk-row-head">
+          <span class="risk-tag warn">Concentration</span>
+          <span class="risk-row-pct">${c.pct.toFixed(1)}%</span>
+        </div>
+        <div class="risk-row-text">
+          <b>${escAttr(c.name)}</b> is one correlated bet (${escAttr(c.symbols.join(", "))}) and makes up
+          ${c.pct.toFixed(1)}% of the portfolio. These move together — treat it as a single position when sizing risk.
+        </div>
+      </div>`;
+    }
+  }
+
+  if (hasDrift) {
+    for (const d of risk.drift) {
+      const cls = d.deltaPct > 0 ? "over" : "under";
+      rows += `<div class="risk-row">
+        <div class="risk-row-head">
+          <span class="risk-tag ${cls}">${d.deltaPct > 0 ? "Overweight" : "Underweight"}</span>
+          <span class="risk-row-pct">${ALLOC_LABELS[d.cls] || d.cls} · ${d.curPct.toFixed(1)}% vs ${d.tgtPct.toFixed(0)}% target</span>
+        </div>
+        <div class="risk-row-text">${escAttr(d.action)}</div>
+      </div>`;
+    }
+  }
+
+  return `
+    <div class="risk-card">
+      <div class="risk-head">
+        <h3>Portfolio Risk</h3>
+        <span class="risk-sub">Drift &amp; concentration — what the allocation strip alone hides</span>
+      </div>
+      <div class="risk-list">${rows}</div>
+      <div class="risk-footer">Targets editable in Settings. Correlated clusters group holdings that move as one bet.</div>
+    </div>
+  `;
 }
 
 function renderOpportunityPulse() {
@@ -9933,6 +10230,16 @@ const BOT_MAX_POSITIONS    = 5;
 const BOT_STOP_LOSS_PCT    = 0.92;  // -8%
 const BOT_TAKE_PROFIT_PCT  = 1.15;  // +15%
 const BOT_TX_COST_PCT      = 0.001; // 0.1% per side (buy + sell), realistic friction
+// Slippage: real fills are worse than the printed close. Buys fill slightly
+// above, sells slightly below. This is separate from commission/spread
+// (BOT_TX_COST_PCT) — it models the price you actually transact at.
+const BOT_SLIPPAGE_PCT     = 0.0005; // 0.05% adverse price move per fill
+// Apply slippage to a fill price. side: "buy" pays up, "sell" receives less.
+function applySlippage(price, side) {
+  return side === "buy"
+    ? price * (1 + BOT_SLIPPAGE_PCT)
+    : price * (1 - BOT_SLIPPAGE_PCT);
+}
 
 function emptyBotState(label) {
   return {
@@ -10365,6 +10672,7 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
       const highs  = indexed[sym].highs;
       const times  = indexed[sym].times;
       const cur    = closes[idx];
+      const buyFill = applySlippage(cur, "buy"); // slippage-adjusted buy price
       const hasPos = !!sim.positions[sym];
       const position = hasPos ? sim.positions[sym] : null;
       const entryPrice = hasPos ? position.entryPrice : null;
@@ -10442,11 +10750,12 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
         const pos = sim.positions[sym];
         // For Value-Avg and Regime modes, support PARTIAL sells via _vaSellPortion
         const sellQty = sig._vaSellPortion ? pos.qty * sig._vaSellPortion : pos.qty;
-        const grossProceeds = sellQty * cur;
+        const fillPrice = applySlippage(cur, "sell");
+        const grossProceeds = sellQty * fillPrice;
         const txCost = grossProceeds * BOT_TX_COST_PCT;
         const proceeds = grossProceeds - txCost;
         const pnl = proceeds - (sellQty * pos.entryPrice);
-        const pnlPct = ((cur / pos.entryPrice) - 1) * 100;
+        const pnlPct = ((fillPrice / pos.entryPrice) - 1) * 100;
         sim.cash += proceeds;
         sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
         sim.trades.push({
@@ -10470,10 +10779,10 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
           if (!sizeUSD || sim.cash < sizeUSD || sizeUSD < 50) continue;
           const txCost = sizeUSD * BOT_TX_COST_PCT;
           const investAmount = sizeUSD - txCost;
-          const qty = investAmount / cur;
+          const qty = investAmount / buyFill;
           sim.positions[sym] = {
             entryDate: new Date(t).toISOString().slice(0,10),
-            entryPrice: cur, qty, entryReason: sig.reason,
+            entryPrice: buyFill, qty, entryReason: sig.reason,
             peakSinceEntry: cur, daysHeld: 0, _entryIdx: idx,
           };
           sim.cash -= sizeUSD;
@@ -10483,7 +10792,7 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
           if (sim.cash < sizeUSD) continue;
           const txCost = sizeUSD * BOT_TX_COST_PCT;
           const investAmount = sizeUSD - txCost;
-          const addQty = investAmount / cur;
+          const addQty = investAmount / buyFill;
           if (hasPos) {
             const pos = sim.positions[sym];
             const newQty = pos.qty + addQty;
@@ -10493,7 +10802,7 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
           } else {
             sim.positions[sym] = {
               entryDate: new Date(t).toISOString().slice(0,10),
-              entryPrice: cur, qty: addQty, entryReason: sig.reason,
+              entryPrice: buyFill, qty: addQty, entryReason: sig.reason,
               _entryIdx: idx,
             };
           }
@@ -10505,7 +10814,7 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
           if (sizeUSD < 50 || sim.cash < sizeUSD) continue;
           const txCost = sizeUSD * BOT_TX_COST_PCT;
           const investAmount = sizeUSD - txCost;
-          const addQty = investAmount / cur;
+          const addQty = investAmount / buyFill;
           if (hasPos) {
             const pos = sim.positions[sym];
             const newQty = pos.qty + addQty;
@@ -10515,7 +10824,7 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
           } else {
             sim.positions[sym] = {
               entryDate: new Date(t).toISOString().slice(0,10),
-              entryPrice: cur, qty: addQty, entryReason: sig.reason,
+              entryPrice: buyFill, qty: addQty, entryReason: sig.reason,
               peakSinceEntry: cur, daysHeld: 0, _entryIdx: idx,
             };
           }
@@ -10530,10 +10839,10 @@ function backtestStrategy(strategyFn, symbolOhlcv, mode = "active", startCapital
           if (sim.cash < sizeUSD || sizeUSD < 100) continue;
           const txCost = sizeUSD * BOT_TX_COST_PCT;
           const investAmount = sizeUSD - txCost;
-          const qty = investAmount / cur;
+          const qty = investAmount / buyFill;
           sim.positions[sym] = {
             entryDate: new Date(t).toISOString().slice(0,10),
-            entryPrice: cur, qty, entryReason: sig.reason,
+            entryPrice: buyFill, qty, entryReason: sig.reason,
             peakSinceEntry: cur, daysHeld: 0, _entryIdx: idx,
           };
           sim.cash -= sizeUSD;
@@ -10871,6 +11180,8 @@ async function runForwardStep() {
     const times  = data.ohlcv.map(d => d.t);
     const idx    = closes.length - 1;
     const cur    = data.current_price ?? closes[idx];
+    const buyFill = applySlippage(cur, "buy");   // slippage-adjusted buy price
+    const sellFill = applySlippage(cur, "sell"); // slippage-adjusted sell price
 
     for (const strat of BOT_STRATEGIES) {
       const sim = state.bot[strat.key];
@@ -10916,16 +11227,16 @@ async function runForwardStep() {
       if (!sig) continue;
 
       if (sig.side === "sell" && hasPos) {
-        const grossProceeds = position.qty * cur;
+        const grossProceeds = position.qty * sellFill;
         const txCost = grossProceeds * BOT_TX_COST_PCT;
         const proceeds = grossProceeds - txCost;
         const pnl = proceeds - (position.qty * position.entryPrice);
-        const pnlPct = ((cur / position.entryPrice) - 1) * 100;
+        const pnlPct = ((sellFill / position.entryPrice) - 1) * 100;
         sim.cash += proceeds;
         sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
         sim.trades.push({
           symbol: sym, entryDate: position.entryDate, exitDate: today,
-          entryPrice: position.entryPrice, exitPrice: cur,
+          entryPrice: position.entryPrice, exitPrice: sellFill,
           qty: position.qty, pnl, pnlPct,
           entryReason: position.entryReason, exitReason: sig.reason,
         });
@@ -10942,14 +11253,14 @@ async function runForwardStep() {
           const txCost = sizeUSD * BOT_TX_COST_PCT;
           const investAmount = sizeUSD - txCost;
           if (hasPos) {
-            const addQty = investAmount / cur;
+            const addQty = investAmount / buyFill;
             const newQty = position.qty + addQty;
             const newCost = (position.qty * position.entryPrice) + investAmount;
             position.qty = newQty;
             position.entryPrice = newCost / newQty;
           } else {
-            const qty = investAmount / cur;
-            sim.positions[sym] = { entryDate: today, entryPrice: cur, qty, entryReason: sig.reason };
+            const qty = investAmount / buyFill;
+            sim.positions[sym] = { entryDate: today, entryPrice: buyFill, qty, entryReason: sig.reason };
           }
           sim.cash -= sizeUSD;
           sim.totalTxCost = (sim.totalTxCost || 0) + txCost;
@@ -10970,9 +11281,9 @@ async function runForwardStep() {
         }
         const txCost = sizeUSD * BOT_TX_COST_PCT;
         const investAmount = sizeUSD - txCost;
-        const qty = investAmount / cur;
+        const qty = investAmount / buyFill;
         sim.positions[sym] = {
-          entryDate: today, entryPrice: cur, qty, entryReason: sig.reason,
+          entryDate: today, entryPrice: buyFill, qty, entryReason: sig.reason,
           peakSinceEntry: cur, daysHeld: 0,
         };
         sim.cash -= sizeUSD;
@@ -11384,9 +11695,10 @@ function renderSettings() {
         <div><div class="lbl">Worker</div><div class="sub" style="font-family:var(--mono);font-size:10.5px;">portfolio-advisor.workers.dev</div></div>
       </div>
       <div class="setting-row">
-        <div><div class="lbl">Version</div><div class="sub">1.3.0</div></div>
+        <div><div class="lbl">Version</div><div class="sub">1.4.0</div></div>
       </div>
     </div>
+    ${renderRiskSettings()}
     <div class="empty-state" style="padding: 30px 20px;">
       <p style="font-size:11px;color:var(--ink-muted);line-height:1.6;">
         This app is a tool, not an advisor. All signals are inputs, not recommendations.<br>
@@ -11394,6 +11706,79 @@ function renderSettings() {
       </p>
     </div>
   `;
+}
+
+// Risk settings: editable target allocation + per-trade risk display.
+function renderRiskSettings() {
+  const t = getTargetAlloc();
+  const classes = ["etf", "us_stock", "crypto", "metal", "cash"];
+  const sumPct = classes.reduce((s, c) => s + ((t[c] || 0) * 100), 0);
+  const rows = classes.map(c => `
+    <div class="setting-row">
+      <div><div class="lbl">${ALLOC_LABELS[c] || c}</div></div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input id="tgt_${c}" type="number" min="0" max="100" step="1"
+          value="${((t[c] || 0) * 100).toFixed(0)}"
+          style="width:62px;padding:6px 8px;border:1px solid var(--rule);border-radius:6px;
+                 background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:13px;text-align:right;" />
+        <span style="font-family:var(--mono);font-size:12px;color:var(--ink-muted);">%</span>
+      </div>
+    </div>`).join("");
+  return `
+    <div class="section-head" style="padding: 16px 20px 0;"><h2 style="font-size:18px;">Risk Model</h2></div>
+    <div class="settings-group">
+      <div class="setting-row">
+        <div>
+          <div class="lbl">Risk per trade</div>
+          <div class="sub">Max % of portfolio lost if a stop is hit</div>
+        </div>
+        <div class="sub" style="font-family:var(--mono);">${(MAX_RISK_PER_TRADE * 100).toFixed(1)}%</div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="lbl">Min reward:risk</div>
+          <div class="sub">Trades below this ratio are flagged</div>
+        </div>
+        <div class="sub" style="font-family:var(--mono);">${MIN_REWARD_RISK.toFixed(1)}:1</div>
+      </div>
+    </div>
+    <div class="section-head" style="padding: 8px 20px 0;">
+      <span class="sub" style="font-family:var(--mono);font-size:10.5px;color:var(--ink-muted);">
+        TARGET ALLOCATION — drives the drift alerts
+      </span>
+    </div>
+    <div class="settings-group">
+      ${rows}
+      <div class="setting-row">
+        <div><div class="lbl">Total</div><div class="sub" id="tgt_sum_note">${sumPct.toFixed(0)}% ${Math.abs(sumPct - 100) < 0.5 ? "✓" : "— should sum to 100%"}</div></div>
+        <button class="btn btn-sm" data-act="save-target-alloc">Save</button>
+      </div>
+    </div>
+  `;
+}
+
+function saveTargetAlloc() {
+  const classes = ["etf", "us_stock", "crypto", "metal", "cash"];
+  const next = {};
+  let sum = 0;
+  for (const c of classes) {
+    const el = $("#tgt_" + c);
+    const v = el ? parseFloat(el.value) : 0;
+    const frac = (isNaN(v) ? 0 : v) / 100;
+    next[c] = frac;
+    sum += frac;
+  }
+  if (Math.abs(sum - 1) > 0.01) {
+    toast(`Targets sum to ${(sum * 100).toFixed(0)}% — must total 100%`, 3000, "error");
+    return;
+  }
+  try {
+    localStorage.setItem("targetAlloc", JSON.stringify(next));
+    toast("Target allocation saved");
+    renderCurrentView();
+  } catch (e) {
+    toast("Could not save: " + e.message, 3000, "error");
+  }
 }
 function resetPin() {
   if (confirm("Reset PIN? You'll need to create a new one.")) {
@@ -12141,6 +12526,7 @@ document.addEventListener("click", (e) => {
         $("#aw_search_results").classList.add("hidden");
         break;
       case "reset-pin":              resetPin(); break;
+      case "save-target-alloc":      saveTargetAlloc(); break;
       case "manual-refresh":         manualRefresh(); break;
       case "export-data":            exportData(); break;
       case "bot-backtest":           runBacktest(); break;
