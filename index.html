@@ -4642,10 +4642,20 @@ function calendarFor(symbol) {
 //
 // Null result (crypto, illiquid, international) → no chip, no plan effect.
 // ============================================================================
-const IV_RANK_CACHE_KEY = "ivRank_v1";
+// Cache key version bump history:
+//   v1 → v2 (May 2026): worker v1.7 added `source` field for IV/HV distinction.
+//   Old v1 cache lacks this field. Any cached entry without `source` is treated
+//   as invalid and the whole cache is discarded so we re-fetch from the new worker.
+const IV_RANK_CACHE_KEY = "ivRank_v2";
+const IV_RANK_LEGACY_KEYS = ["ivRank_v1"];
 const IV_RANK_TTL_HOURS = 4;
 
 function loadIvRankCache() {
+  // Clean up legacy keys so stale data doesn't sit in localStorage forever.
+  // Runs once per page load; localStorage.removeItem on a missing key is a no-op.
+  for (const k of IV_RANK_LEGACY_KEYS) {
+    try { localStorage.removeItem(k); } catch (e) {}
+  }
   try {
     const raw = localStorage.getItem(IV_RANK_CACHE_KEY);
     if (!raw) return null;
@@ -4653,7 +4663,20 @@ function loadIvRankCache() {
     if (!c.fetchedAt) return null;
     const ageH = (Date.now() - new Date(c.fetchedAt).getTime()) / 3600000;
     if (ageH > IV_RANK_TTL_HOURS) return null;
-    return c.results || null;
+    if (!c.results || typeof c.results !== "object") return null;
+    // Shape validation: every non-null entry must have a `source` field.
+    // If any entry fails this, the cache is from an old worker version and
+    // we discard the whole thing so we re-fetch fresh shapes.
+    for (const sym of Object.keys(c.results)) {
+      const entry = c.results[sym];
+      if (entry === null) continue; // null is fine — symbol legitimately has no data
+      if (!entry.source || (entry.source !== "iv" && entry.source !== "hv")) {
+        // Old-shape cache detected → invalidate everything
+        try { localStorage.removeItem(IV_RANK_CACHE_KEY); } catch (e) {}
+        return null;
+      }
+    }
+    return c.results;
   } catch (e) { return null; }
 }
 function saveIvRankCache(results) {
