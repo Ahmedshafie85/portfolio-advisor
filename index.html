@@ -3175,6 +3175,20 @@ function getRecStatus(recKey) {
   return state.recStatus[recKey]?.status || null;
 }
 
+// Cache config constants — declared here (before `state`) because their
+// load*Cache() functions are invoked during state initialization below.
+// `const` is not hoisted into a usable form, so referencing these from a
+// loader before this point throws a temporal-dead-zone ReferenceError.
+const IV_RANK_CACHE_KEY = "ivRank_v2";
+const IV_RANK_LEGACY_KEYS = ["ivRank_v1"];
+const IV_RANK_TTL_HOURS = 4;
+const MACRO_CACHE_KEY = "macroRegime_v1";
+const MACRO_TTL_HOURS = 6;
+const SHORT_INTEREST_CACHE_KEY = "shortInterest_v1";
+const SHORT_INTEREST_TTL_HOURS = 24;
+const CALENDAR_CACHE_KEY = "calendarData_v1";
+const CALENDAR_TTL_HOURS = 24; // worker side caches 6h already
+
 const state = {
   uid: null,
   pinAttempts: 0,
@@ -4293,9 +4307,6 @@ function computeRSSeries(targetCloses, benchCloses) {
 // Data refresh: localStorage TTL of 6 hours (macro moves slowly).
 // ============================================================================
 
-const MACRO_CACHE_KEY = "macroRegime_v1";
-const MACRO_TTL_HOURS = 6;
-
 function loadMacroCache() {
   try {
     const raw = localStorage.getItem(MACRO_CACHE_KEY);
@@ -4526,9 +4537,6 @@ function symbolMacroVerdict(symbol, assetClass, regime) {
 // SHORT INTEREST — Days-to-Cover for SCAN_UNIVERSE
 // Cached for 24h since FINRA short data is bi-monthly anyway.
 // ============================================================================
-const SHORT_INTEREST_CACHE_KEY = "shortInterest_v1";
-const SHORT_INTEREST_TTL_HOURS = 24;
-
 function loadShortInterestCache() {
   try {
     const raw = localStorage.getItem(SHORT_INTEREST_CACHE_KEY);
@@ -4580,9 +4588,6 @@ async function fetchShortInterestForUniverse(symbols) {
 // to ±2 hard-capped). It nudges conviction but does NOT flip action labels.
 // A single calendar date should never override Daily Scan + AI + Pre-Surge.
 // ============================================================================
-
-const CALENDAR_CACHE_KEY = "calendarData_v1";
-const CALENDAR_TTL_HOURS = 24; // worker side caches 6h already
 
 function loadCalendarCache() {
   try {
@@ -4646,10 +4651,6 @@ function calendarFor(symbol) {
 //   v1 → v2 (May 2026): worker v1.7 added `source` field for IV/HV distinction.
 //   Old v1 cache lacks this field. Any cached entry without `source` is treated
 //   as invalid and the whole cache is discarded so we re-fetch from the new worker.
-const IV_RANK_CACHE_KEY = "ivRank_v2";
-const IV_RANK_LEGACY_KEYS = ["ivRank_v1"];
-const IV_RANK_TTL_HOURS = 4;
-
 function loadIvRankCache() {
   // Clean up legacy keys so stale data doesn't sit in localStorage forever.
   // Runs once per page load; localStorage.removeItem on a missing key is a no-op.
