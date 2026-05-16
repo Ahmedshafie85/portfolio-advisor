@@ -8188,6 +8188,10 @@ function renderPortfolio() {
 
     ${renderAttentionSlot()}
 
+    ${renderTodaysVerdictCard()}
+
+    ${renderTodaysOpportunitiesCard()}
+
     <div class="section-head" style="padding: 0 20px; margin-top: 20px;">
       <h2>Holdings</h2>
       <button class="btn-ghost" data-act="add-holding" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
@@ -8198,26 +8202,13 @@ function renderPortfolio() {
 }
 
 // ----------------------------------------------------------------------------
-// Attention slot — picks ONE thing worth surfacing on the home screen.
-// Priority: breakout prompt > risk warning > today's verdict.
-// If nothing qualifies, renders a tiny "all quiet" pill linking to Signals.
-// Everything that used to crowd the portfolio screen now lives in Signals.
+// Attention slot — surfaces a fired breakout only. Portfolio risk and the
+// portfolio-stance verdict live in Signals → Scans now.
 // ----------------------------------------------------------------------------
 function renderAttentionSlot() {
   const breakout = renderBreakoutPrompt();
   if (breakout && breakout.trim()) return breakout;
-
-  const risk = renderRiskCard();
-  if (risk && risk.trim()) return risk;
-
-  const verdict = renderTodaysVerdictCard();
-  if (verdict && verdict.trim()) return verdict;
-
-  return `<div class="attention-quiet" data-act="open-signals">
-    <span class="attention-quiet-dot"></span>
-    <span class="attention-quiet-text">All quiet. Tap to see macro, scans, and opportunities.</span>
-    <span class="attention-quiet-arrow">→</span>
-  </div>`;
+  return "";
 }
 
 // ----------------------------------------------------------------------------
@@ -10133,14 +10124,13 @@ function renderSignals() {
     if (sub === "news")    { renderNews(); }
     else if (sub === "journal") { renderJournal(); }
     else if (sub === "bot")     { renderBot(); }
-    else { // "scans" — the demoted home-screen cards live here
+    else { // "scans" — portfolio stance + risk + macro + pre-surge + opportunity pulse
       body.innerHTML = `
-        ${renderMacroRegimeCard()}
-        ${renderTodaysOpportunitiesCard()}
-        ${renderPreSurgeCard()}
-        ${renderDailyScan()}
-        ${renderOpportunityPulse()}
         ${renderPortAnalysisInlineCard()}
+        ${renderRiskCard()}
+        ${renderMacroRegimeCard()}
+        ${renderPreSurgeCard()}
+        ${renderOpportunityPulse()}
       `;
     }
   } finally {
