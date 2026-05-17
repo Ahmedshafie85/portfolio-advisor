@@ -153,6 +153,142 @@ body {
 .attention-quiet-text { flex: 1; }
 .attention-quiet-arrow { color: var(--ink-muted); font-size: 14px; }
 
+/* ===========================================================================
+   Phase B — Triggers Banner.
+   Pinned at the top of Portfolio. One row per fired trigger, severity-coded.
+   Each row is tap-to-open-asset; the × button acknowledges (hides) that row.
+   =========================================================================== */
+.triggers-banner {
+  margin: 12px 16px 4px;
+  padding: 14px 14px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--gold);
+}
+.triggers-banner.triggers-loading {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--ink-soft); font-size: 13px;
+}
+.triggers-banner-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 10px; margin-bottom: 10px;
+}
+.triggers-banner-title {
+  font-family: var(--sans); font-weight: 600; font-size: 14px;
+  color: var(--ink); letter-spacing: -0.01em;
+}
+.triggers-banner-sub {
+  font-size: 11px; color: var(--ink-muted); margin-top: 2px;
+}
+.triggers-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-ghost-sm {
+  padding: 4px 10px; border: 1px solid var(--rule); background: transparent;
+  color: var(--ink-soft); font-family: var(--sans); font-size: 11px;
+  font-weight: 500; letter-spacing: 0.02em; border-radius: 999px;
+  cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+}
+.btn-ghost-sm:hover { color: var(--ink); border-color: var(--ink-muted); }
+.btn-ghost-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.triggers-banner-list {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.trigger-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg); border-radius: 8px;
+  border: 1px solid var(--rule-soft);
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.trigger-row:hover { border-color: var(--ink-muted); }
+.trigger-row.trigger-high  { border-left: 3px solid var(--red); }
+.trigger-row.trigger-medium { border-left: 3px solid var(--gold); }
+.trigger-row.trigger-low { border-left: 3px solid var(--ink-muted); }
+.trigger-row-left { flex: 1; min-width: 0; }
+.trigger-row-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-bottom: 4px;
+}
+.trigger-symbol {
+  font-family: var(--mono); font-weight: 600; font-size: 13px; color: var(--ink);
+  letter-spacing: 0.02em;
+}
+.trigger-dir {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--sans); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.02em; color: var(--ink-muted);
+}
+.trigger-dir-bull { color: var(--green); }
+.trigger-dir-bear { color: var(--red); }
+.trigger-sev-pill {
+  font-family: var(--sans); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 999px;
+}
+.trigger-sev-pill.trigger-sev-high   { background: rgba(220, 38, 38, 0.12); color: var(--red); }
+.trigger-sev-pill.trigger-sev-medium { background: rgba(202, 138, 4, 0.12); color: var(--gold); }
+.trigger-sev-pill.trigger-sev-low    { background: var(--bg-elev); color: var(--ink-muted); }
+.trigger-row-condition {
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft);
+  line-height: 1.45; margin-bottom: 4px;
+}
+.trigger-row-because {
+  font-family: var(--sans); font-size: 12px; color: var(--ink); line-height: 1.45;
+}
+.trigger-row-action {
+  font-family: var(--sans); font-size: 12px; color: var(--ink-soft);
+  line-height: 1.45; margin-top: 4px; font-style: italic;
+}
+.trigger-ack {
+  flex-shrink: 0; width: 24px; height: 24px;
+  border: none; background: transparent;
+  color: var(--ink-muted); font-size: 18px; line-height: 1;
+  cursor: pointer; border-radius: 6px;
+  transition: background .15s, color .15s;
+}
+.trigger-ack:hover { background: var(--bg-elev); color: var(--ink); }
+
+/* ===========================================================================
+   Phase B — Conviction Decay UI.
+   Stale-dot: tiny inline indicator on holding rows.
+   Decay banner: top of the AI card, prompts re-analysis on stale verdicts.
+   =========================================================================== */
+.stale-dot {
+  display: inline-block;
+  width: 6px; height: 6px; border-radius: 50%;
+  margin-left: 6px; vertical-align: middle;
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.stale-dot.stale-very_stale { background: var(--red); }
+.stale-dot.stale-stale { background: var(--gold); }
+
+.ai-card.ai-card-stale {
+  /* Subtle desaturation of the underlying card so the eye lands on the banner */
+  position: relative;
+}
+.ai-card.ai-card-stale .stance-hero { opacity: 0.92; }
+
+.decay-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 14px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--rule-soft);
+  border-left: 3px solid var(--gold);
+}
+.decay-banner.decay-very_stale { border-left-color: var(--red); }
+.decay-banner-left { flex: 1; min-width: 0; }
+.decay-banner-title {
+  font-family: var(--sans); font-weight: 600; font-size: 12.5px;
+  color: var(--ink); letter-spacing: -0.005em;
+}
+.decay-banner-sub {
+  font-family: var(--sans); font-size: 11px; color: var(--ink-muted);
+  margin-top: 2px; line-height: 1.4;
+}
+
 .section-head {
   display: flex; justify-content: space-between; align-items: baseline;
   margin-bottom: 14px;
@@ -3271,6 +3407,17 @@ const state = {
   // Null until first save. When null, prompts fall back to their hardcoded defaults.
   investorProfile: null,
   investorProfileLoading: false,
+  // Phase B — Triggers Fired digest.
+  // triggersFired = full list of fired triggers from the most recent check.
+  // triggersAcknowledged = Set of "symbol|trigger_text" keys the user has dismissed
+  //   for this session. Stored in localStorage so dismissals survive reloads.
+  // triggersCheckedAt = ISO of last /triggers-check call; the request is debounced
+  //   to once every 6h via this timestamp (also persisted to localStorage).
+  triggersFired: [],
+  triggersUnableToEvaluate: [],
+  triggersAcknowledged: new Set(JSON.parse(localStorage.getItem("triggersAcknowledged") || "[]")),
+  triggersCheckedAt: localStorage.getItem("triggersCheckedAt") || null,
+  triggersLoading: false,
   watchlist: [],
   watchlistSnapshot: {},
   triggers: [],
@@ -3710,6 +3857,8 @@ async function loadInitialData() {
   renderCurrentView();
   // Background scan after first render
   setTimeout(() => runScan().catch(() => {}), 1500);
+  // Phase B — check fired triggers on first load. Debounced to 6h via state.triggersCheckedAt.
+  setTimeout(() => runTriggersCheck(false).catch(() => {}), 3500);
 
   // ROUND 1+1.5 AUTO-REFRESH:
   // The verdict math depends on 5 signal sources — Daily Scan (always runs),
@@ -8214,10 +8363,16 @@ function renderPortfolio() {
       const stanceBadge = (stance && !isCash)
         ? `<span class="holding-stance show ${escAttr(stance)}">${escAttr(stance)}</span>`
         : "";
+      // Phase B: stale-dot indicator when the analysis is past its decay window.
+      // Tiny visual only — full re-analyze prompt lives in the asset detail card.
+      const decay = (a && !isCash) ? convictionDecay(a, h.asset_class) : null;
+      const staleDot = (decay && decay.is_stale)
+        ? `<span class="stale-dot stale-${escAttr(decay.status)}" title="Analysis ${decay.days_old.toFixed(0)}d old · ${h.asset_class} window ${decay.window_days}d"></span>`
+        : "";
       return `<div class="holding" data-act="open-asset" data-symbol="${escAttr(h.symbol)}">
         <div class="holding-icon" data-class="${h.asset_class}">${escAttr(h.symbol.slice(0,2))}</div>
         <div class="holding-main">
-          <div class="holding-symbol">${escAttr(h.symbol)}</div>
+          <div class="holding-symbol">${escAttr(h.symbol)}${staleDot}</div>
           <div class="holding-name">${escAttr(h.name || '')}</div>
           ${stanceBadge}
         </div>
@@ -8230,6 +8385,7 @@ function renderPortfolio() {
   }
 
   view.innerHTML = `
+    ${renderTriggersBanner()}
     <div class="hero">
       <div class="eyebrow">Total Value · USD</div>
       <div class="hero-value"><span class="currency-prefix">$</span>${fmtUSD(m.totalValue, 0)}</div>
@@ -9488,6 +9644,45 @@ async function renderAssetDetail(symbol) {
 }
 
 // ============================================================================
+// PHASE B — Conviction Decay
+// Per-asset-class window beyond which an analysis is considered stale and
+// the UI prompts a re-analysis. The data is still shown — we don't hide it —
+// but it's visually demoted and tagged so the user knows the call is aging.
+// Windows are deliberately conservative: regime shifts faster in crypto than
+// ETFs, so crypto gets the tightest window.
+// ============================================================================
+const CONVICTION_DECAY_DAYS = {
+  crypto: 14,
+  us_stock: 30,
+  metal: 45,
+  etf: 60,
+  cash: 999,  // cash analysis never decays — it's always "hold"
+};
+const DECAY_DEFAULT_DAYS = 30;
+
+// Returns { is_stale, days_old, window_days, status } given an analysis object
+// and the asset_class of the holding/watch item. Returns null if there's no
+// timestamp to check (treat as not-stale, since we can't tell).
+function convictionDecay(analysis, assetClass) {
+  if (!analysis || !analysis.generated_at) return null;
+  const window_days = CONVICTION_DECAY_DAYS[assetClass] ?? DECAY_DEFAULT_DAYS;
+  const ageMs = Date.now() - new Date(analysis.generated_at).getTime();
+  const days_old = ageMs / 86400000;
+  const is_stale = days_old >= window_days;
+  let status;
+  if (days_old < window_days * 0.5)      status = "fresh";
+  else if (days_old < window_days)       status = "aging";
+  else if (days_old < window_days * 2)   status = "stale";
+  else                                    status = "very_stale";
+  return {
+    is_stale,
+    days_old: Number(days_old.toFixed(1)),
+    window_days,
+    status,
+  };
+}
+
+// ============================================================================
 // AI CARD
 // ============================================================================
 function renderAiCard(symbol, a) {
@@ -9536,7 +9731,26 @@ function renderAiCard(symbol, a) {
     || (scenarios.bull_trigger?.condition && stance.toLowerCase().includes("sell") ? scenarios.bull_trigger.condition : null)
     || null;
 
-  return `<div class="ai-card">
+  // Phase B — compute decay status. The class comes from the holding (if any)
+  // or falls back via symbol lookup. When stale we show a banner above the
+  // stance hero prompting re-analysis; the underlying analysis still renders.
+  const heldRecord = state.holdings.find(h => h.symbol === symbol);
+  const decayClass = heldRecord?.asset_class
+    || state.watchlist.find(w => w.symbol === symbol)?.asset_class
+    || "us_stock";
+  const decay = convictionDecay(a, decayClass);
+  const decayBanner = (decay && decay.is_stale) ? `
+    <div class="decay-banner decay-${escAttr(decay.status)}">
+      <div class="decay-banner-left">
+        <div class="decay-banner-title">Analysis is ${decay.status === "very_stale" ? "very stale" : "stale"}</div>
+        <div class="decay-banner-sub">${decay.days_old.toFixed(0)} days old · ${decayClass} window is ${decay.window_days}d. Conditions may have changed.</div>
+      </div>
+      <button class="btn btn-sm" data-act="run-analysis" data-symbol="${escAttr(symbol)}">Re-analyze</button>
+    </div>
+  ` : "";
+
+  return `<div class="ai-card ${decay?.is_stale ? "ai-card-stale" : ""}">
+    ${decayBanner}
     <div class="stance-hero collapsible-head" data-act="toggle-analysis" data-key="${escAttr(symbol)}" style="cursor:pointer;">
       <div style="display:flex;justify-content:space-between;align-items:start;gap:12px;">
         <div style="flex:1;min-width:0;">
@@ -10122,8 +10336,136 @@ async function runPortfolioAnalysis() {
 }
 
 // ============================================================================
-// JOURNAL / ALERTS / SETTINGS
+// PHASE B — TRIGGERS-FIRED DIGEST
+// Calls /triggers-check, which compares stored bull/bear trigger conditions
+// against live market data and returns the ones that have fired. Debounced to
+// once per 6h via localStorage so we don't burn AI tokens on every page open.
+// User can force a re-check via the banner's refresh button.
 // ============================================================================
+const TRIGGERS_CHECK_DEBOUNCE_MS = 6 * 60 * 60 * 1000;
+
+async function runTriggersCheck(force = false) {
+  if (!state.uid) return;
+  if (state.triggersLoading) return;
+
+  // Debounce: skip if a check ran within the last 6h, unless force is set.
+  if (!force && state.triggersCheckedAt) {
+    const age = Date.now() - new Date(state.triggersCheckedAt).getTime();
+    if (age < TRIGGERS_CHECK_DEBOUNCE_MS) return;
+  }
+
+  state.triggersLoading = true;
+  if (state.currentView === "portfolio") renderPortfolio();
+
+  try {
+    const idToken = await auth.currentUser.getIdToken();
+    const r = await fetch(`${WORKER_URL}/triggers-check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: state.uid, idToken }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    state.triggersFired = Array.isArray(j.fired) ? j.fired : [];
+    state.triggersUnableToEvaluate = Array.isArray(j.unable_to_evaluate) ? j.unable_to_evaluate : [];
+    state.triggersCheckedAt = new Date().toISOString();
+    localStorage.setItem("triggersCheckedAt", state.triggersCheckedAt);
+  } catch (e) {
+    // Soft-fail: keep whatever's in state, don't toast on background runs.
+    if (force) toast("Trigger check failed: " + (e.message || "").slice(0, 80), 3000, "error");
+  } finally {
+    state.triggersLoading = false;
+    if (state.currentView === "portfolio") renderPortfolio();
+  }
+}
+
+// Mark a specific (symbol, trigger_text) pair as acknowledged. The pair is
+// added to the persisted ack set and the banner immediately hides it. The
+// next /triggers-check run still receives it from the server — acks are
+// purely client-side display state, not server-side history.
+function ackTrigger(symbol, triggerText) {
+  const key = `${symbol}|${(triggerText || "").slice(0, 80)}`;
+  state.triggersAcknowledged.add(key);
+  localStorage.setItem("triggersAcknowledged", JSON.stringify(Array.from(state.triggersAcknowledged)));
+  if (state.currentView === "portfolio") renderPortfolio();
+}
+
+function ackAllTriggers() {
+  for (const f of state.triggersFired) {
+    state.triggersAcknowledged.add(`${f.symbol}|${(f.trigger_text || "").slice(0, 80)}`);
+  }
+  localStorage.setItem("triggersAcknowledged", JSON.stringify(Array.from(state.triggersAcknowledged)));
+  if (state.currentView === "portfolio") renderPortfolio();
+}
+
+function visibleFiredTriggers() {
+  return state.triggersFired.filter(f => {
+    const key = `${f.symbol}|${(f.trigger_text || "").slice(0, 80)}`;
+    return !state.triggersAcknowledged.has(key);
+  });
+}
+
+// Render the triggers banner. Returns "" when nothing is fired (or all acked).
+// Sits at the very top of the Portfolio view, above the hero — it's a "thing
+// that needs your attention NOW" panel, not a card.
+function renderTriggersBanner() {
+  const visible = visibleFiredTriggers();
+  if (visible.length === 0 && !state.triggersLoading) return "";
+
+  if (state.triggersLoading && state.triggersFired.length === 0) {
+    return `<div class="triggers-banner triggers-loading">
+      <span class="spinner"></span>
+      <span>Checking triggers against live prices…</span>
+    </div>`;
+  }
+
+  // Group by severity. High first.
+  const high = visible.filter(f => f.severity === "high");
+  const med  = visible.filter(f => f.severity === "medium");
+  const low  = visible.filter(f => f.severity === "low");
+  const ordered = [...high, ...med, ...low];
+
+  const rows = ordered.map(f => {
+    const key = `${f.symbol}|${(f.trigger_text || "").slice(0, 80)}`;
+    const dirIcon = f.direction === "bear"
+      ? `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`
+      : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"/></svg>`;
+    return `
+      <div class="trigger-row trigger-${escAttr(f.severity)}" data-act="open-asset" data-symbol="${escAttr(f.symbol)}">
+        <div class="trigger-row-left">
+          <div class="trigger-row-head">
+            <span class="trigger-symbol">${escAttr(f.symbol)}</span>
+            <span class="trigger-dir trigger-dir-${escAttr(f.direction)}">${dirIcon} ${escAttr(f.direction)} trigger fired</span>
+            <span class="trigger-sev-pill trigger-sev-${escAttr(f.severity)}">${escAttr(f.severity)}</span>
+          </div>
+          <div class="trigger-row-condition">${escAttr(f.trigger_text)}</div>
+          <div class="trigger-row-because">${escAttr(f.fired_because)}</div>
+          ${f.action ? `<div class="trigger-row-action">→ ${escAttr(f.action)}</div>` : ""}
+        </div>
+        <button class="trigger-ack" data-act="ack-trigger" data-key="${escAttr(key)}" data-symbol="${escAttr(f.symbol)}" data-text="${escAttr(f.trigger_text)}" title="Dismiss">×</button>
+      </div>
+    `;
+  }).join("");
+
+  const checkedRel = state.triggersCheckedAt ? `Checked ${fmtRel(state.triggersCheckedAt)}` : "";
+
+  return `
+    <div class="triggers-banner">
+      <div class="triggers-banner-head">
+        <div>
+          <div class="triggers-banner-title">${visible.length} trigger${visible.length === 1 ? "" : "s"} fired</div>
+          <div class="triggers-banner-sub">${checkedRel}${state.triggersLoading ? " · refreshing…" : ""}</div>
+        </div>
+        <div class="triggers-banner-actions">
+          <button class="btn-ghost-sm" data-act="triggers-refresh" ${state.triggersLoading ? "disabled" : ""}>Refresh</button>
+          <button class="btn-ghost-sm" data-act="triggers-ack-all">Clear All</button>
+        </div>
+      </div>
+      <div class="triggers-banner-list">${rows}</div>
+    </div>
+  `;
+}
+
 async function loadJournal() {
   const snap = await db.collection("users").doc(state.uid).collection("journal")
     .orderBy("date", "desc").limit(100).get();
@@ -12894,6 +13236,9 @@ document.addEventListener("click", (e) => {
         break;
       case "reset-pin":              resetPin(); break;
       case "submit-investor-profile": submitInvestorProfile(); break;
+      case "triggers-refresh":       runTriggersCheck(true); break;
+      case "ack-trigger":             ackTrigger(target.dataset.symbol, target.dataset.text); break;
+      case "triggers-ack-all":        ackAllTriggers(); break;
       case "save-target-alloc":      saveTargetAlloc(); break;
       case "manual-refresh":         manualRefresh(); break;
       case "export-data":            exportData(); break;
