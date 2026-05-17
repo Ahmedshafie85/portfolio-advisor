@@ -10428,7 +10428,7 @@ async function runAnalysis(symbol) {
     if (!r.ok) throw new Error(await r.text());
     const j = await r.json();
     if (j.analysis) {
-      state.analyses[symbol] = {
+      const analysisRecord = {
         ...j.analysis, symbol,
         generated_at: new Date().toISOString(),
         current_price: j.current_price,
@@ -10437,6 +10437,20 @@ async function runAnalysis(symbol) {
           ? `Data sanity: ${preCheck.severity}. ${preCheck.issues.map(i => i.msg).join(" ")}`.slice(0, 240)
           : null,
       };
+      state.analyses[symbol] = analysisRecord;
+
+      // Persist to Firestore so the analysis survives a reload AND is visible
+      // to the server-side /verdict endpoint. Without this write the verdict
+      // keeps reporting "no analysis" because state.analyses lives only in
+      // browser memory and loadAnalysesFromFirestore() reads this collection.
+      try {
+        await db.collection("users").doc(state.uid).collection("analyses")
+          .add(analysisRecord);
+      } catch (persistErr) {
+        console.warn("analysis persist failed", persistErr);
+        toast("Analysis saved locally but not synced — verdict may not update", 3500, "error");
+      }
+
       toast("Analysis complete");
       renderAssetDetail(symbol);
       // Phase C — fresh analysis invalidates the verdict cache for this symbol.
