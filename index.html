@@ -289,6 +289,133 @@ body {
   margin-top: 2px; line-height: 1.4;
 }
 
+/* ===========================================================================
+   Phase C — Verdict zones.
+   The Portfolio screen is now a single integrated list: ACT (top), WATCH,
+   HOLD. One row per holding, one verb, one action line. The full asset detail
+   card is one tap away — no ingredients on the home screen.
+   =========================================================================== */
+.verdict-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; padding: 18px 16px 8px;
+}
+.verdict-header-left { flex: 1; min-width: 0; }
+.verdict-eyebrow {
+  font-family: var(--sans); font-size: 13px; font-weight: 600;
+  color: var(--ink); letter-spacing: -0.005em;
+}
+.verdict-meta-row { display: flex; gap: 6px; align-items: center; margin-top: 4px; flex-wrap: wrap; }
+.verdict-age-pill,
+.verdict-loading-pill {
+  font-family: var(--sans); font-size: 10.5px; color: var(--ink-muted);
+  letter-spacing: 0.02em;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.portfolio-note {
+  margin: 0 16px 12px;
+  padding: 10px 12px;
+  background: var(--bg-elev);
+  border-radius: 8px;
+  border-left: 3px solid var(--ink-muted);
+  font-family: var(--sans); font-size: 12.5px; line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.verdict-zone {
+  margin: 0 16px 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.verdict-zone-label {
+  font-family: var(--sans); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-top: 4px; margin-bottom: 2px;
+  padding-left: 2px;
+}
+
+.vrow {
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.vrow:hover { border-color: var(--ink-muted); }
+.vrow-head {
+  display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap;
+}
+.vrow-verb {
+  font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 999px;
+  color: var(--ink-soft); background: var(--bg-elev);
+  flex-shrink: 0;
+}
+.vrow-symbol {
+  font-family: var(--mono); font-weight: 600; font-size: 14px;
+  color: var(--ink); letter-spacing: 0.01em;
+}
+.vrow-spacer { flex: 1; }
+.vrow-value {
+  font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft);
+}
+.vrow-day {
+  font-family: var(--mono); font-size: 11.5px; font-weight: 500;
+  padding: 2px 6px; border-radius: 4px;
+}
+.vrow-day.pos { color: var(--green); background: rgba(22, 163, 74, 0.08); }
+.vrow-day.neg { color: var(--red); background: rgba(220, 38, 38, 0.08); }
+.vrow-action {
+  font-family: var(--sans); font-size: 13.5px; font-weight: 500;
+  color: var(--ink); line-height: 1.45;
+  margin-top: 8px;
+}
+.vrow-action-inline {
+  font-family: var(--sans); font-size: 12.5px; color: var(--ink-soft);
+  line-height: 1.4;
+  /* allow wrapping after symbol */
+  flex-basis: 100%;
+  margin-top: 2px;
+}
+.vrow-reasoning {
+  font-family: var(--sans); font-size: 12px; color: var(--ink-muted);
+  line-height: 1.5; margin-top: 4px;
+}
+.vrow-sev-pill {
+  font-family: var(--sans); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 999px;
+}
+.vrow-sev-pill-high   { background: rgba(220, 38, 38, 0.12); color: var(--red); }
+.vrow-sev-pill-medium { background: rgba(202, 138, 4, 0.12); color: var(--gold); }
+.vrow-sev-pill-low    { background: var(--bg-elev); color: var(--ink-muted); }
+.vrow-fresh-dot {
+  width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+}
+.vrow-fresh-stale       { background: var(--gold); }
+.vrow-fresh-very_stale  { background: var(--red); }
+.vrow-fresh-missing     { background: var(--ink-muted); }
+
+/* ACT rows get a left border in red/gold/grey by severity. The whole row
+   stays card-shaped — the severity is signalled by the accent, not by tinting
+   the background, so the type stays readable on small screens. */
+.vrow.vrow-act { border-left: 3px solid var(--ink-muted); }
+.vrow.vrow-act.vrow-sev-high   { border-left-color: var(--red); }
+.vrow.vrow-act.vrow-sev-medium { border-left-color: var(--gold); }
+.vrow.vrow-act.vrow-sev-low    { border-left-color: var(--ink-muted); }
+.vrow.vrow-act .vrow-verb { color: var(--ink); background: var(--ink-soft); color: var(--bg); }
+
+/* WATCH rows: muted, gold accent. */
+.vrow.vrow-watch { border-left: 3px solid var(--gold); }
+.vrow.vrow-watch .vrow-verb { color: var(--gold); }
+
+/* HOLD rows: tightest, no left accent, no day-pill highlight. */
+.vrow.vrow-hold { padding: 10px 14px; }
+.vrow.vrow-hold .vrow-verb { color: var(--ink-muted); }
+
+
 .section-head {
   display: flex; justify-content: space-between; align-items: baseline;
   margin-bottom: 14px;
@@ -3418,6 +3545,14 @@ const state = {
   triggersAcknowledged: new Set(JSON.parse(localStorage.getItem("triggersAcknowledged") || "[]")),
   triggersCheckedAt: localStorage.getItem("triggersCheckedAt") || null,
   triggersLoading: false,
+  // Phase C — Unified Verdict.
+  // One verdict per holding (ACT/HOLD/WATCH) computed server-side from every
+  // signal source. Cached in localStorage so the screen renders instantly on
+  // app open; refreshed via /verdict on a 4h debounce.
+  verdicts: JSON.parse(localStorage.getItem("verdictsCache") || "[]"),
+  portfolioNote: localStorage.getItem("portfolioNote") || "",
+  verdictsAt: localStorage.getItem("verdictsAt") || null,
+  verdictsLoading: false,
   watchlist: [],
   watchlistSnapshot: {},
   triggers: [],
@@ -3859,6 +3994,8 @@ async function loadInitialData() {
   setTimeout(() => runScan().catch(() => {}), 1500);
   // Phase B — check fired triggers on first load. Debounced to 6h via state.triggersCheckedAt.
   setTimeout(() => runTriggersCheck(false).catch(() => {}), 3500);
+  // Phase C — unified verdict on first load. Debounced to 4h.
+  setTimeout(() => runVerdict(false).catch(() => {}), 4500);
 
   // ROUND 1+1.5 AUTO-REFRESH:
   // The verdict math depends on 5 signal sources — Daily Scan (always runs),
@@ -8344,48 +8481,19 @@ function renderPortfolio() {
   const oppCard = "";
   const portAnalysisCard = "";
 
-  let holdingsHtml = "";
+  // Phase C — drop the legacy holdings list. The verdict zones below own that
+  // surface. The empty-state still fires when there are zero holdings, because
+  // that's a real "you need to add something" moment, not a verdict.
+  let emptyStateHtml = "";
   if (state.holdings.length === 0) {
-    holdingsHtml = `<div class="empty-state">
+    emptyStateHtml = `<div class="empty-state">
       <span class="display">No holdings yet</span>
       <p>Tap below to add your first position.</p>
       <button class="btn" data-act="add-holding">Add Holding</button>
     </div>`;
-  } else {
-    state.holdings.sort((a, b) => (holdingMetrics(b).value || 0) - (holdingMetrics(a).value || 0));
-    holdingsHtml = state.holdings.map(h => {
-      const hm = holdingMetrics(h);
-      const a = state.analyses[h.symbol];
-      const stance = a?.stance;
-      const isCash = h.asset_class === "cash";
-      const pnlClass = isCash ? "flat" : (hm.pnlPct >= 0 ? "pos" : "neg");
-      const pnlText = isCash ? "Cash" : fmtPct(hm.pnlPct);
-      const stanceBadge = (stance && !isCash)
-        ? `<span class="holding-stance show ${escAttr(stance)}">${escAttr(stance)}</span>`
-        : "";
-      // Phase B: stale-dot indicator when the analysis is past its decay window.
-      // Tiny visual only — full re-analyze prompt lives in the asset detail card.
-      const decay = (a && !isCash) ? convictionDecay(a, h.asset_class) : null;
-      const staleDot = (decay && decay.is_stale)
-        ? `<span class="stale-dot stale-${escAttr(decay.status)}" title="Analysis ${decay.days_old.toFixed(0)}d old · ${h.asset_class} window ${decay.window_days}d"></span>`
-        : "";
-      return `<div class="holding" data-act="open-asset" data-symbol="${escAttr(h.symbol)}">
-        <div class="holding-icon" data-class="${h.asset_class}">${escAttr(h.symbol.slice(0,2))}</div>
-        <div class="holding-main">
-          <div class="holding-symbol">${escAttr(h.symbol)}${staleDot}</div>
-          <div class="holding-name">${escAttr(h.name || '')}</div>
-          ${stanceBadge}
-        </div>
-        <div class="holding-right">
-          <div class="holding-value">${hm.value != null ? '$' + fmtUSD(hm.value, 0) : '—'}</div>
-          <div class="holding-pnl ${pnlClass}">${pnlText}</div>
-        </div>
-      </div>`;
-    }).join("");
   }
 
   view.innerHTML = `
-    ${renderTriggersBanner()}
     <div class="hero">
       <div class="eyebrow">Total Value · USD</div>
       <div class="hero-value"><span class="currency-prefix">$</span>${fmtUSD(m.totalValue, 0)}</div>
@@ -8403,19 +8511,179 @@ function renderPortfolio() {
       <div class="alloc-legend">${allocLegend}</div>
     </div>
 
-    ${renderAttentionSlot()}
+    ${emptyStateHtml}
 
-    ${renderTodaysVerdictCard()}
+    ${renderVerdictZones()}
 
     ${renderTodaysOpportunitiesCard()}
-
-    <div class="section-head" style="padding: 0 20px; margin-top: 20px;">
-      <h2>Holdings</h2>
-      <button class="btn-ghost" data-act="add-holding" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
-    </div>
-    <div class="holdings">${holdingsHtml}</div>
   `;
   $("#topbarTitle").textContent = "Portfolio";
+}
+
+// ============================================================================
+// PHASE C — Verdict zones.
+// Three sections rendered in priority order: ACT (top), WATCH (middle),
+// HOLD (bottom, collapsible). Each row is one holding with one verb and a
+// one-line action. Tap to drill into the asset detail card.
+// ============================================================================
+
+function renderVerdictZones() {
+  if (state.holdings.length === 0) return "";
+
+  const verdictsBySymbol = new Map(state.verdicts.map(v => [v.symbol, v]));
+
+  // Build row records for every holding. Even when the verdict is missing
+  // (first load before /verdict completes, or it failed), show a placeholder
+  // row so the user sees their book and a clear "Run analyze" path.
+  const rows = state.holdings.map(h => {
+    const v = verdictsBySymbol.get(h.symbol);
+    const hm = holdingMetrics(h);
+    const isCash = h.asset_class === "cash";
+    if (isCash) {
+      // Cash never gets a verdict — it's just there as portfolio context.
+      return {
+        symbol: h.symbol, name: h.name, asset_class: h.asset_class,
+        verdict: "HOLD", action_line: `${((hm.value || 0) / Math.max(m_safe(), 1) * 100).toFixed(1)}% of portfolio`,
+        severity: "low", freshness: "fresh", reasoning_short: "",
+        missing_inputs: [], fired_trigger: null,
+        value: hm.value, pnl_pct: 0, day_change_pct: 0,
+        is_placeholder: false, is_cash: true,
+      };
+    }
+    if (!v) {
+      // No server verdict yet: synthesize a WATCH row that prompts an analysis.
+      const a = state.analyses[h.symbol];
+      const decay = a ? convictionDecay(a, h.asset_class) : null;
+      let action_line, missing;
+      if (!a) {
+        action_line = "Run analyze for full read";
+        missing = [`No analysis exists for ${h.symbol} — run analyze`];
+      } else if (decay && decay.is_stale) {
+        action_line = `Re-analyze — last call ${decay.days_old.toFixed(0)}d old`;
+        missing = [`AI analysis on ${h.symbol} is ${decay.days_old.toFixed(0)}d old`];
+      } else {
+        action_line = state.verdictsLoading ? "Computing verdict…" : "Verdict pending — pull to refresh";
+        missing = [];
+      }
+      return {
+        symbol: h.symbol, name: h.name, asset_class: h.asset_class,
+        verdict: "WATCH", action_line, severity: "low",
+        freshness: a ? (decay?.status || "fresh") : "missing",
+        reasoning_short: "", missing_inputs: missing, fired_trigger: null,
+        value: hm.value, pnl_pct: hm.pnlPct, day_change_pct: null,
+        is_placeholder: true, is_cash: false,
+      };
+    }
+    return {
+      symbol: v.symbol, name: v.name || h.name, asset_class: v.asset_class || h.asset_class,
+      verdict: v.verdict, action_line: v.action_line, severity: v.severity,
+      freshness: v.freshness, reasoning_short: v.reasoning_short,
+      missing_inputs: v.missing_inputs || [], fired_trigger: v.fired_trigger,
+      value: hm.value, pnl_pct: hm.pnlPct, day_change_pct: v.day_change_pct,
+      is_placeholder: false, is_cash: false,
+    };
+  });
+
+  const act   = rows.filter(r => r.verdict === "ACT");
+  const watch = rows.filter(r => r.verdict === "WATCH");
+  const hold  = rows.filter(r => r.verdict === "HOLD");
+
+  // Sort: ACT by severity (high→low) then size; WATCH by missing_inputs first;
+  // HOLD by portfolio value desc (biggest first).
+  const sevRank = { high: 0, medium: 1, low: 2 };
+  act.sort((a, b) => (sevRank[a.severity] - sevRank[b.severity]) || ((b.value || 0) - (a.value || 0)));
+  watch.sort((a, b) => (b.missing_inputs.length - a.missing_inputs.length) || ((b.value || 0) - (a.value || 0)));
+  hold.sort((a, b) => (b.value || 0) - (a.value || 0));
+
+  // Eyebrow rollup: "2 actions · 5 holding · 1 watch"
+  const counts = `${act.length} action${act.length === 1 ? "" : "s"} · ${hold.length} holding · ${watch.length} watch`;
+
+  const loadingTag = state.verdictsLoading ? `<span class="verdict-loading-pill"><span class="spinner"></span> refreshing</span>` : "";
+  const ageTag = state.verdictsAt && !state.verdictsLoading
+    ? `<span class="verdict-age-pill">Updated ${fmtRel(state.verdictsAt)}</span>`
+    : "";
+  const refreshBtn = `<button class="btn-ghost-sm" data-act="verdict-refresh" ${state.verdictsLoading ? "disabled" : ""}>Refresh</button>`;
+
+  const noteHtml = state.portfolioNote
+    ? `<div class="portfolio-note">${escAttr(state.portfolioNote)}</div>`
+    : "";
+
+  return `
+    <div class="verdict-header">
+      <div class="verdict-header-left">
+        <div class="verdict-eyebrow">${counts}</div>
+        <div class="verdict-meta-row">${ageTag}${loadingTag}</div>
+      </div>
+      ${refreshBtn}
+    </div>
+    ${noteHtml}
+    ${act.length > 0 ? `
+      <div class="verdict-zone verdict-zone-act">
+        ${act.map(renderVerdictRow).join("")}
+      </div>` : ""}
+    ${watch.length > 0 ? `
+      <div class="verdict-zone verdict-zone-watch">
+        <div class="verdict-zone-label">Watch</div>
+        ${watch.map(renderVerdictRow).join("")}
+      </div>` : ""}
+    ${hold.length > 0 ? `
+      <div class="verdict-zone verdict-zone-hold">
+        <div class="verdict-zone-label">Hold</div>
+        ${hold.map(renderVerdictRow).join("")}
+      </div>` : ""}
+  `;
+}
+
+// Single row renderer for the verdict list.
+// Stays compact: one line for verdict+action, one line for the reasoning when
+// present (ACT only). HOLD rows are deliberately tight — they're the quiet zone.
+function renderVerdictRow(r) {
+  const verdictClass = `vrow-${r.verdict.toLowerCase()}`;
+  const sevClass = r.verdict === "ACT" ? `vrow-sev-${r.severity}` : "";
+  const freshDot = (r.freshness === "stale" || r.freshness === "very_stale" || r.freshness === "missing")
+    ? `<span class="vrow-fresh-dot vrow-fresh-${escAttr(r.freshness)}" title="Analysis freshness: ${r.freshness}"></span>`
+    : "";
+  const dayChange = (r.day_change_pct != null && !r.is_cash)
+    ? `<span class="vrow-day ${r.day_change_pct >= 0 ? 'pos' : 'neg'}">${fmtPct(r.day_change_pct)}</span>`
+    : "";
+  const value = r.value != null
+    ? `<span class="vrow-value">$${fmtUSD(r.value, 0)}</span>`
+    : "";
+
+  // ACT rows get a full row treatment: action line, reasoning, severity pill.
+  if (r.verdict === "ACT") {
+    return `<div class="vrow ${verdictClass} ${sevClass}" data-act="open-asset" data-symbol="${escAttr(r.symbol)}">
+      <div class="vrow-head">
+        <span class="vrow-verb">ACT</span>
+        <span class="vrow-symbol">${escAttr(r.symbol)}</span>
+        <span class="vrow-sev-pill vrow-sev-pill-${escAttr(r.severity)}">${escAttr(r.severity)}</span>
+        ${freshDot}
+        <span class="vrow-spacer"></span>
+        ${value}${dayChange}
+      </div>
+      <div class="vrow-action">${escAttr(r.action_line)}</div>
+      ${r.reasoning_short ? `<div class="vrow-reasoning">${escAttr(r.reasoning_short)}</div>` : ""}
+    </div>`;
+  }
+
+  // WATCH and HOLD rows are tighter — single line where possible, action_line
+  // on a second line if non-trivial.
+  return `<div class="vrow ${verdictClass}" data-act="open-asset" data-symbol="${escAttr(r.symbol)}">
+    <div class="vrow-head">
+      <span class="vrow-verb">${r.verdict}</span>
+      <span class="vrow-symbol">${escAttr(r.symbol)}</span>
+      ${freshDot}
+      <span class="vrow-action-inline">${escAttr(r.action_line)}</span>
+      <span class="vrow-spacer"></span>
+      ${value}${dayChange}
+    </div>
+  </div>`;
+}
+
+// Defensive: portfolioMetrics might return 0 totalValue (cash-only or empty).
+// Used inside renderVerdictZones for the cash row's percent calculation.
+function m_safe() {
+  return portfolioMetrics().totalValue || 1;
 }
 
 // ----------------------------------------------------------------------------
@@ -10077,6 +10345,9 @@ async function runAnalysis(symbol) {
       };
       toast("Analysis complete");
       renderAssetDetail(symbol);
+      // Phase C — fresh analysis invalidates the verdict cache for this symbol.
+      // Force a /verdict re-run so the row on Portfolio reflects the new read.
+      runVerdict(true).catch(() => {});
     } else throw new Error("No analysis returned");
   } catch (e) {
     toast("Analysis failed: " + (e.message || "unknown error").slice(0, 80), 3000, "error");
@@ -10343,6 +10614,60 @@ async function runPortfolioAnalysis() {
 // User can force a re-check via the banner's refresh button.
 // ============================================================================
 const TRIGGERS_CHECK_DEBOUNCE_MS = 6 * 60 * 60 * 1000;
+
+// ============================================================================
+// PHASE C — Unified Verdict runner.
+// Calls /verdict once per app open (4h debounce). The result is cached in
+// localStorage so subsequent loads render the verdict zones immediately,
+// before the network call completes. Force-refresh via the Portfolio header
+// reload button.
+// ============================================================================
+const VERDICT_DEBOUNCE_MS = 4 * 60 * 60 * 1000;
+
+async function runVerdict(force = false) {
+  if (!state.uid) return;
+  if (state.verdictsLoading) return;
+  if (state.holdings.length === 0) {
+    state.verdicts = [];
+    state.portfolioNote = "";
+    return;
+  }
+
+  if (!force && state.verdictsAt) {
+    const age = Date.now() - new Date(state.verdictsAt).getTime();
+    if (age < VERDICT_DEBOUNCE_MS) return;
+  }
+
+  state.verdictsLoading = true;
+  if (state.currentView === "portfolio") renderPortfolio();
+
+  try {
+    const idToken = await auth.currentUser.getIdToken();
+    const r = await fetch(`${WORKER_URL}/verdict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        uid: state.uid,
+        idToken,
+        holdings: state.holdings,
+        investor_profile: state.investorProfile,
+      }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    state.verdicts = Array.isArray(j.verdicts) ? j.verdicts : [];
+    state.portfolioNote = String(j.portfolio_note || "");
+    state.verdictsAt = j.generated_at || new Date().toISOString();
+    localStorage.setItem("verdictsCache", JSON.stringify(state.verdicts));
+    localStorage.setItem("portfolioNote", state.portfolioNote);
+    localStorage.setItem("verdictsAt", state.verdictsAt);
+  } catch (e) {
+    if (force) toast("Verdict refresh failed: " + (e.message || "").slice(0, 80), 3000, "error");
+  } finally {
+    state.verdictsLoading = false;
+    if (state.currentView === "portfolio") renderPortfolio();
+  }
+}
 
 async function runTriggersCheck(force = false) {
   if (!state.uid) return;
@@ -13237,6 +13562,7 @@ document.addEventListener("click", (e) => {
       case "reset-pin":              resetPin(); break;
       case "submit-investor-profile": submitInvestorProfile(); break;
       case "triggers-refresh":       runTriggersCheck(true); break;
+      case "verdict-refresh":         runVerdict(true); break;
       case "ack-trigger":             ackTrigger(target.dataset.symbol, target.dataset.text); break;
       case "triggers-ack-all":        ackAllTriggers(); break;
       case "save-target-alloc":      saveTargetAlloc(); break;
