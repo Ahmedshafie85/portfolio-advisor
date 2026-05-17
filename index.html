@@ -1932,13 +1932,17 @@ body {
 @media (max-width: 480px) {
   .tp-exit-grid { grid-template-columns: 1fr; }
 }
-.tp-block, .exit-block {
+.tp-block, .exit-block, .sizing-block {
   padding: 10px 12px;
   background: var(--bg-elev); border-radius: 8px;
   border: 1px solid var(--rule-soft);
 }
 .tp-block  { border-left: 3px solid var(--green); }
 .exit-block { border-left: 3px solid var(--red); }
+.sizing-block {
+  border-left: 3px solid var(--gold);
+  margin-top: 10px;
+}
 .tpe-lbl {
   font-family: var(--mono); font-size: 10px;
   letter-spacing: 0.1em; text-transform: uppercase;
@@ -3262,6 +3266,11 @@ const state = {
   prices: {},
   analyses: {},
   portfolioAnalysis: null,
+  // Investor profile (Phase A) — calibrates AI prompts to the user's stated rules.
+  // Loaded from Firestore on auth; written via the Settings → Investor Profile form.
+  // Null until first save. When null, prompts fall back to their hardcoded defaults.
+  investorProfile: null,
+  investorProfileLoading: false,
   watchlist: [],
   watchlistSnapshot: {},
   triggers: [],
@@ -3690,6 +3699,7 @@ async function loadInitialData() {
   await ensureAuth();
   await loadHoldingsFromFirestore();
   if (state.holdings.length === 0) await seedHoldings();
+  await loadInvestorProfile();
   await loadAnalysesFromFirestore();
   await loadPortfolioAnalysis();
   await loadWatchlist();
@@ -3787,6 +3797,57 @@ async function autoRefreshSignals() {
   }
 
   renderCurrentView();
+}
+
+// ============================================================================
+// INVESTOR PROFILE (Phase A) — Firestore-backed personal rules that calibrate
+// every AI analysis. Single doc at users/{uid}/profile/investor. Read once on
+// boot, re-read after save. Passed in every /analyze and /analyze-portfolio
+// payload as the `investor_profile` field. When the doc doesn't exist the app
+// works exactly as before — the worker treats absent profile as "no overrides".
+// ============================================================================
+const INVESTOR_PROFILE_DEFAULTS = {
+  base_currency: "USD",
+  tax_jurisdiction: "",
+  drawdown_tolerance_pct: 40,
+  min_reward_risk: 2.0,
+  per_trade_risk_pct: 1.0,
+  max_position_pct: 15,
+  time_budget_hrs_week: 2,
+  horizon_default: "long",
+  anti_portfolio: "",
+  core_thesis: "",
+  liquidity_constraints: "",
+  public_exposure_rules: "",
+};
+
+async function loadInvestorProfile() {
+  if (!state.uid) return;
+  state.investorProfileLoading = true;
+  try {
+    const ref = db.collection("users").doc(state.uid).collection("profile").doc("investor");
+    const snap = await ref.get();
+    if (snap.exists) {
+      state.investorProfile = { ...INVESTOR_PROFILE_DEFAULTS, ...snap.data() };
+    } else {
+      state.investorProfile = null;
+    }
+  } catch (e) {
+    console.warn("loadInvestorProfile failed:", e.message);
+    state.investorProfile = null;
+  } finally {
+    state.investorProfileLoading = false;
+  }
+}
+
+async function saveInvestorProfile(patch) {
+  if (!state.uid) throw new Error("Not signed in");
+  const current = state.investorProfile || INVESTOR_PROFILE_DEFAULTS;
+  const next = { ...current, ...patch, updated_at: new Date().toISOString() };
+  const ref = db.collection("users").doc(state.uid).collection("profile").doc("investor");
+  await ref.set(next, { merge: true });
+  state.investorProfile = next;
+  return next;
 }
 
 async function loadHoldingsFromFirestore() {
@@ -9528,6 +9589,13 @@ function renderAiCard(symbol, a) {
           ${a.exit_strategy.trailing_rule ? `<div class="tpe-row"><b>Trail</b> ${escAttr(a.exit_strategy.trailing_rule)}</div>` : ""}
           ${a.exit_strategy.thesis_break ? `<div class="tpe-row tpe-row-wrap"><b>Break</b> ${escAttr(a.exit_strategy.thesis_break)}</div>` : ""}
         </div>` : ""}
+      ${a.position_sizing ? `
+        <div class="sizing-block">
+          <div class="tpe-lbl">Position Sizing</div>
+          ${a.position_sizing.recommended_pct_of_portfolio != null ? `<div class="tpe-row"><b>Size</b> ${escAttr(String(a.position_sizing.recommended_pct_of_portfolio))}% of portfolio</div>` : ""}
+          ${a.position_sizing.max_risk_dollars != null ? `<div class="tpe-row"><b>Risk</b> $${escAttr(fmtUSD(a.position_sizing.max_risk_dollars, 0))} max if stop hits</div>` : ""}
+          ${a.position_sizing.reasoning ? `<div class="tpe-row tpe-row-wrap"><b>Why</b> ${escAttr(a.position_sizing.reasoning)}</div>` : ""}
+        </div>` : ""}
     </div>` : ""}
 
     <div class="ai-body">
@@ -9775,6 +9843,9 @@ async function runAnalysis(symbol) {
         portfolio_context: portfolioContext,
         // Pass the sanity result so the AI prompt can include it
         data_sanity: preCheck,
+        // Phase A: investor profile drives personalized sizing + R:R calibration.
+        // Null when the user hasn't filled out the form yet — worker handles absence.
+        investor_profile: state.investorProfile,
         idToken,
       }),
     });
@@ -10028,6 +10099,9 @@ async function runPortfolioAnalysis() {
         idToken,
         holdings: state.holdings,
         portfolio_metrics: m,
+        // Phase A: the portfolio-stance prompt uses anti_portfolio, drawdown
+        // tolerance, and core_thesis to flag drift from stated rules.
+        investor_profile: state.investorProfile,
       }),
     });
     if (!r.ok) throw new Error(await r.text());
@@ -11845,6 +11919,7 @@ function renderSettings() {
         <div><div class="lbl">Version</div><div class="sub">1.4.0</div></div>
       </div>
     </div>
+    ${renderInvestorProfileSection()}
     ${renderRiskSettings()}
     <div class="empty-state" style="padding: 30px 20px;">
       <p style="font-size:11px;color:var(--ink-muted);line-height:1.6;">
@@ -11853,6 +11928,139 @@ function renderSettings() {
       </p>
     </div>
   `;
+}
+
+// ============================================================================
+// INVESTOR PROFILE — Settings section (Phase A).
+// 12 fields, structured form. Saves to Firestore on tap; the saved object is
+// read on every /analyze + /analyze-portfolio call so the AI knows the user's
+// drawdown tolerance, sizing rules, anti-portfolio, and core thesis.
+// ============================================================================
+function renderInvestorProfileSection() {
+  const p = state.investorProfile || INVESTOR_PROFILE_DEFAULTS;
+  const isSet = !!state.investorProfile;
+  const updatedAt = state.investorProfile?.updated_at;
+  const updatedLabel = updatedAt ? `Saved ${fmtRel(updatedAt)}` : "Not yet saved — using defaults";
+
+  // Field input helper. Plain inputs, no JS frameworks, no clever bindings.
+  // Values are read from the DOM at submit time, not tracked in state.
+  const txt = (id, label, sub, value, placeholder) => `
+    <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+      <div>
+        <div class="lbl">${label}</div>
+        ${sub ? `<div class="sub">${sub}</div>` : ""}
+      </div>
+      <input id="ip_${id}" type="text" value="${escAttr(value || "")}"
+        placeholder="${escAttr(placeholder || "")}"
+        style="width:100%;padding:8px 10px;border:1px solid var(--rule);border-radius:6px;
+               background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;" />
+    </div>`;
+
+  const num = (id, label, sub, value, min, max, step) => `
+    <div class="setting-row">
+      <div>
+        <div class="lbl">${label}</div>
+        ${sub ? `<div class="sub">${sub}</div>` : ""}
+      </div>
+      <input id="ip_${id}" type="number" value="${value}"
+        min="${min}" max="${max}" step="${step}"
+        style="width:80px;padding:6px 8px;border:1px solid var(--rule);border-radius:6px;
+               background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:13px;text-align:right;" />
+    </div>`;
+
+  const sel = (id, label, sub, value, options) => `
+    <div class="setting-row">
+      <div>
+        <div class="lbl">${label}</div>
+        ${sub ? `<div class="sub">${sub}</div>` : ""}
+      </div>
+      <select id="ip_${id}"
+        style="padding:6px 8px;border:1px solid var(--rule);border-radius:6px;
+               background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;">
+        ${options.map(o => `<option value="${escAttr(o.value)}" ${o.value === value ? "selected" : ""}>${escAttr(o.label)}</option>`).join("")}
+      </select>
+    </div>`;
+
+  const area = (id, label, sub, value, placeholder) => `
+    <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+      <div>
+        <div class="lbl">${label}</div>
+        ${sub ? `<div class="sub">${sub}</div>` : ""}
+      </div>
+      <textarea id="ip_${id}" rows="3"
+        placeholder="${escAttr(placeholder || "")}"
+        style="width:100%;padding:8px 10px;border:1px solid var(--rule);border-radius:6px;
+               background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;
+               resize:vertical;line-height:1.45;">${escAttr(value || "")}</textarea>
+    </div>`;
+
+  return `
+    <div class="section-head" style="padding: 20px 20px 0;">
+      <h2>Investor Profile</h2>
+      <span style="font-size:11px;color:var(--ink-muted);">${escAttr(updatedLabel)}</span>
+    </div>
+    <div class="settings-group">
+      ${txt("base_currency", "Base Currency", "Currency you report P&L in", p.base_currency, "USD")}
+      ${txt("tax_jurisdiction", "Tax Jurisdiction", "Country / regime — affects timing of realisations", p.tax_jurisdiction, "Kuwait")}
+      ${num("drawdown_tolerance_pct", "Drawdown Tolerance", "% paper drawdown you can sleep through", p.drawdown_tolerance_pct, 5, 90, 1)}
+      ${num("min_reward_risk", "Min Reward:Risk", "Minimum acceptable R-multiple for new trades", p.min_reward_risk, 1, 10, 0.1)}
+      ${num("per_trade_risk_pct", "Per-Trade Risk %", "Max % of portfolio risked on one trade", p.per_trade_risk_pct, 0.1, 5, 0.1)}
+      ${num("max_position_pct", "Max Position %", "Hard ceiling on any single holding", p.max_position_pct, 1, 100, 1)}
+      ${num("time_budget_hrs_week", "Time Budget (hrs/wk)", "Hours/week for active management", p.time_budget_hrs_week, 0, 40, 0.5)}
+      ${sel("horizon_default", "Default Horizon", "Lens used when horizons disagree", p.horizon_default, [
+        { value: "tactical", label: "Tactical (weeks)" },
+        { value: "medium",   label: "Medium (months)" },
+        { value: "long",     label: "Long (years)" },
+      ])}
+      ${area("anti_portfolio", "Anti-Portfolio", "Categories/structures you will not buy", p.anti_portfolio,
+        "e.g. leveraged ETFs; pre-revenue biotech; meme stocks")}
+      ${area("core_thesis", "Core Thesis", "The compounding stance, in your own words", p.core_thesis,
+        "e.g. Compound aggressively this decade; preserve next. Asymmetric upside in tech and BTC.")}
+      ${area("liquidity_constraints", "Liquidity Constraints", "Cash flow / withdrawal rules", p.liquidity_constraints,
+        "e.g. No drawdown from portfolio. Monthly DCA adds only.")}
+      ${area("public_exposure_rules", "Public Exposure Rules", "How public positions are governed", p.public_exposure_rules,
+        "e.g. Any position championed publicly requires devil's-advocate memo before sizing up.")}
+      <div class="setting-row">
+        <div>
+          <div class="lbl">${isSet ? "Update Profile" : "Save Profile"}</div>
+          <div class="sub">Calibrates every AI analysis to these rules</div>
+        </div>
+        <button class="btn btn-sm" data-act="submit-investor-profile">${isSet ? "Update" : "Save"}</button>
+      </div>
+    </div>
+  `;
+}
+
+async function submitInvestorProfile() {
+  const num = (id, fallback) => {
+    const v = parseFloat($(`#ip_${id}`)?.value);
+    return Number.isFinite(v) ? v : fallback;
+  };
+  const txt = (id) => ($(`#ip_${id}`)?.value || "").trim();
+  const patch = {
+    base_currency: txt("base_currency") || "USD",
+    tax_jurisdiction: txt("tax_jurisdiction"),
+    drawdown_tolerance_pct: num("drawdown_tolerance_pct", 40),
+    min_reward_risk: num("min_reward_risk", 2.0),
+    per_trade_risk_pct: num("per_trade_risk_pct", 1.0),
+    max_position_pct: num("max_position_pct", 15),
+    time_budget_hrs_week: num("time_budget_hrs_week", 2),
+    horizon_default: txt("horizon_default") || "long",
+    anti_portfolio: txt("anti_portfolio"),
+    core_thesis: txt("core_thesis"),
+    liquidity_constraints: txt("liquidity_constraints"),
+    public_exposure_rules: txt("public_exposure_rules"),
+  };
+  const btn = $('[data-act="submit-investor-profile"]');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>'; }
+  try {
+    await saveInvestorProfile(patch);
+    toast("Profile saved — analyses will use it from next run");
+    renderSettings();
+  } catch (e) {
+    toast("Save failed: " + (e.message || "").slice(0, 80), 3000, "error");
+    if (btn) { btn.disabled = false; btn.innerHTML = "Save"; }
+  }
 }
 
 // Risk settings: editable target allocation + per-trade risk display.
@@ -12685,6 +12893,7 @@ document.addEventListener("click", (e) => {
         $("#aw_search_results").classList.add("hidden");
         break;
       case "reset-pin":              resetPin(); break;
+      case "submit-investor-profile": submitInvestorProfile(); break;
       case "save-target-alloc":      saveTargetAlloc(); break;
       case "manual-refresh":         manualRefresh(); break;
       case "export-data":            exportData(); break;
