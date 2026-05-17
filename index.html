@@ -394,9 +394,23 @@ body {
 .vrow-fresh-dot {
   width: 6px; height: 6px; border-radius: 50%; display: inline-block;
 }
-.vrow-fresh-stale       { background: var(--gold); }
-.vrow-fresh-very_stale  { background: var(--red); }
-.vrow-fresh-missing     { background: var(--ink-muted); }
+.vrow-fresh-dot.vrow-fresh-stale       { background: var(--gold); }
+.vrow-fresh-dot.vrow-fresh-very_stale  { background: var(--red); }
+.vrow-fresh-dot.vrow-fresh-missing     { background: var(--ink-muted); }
+
+/* Freshness badge — labeled version of the dot. Visible whenever the analysis
+   is anything other than "fresh", so the user can read the verdict's
+   grounding at a glance. */
+.vrow-fresh-badge {
+  font-family: var(--sans); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 999px;
+  white-space: nowrap;
+}
+.vrow-fresh-badge.vrow-fresh-aging      { background: var(--bg-elev); color: var(--ink-muted); }
+.vrow-fresh-badge.vrow-fresh-stale      { background: rgba(202, 138, 4, 0.14); color: var(--gold); }
+.vrow-fresh-badge.vrow-fresh-very_stale { background: rgba(220, 38, 38, 0.14); color: var(--red); }
+.vrow-fresh-badge.vrow-fresh-missing    { background: rgba(220, 38, 38, 0.10); color: var(--red); }
 
 /* ACT rows get a left border in red/gold/grey by severity. The whole row
    stays card-shaped — the severity is signalled by the accent, not by tinting
@@ -3595,9 +3609,9 @@ const state = {
   // One verdict per holding (ACT/HOLD/WATCH) computed server-side from every
   // signal source. Cached in localStorage so the screen renders instantly on
   // app open; refreshed via /verdict on a 4h debounce.
-  verdicts: JSON.parse(localStorage.getItem("verdictsCache") || "[]"),
-  portfolioNote: localStorage.getItem("portfolioNote") || "",
-  verdictsAt: localStorage.getItem("verdictsAt") || null,
+  verdicts: JSON.parse(localStorage.getItem("verdictsCache_v2") || "[]"),
+  portfolioNote: localStorage.getItem("portfolioNote_v2") || "",
+  verdictsAt: localStorage.getItem("verdictsAt_v2") || null,
   verdictsLoading: false,
   watchlist: [],
   watchlistSnapshot: {},
@@ -8630,49 +8644,16 @@ function renderVerdictZones() {
         is_placeholder: true, is_cash: false,
       };
     }
-    return (() => {
-      // The server verdict exists. But the worker may not have seen a freshly
-      // run analysis (e.g. it queries Firestore on a path/field that didn't
-      // match). If the client has a local analysis for this symbol, trust it
-      // over the server's "missing"/"stale" freshness so the row doesn't
-      // wrongly say "no analysis exists" right after the user analyzed.
-      const localA = state.analyses[h.symbol];
-      let freshness = v.freshness;
-      let missing_inputs = v.missing_inputs || [];
-      let action_line = v.action_line;
-      let reasoning_short = v.reasoning_short;
-      let stance_echo = v.stance_echo || null;
-      let conviction = v.conviction || null;
-
-      if (localA && (v.freshness === "missing" || !v.stance_echo)) {
-        const decay = convictionDecay(localA, h.asset_class);
-        freshness = decay?.status || "fresh";
-        stance_echo = localA.stance || stance_echo;
-        conviction = localA.conviction || conviction;
-        if (localA.headline && !reasoning_short) reasoning_short = localA.headline;
-        // Drop any "no analysis" complaint the server attached.
-        missing_inputs = missing_inputs.filter(
-          x => !/no analysis|run analyze/i.test(String(x))
-        );
-        if (decay && decay.is_stale) {
-          missing_inputs = [`AI analysis on ${h.symbol} is ${decay.days_old.toFixed(0)}d old`];
-          action_line = `Re-analyze — last call ${decay.days_old.toFixed(0)}d old`;
-        } else if (/no analysis|run analyze for full/i.test(String(action_line))) {
-          action_line = "Verdict pending — pull to refresh";
-        }
-      }
-
-      return {
-        symbol: v.symbol, name: v.name || h.name, asset_class: v.asset_class || h.asset_class,
-        verdict: v.verdict, action_line, severity: v.severity,
-        freshness, reasoning_short,
-        missing_inputs, fired_trigger: v.fired_trigger,
-        stance_echo, conviction,
-        key_signal: v.key_signal || "",
-        value: hm.value, pnl_pct: hm.pnlPct, day_change_pct: v.day_change_pct,
-        is_placeholder: false, is_cash: false,
-      };
-    })();
+    return {
+      symbol: v.symbol, name: v.name || h.name, asset_class: v.asset_class || h.asset_class,
+      verdict: v.verdict, action_line: v.action_line, severity: v.severity,
+      freshness: v.freshness, reasoning_short: v.reasoning_short,
+      missing_inputs: v.missing_inputs || [], fired_trigger: v.fired_trigger,
+      stance_echo: v.stance_echo || null, conviction: v.conviction || null,
+      key_signal: v.key_signal || "",
+      value: hm.value, pnl_pct: hm.pnlPct, day_change_pct: v.day_change_pct,
+      is_placeholder: false, is_cash: false,
+    };
   });
 
   const act   = rows.filter(r => r.verdict === "ACT");
@@ -8733,9 +8714,22 @@ function renderVerdictZones() {
 function renderVerdictRow(r) {
   const verdictClass = `vrow-${r.verdict.toLowerCase()}`;
   const sevClass = r.verdict === "ACT" ? `vrow-sev-${r.severity}` : "";
-  const freshDot = (r.freshness === "stale" || r.freshness === "very_stale" || r.freshness === "missing")
-    ? `<span class="vrow-fresh-dot vrow-fresh-${escAttr(r.freshness)}" title="Analysis freshness: ${r.freshness}"></span>`
-    : "";
+  // Freshness badge. Visible on every non-cash row so the user always sees
+  // whether the verdict is grounded in a recent analysis. Five states map to
+  // three labels:
+  //   fresh        → no badge (the default, quiet state)
+  //   aging        → "AGING" (still inside the decay window but past halfway)
+  //   stale        → "OLD" (past the decay window, needs re-analyze)
+  //   very_stale   → "OLD" (past 2× the decay window)
+  //   missing      → "NO ANALYSIS"
+  const freshBadge = r.is_cash ? "" : (() => {
+    const f = r.freshness;
+    if (!f || f === "fresh") return "";
+    const labelMap = { aging: "AGING", stale: "OLD", very_stale: "OLD", missing: "NO ANALYSIS" };
+    const label = labelMap[f] || "";
+    if (!label) return "";
+    return `<span class="vrow-fresh-badge vrow-fresh-${escAttr(f)}" title="Analysis freshness: ${escAttr(f)}">${escAttr(label)}</span>`;
+  })();
   const dayChange = (r.day_change_pct != null && !r.is_cash)
     ? `<span class="vrow-day ${r.day_change_pct >= 0 ? 'pos' : 'neg'}">${fmtPct(r.day_change_pct)}</span>`
     : "";
@@ -8778,7 +8772,7 @@ function renderVerdictRow(r) {
         <span class="vrow-symbol">${escAttr(r.symbol)}</span>
         <span class="vrow-sev-pill vrow-sev-pill-${escAttr(r.severity)}">${escAttr(r.severity)}</span>
         ${stanceBadge}
-        ${freshDot}
+        ${freshBadge}
         <span class="vrow-spacer"></span>
         ${value}${dayChange}
         ${analyzeBtn}
@@ -8796,7 +8790,7 @@ function renderVerdictRow(r) {
       <span class="vrow-verb">${r.verdict}</span>
       <span class="vrow-symbol">${escAttr(r.symbol)}</span>
       ${stanceBadge}
-      ${freshDot}
+      ${freshBadge}
       <span class="vrow-spacer"></span>
       ${value}${dayChange}
       ${analyzeBtn}
@@ -10461,7 +10455,7 @@ async function runAnalysis(symbol) {
     if (!r.ok) throw new Error(await r.text());
     const j = await r.json();
     if (j.analysis) {
-      const analysisRecord = {
+      state.analyses[symbol] = {
         ...j.analysis, symbol,
         generated_at: new Date().toISOString(),
         current_price: j.current_price,
@@ -10470,20 +10464,6 @@ async function runAnalysis(symbol) {
           ? `Data sanity: ${preCheck.severity}. ${preCheck.issues.map(i => i.msg).join(" ")}`.slice(0, 240)
           : null,
       };
-      state.analyses[symbol] = analysisRecord;
-
-      // Persist to Firestore so the analysis survives a reload AND is visible
-      // to the server-side /verdict endpoint. Without this write the verdict
-      // keeps reporting "no analysis" because state.analyses lives only in
-      // browser memory and loadAnalysesFromFirestore() reads this collection.
-      try {
-        await db.collection("users").doc(state.uid).collection("analyses")
-          .add(analysisRecord);
-      } catch (persistErr) {
-        console.warn("analysis persist failed", persistErr);
-        toast("Analysis saved locally but not synced — verdict may not update", 3500, "error");
-      }
-
       toast("Analysis complete");
       renderAssetDetail(symbol);
       // Phase C — fresh analysis invalidates the verdict cache for this symbol.
@@ -10792,10 +10772,6 @@ async function runVerdict(force = false) {
         idToken,
         holdings: state.holdings,
         investor_profile: state.investorProfile,
-        // Send the client's analyses inline so the worker doesn't have to
-        // (and possibly fail to) query Firestore for them. A worker that
-        // reads this field will see fresh analyses immediately.
-        analyses: state.analyses,
       }),
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -10803,9 +10779,9 @@ async function runVerdict(force = false) {
     state.verdicts = Array.isArray(j.verdicts) ? j.verdicts : [];
     state.portfolioNote = String(j.portfolio_note || "");
     state.verdictsAt = j.generated_at || new Date().toISOString();
-    localStorage.setItem("verdictsCache", JSON.stringify(state.verdicts));
-    localStorage.setItem("portfolioNote", state.portfolioNote);
-    localStorage.setItem("verdictsAt", state.verdictsAt);
+    localStorage.setItem("verdictsCache_v2", JSON.stringify(state.verdicts));
+    localStorage.setItem("portfolioNote_v2", state.portfolioNote);
+    localStorage.setItem("verdictsAt_v2", state.verdictsAt);
   } catch (e) {
     if (force) toast("Verdict refresh failed: " + (e.message || "").slice(0, 80), 3000, "error");
   } finally {
