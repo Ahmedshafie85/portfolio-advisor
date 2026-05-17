@@ -182,14 +182,91 @@ body {
   font-size: 11px; color: var(--ink-muted); margin-top: 2px;
 }
 .triggers-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
+/* Plan block on ACT rows — entry zone, invalidation, R:R, timeframe.
+   Mono font for the values so price levels read like data, not prose.
+   Two-column grid keeps it compact on mobile. */
+.vplan {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--bg-elev);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+}
+.vplan-row {
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 0;
+}
+.vplan-k {
+  font-family: var(--sans); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.vplan-v {
+  font-family: var(--mono); font-size: 12px; color: var(--ink);
+  line-height: 1.35;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vplan-fired {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--red);
+  background: rgba(220, 38, 38, 0.06);
+  border-radius: 6px;
+}
+.vplan-fired-head {
+  font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; color: var(--red);
+}
+.vplan-fired-body {
+  font-family: var(--sans); font-size: 12.5px; color: var(--ink);
+  line-height: 1.4; margin-top: 4px;
+}
+.vplan-fired-why {
+  font-family: var(--sans); font-size: 11.5px; color: var(--ink-soft);
+  line-height: 1.4; margin-top: 4px;
+}
+
+@media (min-width: 600px) {
+  .vplan { grid-template-columns: repeat(4, 1fr); }
+}
+
 .btn-ghost-sm {
   padding: 4px 10px; border: 1px solid var(--rule); background: transparent;
   color: var(--ink-soft); font-family: var(--sans); font-size: 11px;
   font-weight: 500; letter-spacing: 0.02em; border-radius: 999px;
   cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+  display: inline-flex; align-items: center; gap: 6px;
 }
 .btn-ghost-sm:hover { color: var(--ink); border-color: var(--ink-muted); }
 .btn-ghost-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ghost-sm .spinner { width: 11px; height: 11px; }
+.btn-analyze-all { color: var(--ink); border-color: var(--ink-muted); }
+.btn-analyze-all:hover { background: var(--bg-elev); }
+.verdict-header-right {
+  display: flex; gap: 6px; align-items: center; flex-shrink: 0;
+}
+
+/* Minimal modal — used by confirmModal for the "Analyze all" cost prompt and
+   any future blocking confirmations. */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; padding: 20px;
+}
+.modal-content {
+  background: var(--bg); border: 1px solid var(--rule);
+  border-radius: var(--radius); padding: 22px 22px 18px;
+  width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+}
+.modal-content .btn {
+  padding: 8px 16px; border: 1px solid var(--ink);
+  background: var(--ink); color: var(--bg);
+  font-family: var(--sans); font-size: 12.5px; font-weight: 500;
+  border-radius: 999px; cursor: pointer;
+}
+.modal-content .btn:hover { opacity: 0.9; }
 
 .triggers-banner-list {
   display: flex; flex-direction: column; gap: 8px;
@@ -4092,17 +4169,23 @@ async function autoRefreshSignals() {
     }
   } catch (e) { console.warn("auto pre-surge:", e.message || e); }
 
-  // News — refreshNews uses its own freshness logic; only call if no cache
+  // News — refresh on app open if cache is older than 6h. Previously this
+  // only loaded when state was completely empty (first-ever open), which
+  // caused Today's Opportunities to feel frozen across sessions.
   try {
-    if (!state.newsItems || !state.newsFetchedAt) {
+    const newsAgeH = state.newsFetchedAt ? (Date.now() - new Date(state.newsFetchedAt).getTime()) / 3600000 : 999;
+    if (!state.newsItems || newsAgeH > 6) {
       await refreshNews();
     }
   } catch (e) { console.warn("auto news:", e.message || e); }
 
-  // ETF Leaderboard — used as opportunity candidates now
+  // ETF Leaderboard — same pattern: refresh if older than 24h, not only
+  // when missing entirely. The leaderboard moves slowly, so a daily refresh
+  // is enough to keep momentum picks current without burning API quota.
   try {
-    if (!state.etfLeaderboard) {
-      await fetchEtfLeaderboard(false); // false = use cache if fresh
+    const etfAgeH = state.etfLeaderboardFetchedAt ? (Date.now() - new Date(state.etfLeaderboardFetchedAt).getTime()) / 3600000 : 999;
+    if (!state.etfLeaderboard || etfAgeH > 24) {
+      await fetchEtfLeaderboard(false); // false = let function decide based on cache
     }
   } catch (e) { console.warn("auto etf:", e.message || e); }
 
@@ -8674,7 +8757,15 @@ function renderVerdictZones() {
   const ageTag = state.verdictsAt && !state.verdictsLoading
     ? `<span class="verdict-age-pill">Updated ${fmtRel(state.verdictsAt)}</span>`
     : "";
+  // Track in-flight "analyze all" runs. The button shows progress like
+  // "Analyzing 3/8…" so the user knows it's working through the book.
+  const aaTotal = state.analyzeAllTotal || 0;
+  const aaDone = state.analyzeAllDone || 0;
+  const isAnalyzingAll = state.analyzeAllRunning;
   const refreshBtn = `<button class="btn-ghost-sm" data-act="verdict-refresh" ${state.verdictsLoading ? "disabled" : ""}>Refresh</button>`;
+  const analyzeAllBtn = `<button class="btn-ghost-sm btn-analyze-all" data-act="analyze-all" ${isAnalyzingAll ? "disabled" : ""}>${
+    isAnalyzingAll ? `<span class="spinner"></span> ${aaDone}/${aaTotal}` : "Analyze all"
+  }</button>`;
 
   const noteHtml = state.portfolioNote
     ? `<div class="portfolio-note">${escAttr(state.portfolioNote)}</div>`
@@ -8686,7 +8777,10 @@ function renderVerdictZones() {
         <div class="verdict-eyebrow">${counts}</div>
         <div class="verdict-meta-row">${ageTag}${loadingTag}</div>
       </div>
-      ${refreshBtn}
+      <div class="verdict-header-right">
+        ${analyzeAllBtn}
+        ${refreshBtn}
+      </div>
     </div>
     ${noteHtml}
     ${act.length > 0 ? `
@@ -8764,8 +8858,46 @@ function renderVerdictRow(r) {
     : "";
 
   // ACT rows get the full treatment: action line, key signal, reasoning,
-  // severity pill, left-border accent.
+  // severity pill, left-border accent — PLUS a plan block pulled from the
+  // underlying analysis. The verdict is the verb; the plan is the levels:
+  // entry zone, invalidation, reward:risk ratio, fired-trigger text. All of
+  // this exists already in state.analyses[symbol] (the worker /analyze output),
+  // so no extra API call.
   if (r.verdict === "ACT") {
+    const a = state.analyses[r.symbol];
+    const planParts = [];
+    if (a) {
+      // Action zone — entry or exit price band from the stored analysis.
+      if (a.action?.price_zone) {
+        planParts.push(`<div class="vplan-row"><span class="vplan-k">Zone</span><span class="vplan-v">${escAttr(a.action.price_zone)}</span></div>`);
+      }
+      // Invalidation — where the thesis breaks. Critical for risk management.
+      if (a.action?.invalidation && a.action.invalidation !== "N/A") {
+        planParts.push(`<div class="vplan-row"><span class="vplan-k">Invalidate</span><span class="vplan-v">${escAttr(a.action.invalidation)}</span></div>`);
+      }
+      // Reward:risk ratio — the system computes it from scenario implications.
+      const rr = a.reward_risk?.ratio ?? a.computed_reward_risk?.ratio;
+      if (rr != null) {
+        planParts.push(`<div class="vplan-row"><span class="vplan-k">R:R</span><span class="vplan-v">${typeof rr === "number" ? rr.toFixed(2) : escAttr(rr)}</span></div>`);
+      }
+      // Timeframe — when the action should be taken / when to reassess.
+      if (a.action?.timeframe) {
+        planParts.push(`<div class="vplan-row"><span class="vplan-k">Timeframe</span><span class="vplan-v">${escAttr(a.action.timeframe)}</span></div>`);
+      }
+    }
+    // Fired-trigger block — surfaces ALWAYS when the verdict response carried
+    // a fired_trigger object, even when the underlying analysis isn't local.
+    const firedBlock = r.fired_trigger
+      ? `<div class="vplan-fired">
+           <div class="vplan-fired-head">▼ ${escAttr(r.fired_trigger.direction === "bull" ? "BULL TRIGGER FIRED" : "BEAR TRIGGER FIRED")}</div>
+           <div class="vplan-fired-body">${escAttr(r.fired_trigger.trigger_text || "")}</div>
+           ${r.fired_trigger.fired_because ? `<div class="vplan-fired-why">Why: ${escAttr(r.fired_trigger.fired_because)}</div>` : ""}
+         </div>`
+      : "";
+    const planBlock = planParts.length > 0
+      ? `<div class="vplan">${planParts.join("")}</div>`
+      : "";
+
     return `<div class="vrow ${verdictClass} ${sevClass}" data-act="open-asset" data-symbol="${escAttr(r.symbol)}">
       <div class="vrow-head">
         <span class="vrow-verb">ACT</span>
@@ -8780,6 +8912,8 @@ function renderVerdictRow(r) {
       <div class="vrow-action">${escAttr(r.action_line)}</div>
       ${keySignal}
       ${r.reasoning_short ? `<div class="vrow-reasoning">${escAttr(r.reasoning_short)}</div>` : ""}
+      ${firedBlock}
+      ${planBlock}
     </div>`;
   }
 
@@ -10794,6 +10928,105 @@ async function runVerdict(force = false) {
 // (and reused by Today's Opportunities entries). Wraps runAnalysis so the row
 // can show a spinner without the user having to drill into the asset detail.
 // Stops event propagation upstream — the row's tap-to-open shouldn't fire.
+// ============================================================================
+// Analyze ALL — sequentially run /analyze for every non-cash holding.
+// Sequential rather than parallel for two reasons: (1) keeps Anthropic API
+// concurrency low (one in-flight call at a time), (2) lets the user watch
+// progress and bail out by closing the tab if needed. Total cost ~$0.02/symbol
+// so an 8-holding book is ~$0.16. After the last symbol completes the verdict
+// is force-refreshed so the integrated view reflects every fresh analysis.
+//
+// Skips: cash, symbols already analyzed today (cheap optimisation — same-day
+// re-runs are rarely informative and waste API spend). User can still hit the
+// per-row ⚡ if they want to force re-analyze a specific symbol.
+// ============================================================================
+async function analyzeAllSymbols() {
+  if (!state.uid) { toast("Not signed in", 2000, "error"); return; }
+  if (state.analyzeAllRunning) return;
+  const today = new Date().toISOString().slice(0, 10);
+  // Build the target list — every non-cash holding that doesn't already have
+  // a same-day analysis. state.analyses is keyed by symbol and holds the most
+  // recent stored analysis, with a `date` field set by the worker.
+  const targets = state.holdings
+    .filter(h => h.asset_class !== "cash")
+    .filter(h => {
+      const a = state.analyses[h.symbol];
+      return !a || a.date !== today;
+    })
+    .map(h => h.symbol);
+
+  if (targets.length === 0) {
+    toast("All holdings already analyzed today");
+    return;
+  }
+  // Confirm so the user can cancel if they didn't mean to spend the tokens.
+  const proceed = await confirmModal({
+    title: "Analyze all holdings?",
+    body: `This will run AI analysis on ${targets.length} symbol${targets.length === 1 ? "" : "s"}: ${targets.join(", ")}. Approx cost: $${(targets.length * 0.02).toFixed(2)}.`,
+    confirmText: "Analyze all",
+    cancelText: "Cancel",
+  });
+  if (!proceed) return;
+
+  state.analyzeAllRunning = true;
+  state.analyzeAllTotal = targets.length;
+  state.analyzeAllDone = 0;
+  if (state.currentView === "portfolio") renderPortfolio();
+
+  let successes = 0, failures = 0;
+  for (const sym of targets) {
+    // Mark per-symbol so the row spinner shows too.
+    if (!state.analyzingSymbols) state.analyzingSymbols = {};
+    state.analyzingSymbols[sym] = true;
+    if (state.currentView === "portfolio") renderPortfolio();
+    try {
+      await runAnalysis(sym);
+      successes++;
+    } catch (e) {
+      failures++;
+    } finally {
+      if (state.analyzingSymbols) delete state.analyzingSymbols[sym];
+      state.analyzeAllDone++;
+      if (state.currentView === "portfolio") renderPortfolio();
+    }
+  }
+
+  state.analyzeAllRunning = false;
+  state.analyzeAllTotal = 0;
+  state.analyzeAllDone = 0;
+  toast(`Done — ${successes} analyzed${failures > 0 ? `, ${failures} failed` : ""}`);
+  // runAnalysis already triggers a verdict refresh after each, but the final
+  // verdict needs all of them — force one more pass so the integrated view
+  // reflects every fresh analysis in one Claude call rather than N partials.
+  runVerdict(true).catch(() => {});
+}
+
+// confirmModal — minimal promise-based confirm dialog using the existing modal
+// machinery. Returns true if user confirms, false otherwise.
+async function confirmModal({ title, body, confirmText = "OK", cancelText = "Cancel" }) {
+  return new Promise(resolve => {
+    const modal = document.createElement("div");
+    modal.className = "modal-backdrop";
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 420px;">
+        <h3 style="margin: 0 0 12px; font-family: var(--display); font-size: 20px;">${escAttr(title)}</h3>
+        <p style="margin: 0 0 18px; color: var(--ink-soft); font-size: 14px; line-height: 1.5;">${escAttr(body)}</p>
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+          <button class="btn-ghost-sm" data-cm-act="cancel">${escAttr(cancelText)}</button>
+          <button class="btn" data-cm-act="confirm">${escAttr(confirmText)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    const cleanup = (val) => { modal.remove(); resolve(val); };
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) cleanup(false);
+      const act = e.target.closest("[data-cm-act]")?.dataset.cmAct;
+      if (act === "confirm") cleanup(true);
+      if (act === "cancel") cleanup(false);
+    });
+  });
+}
+
 async function inlineAnalyzeFromRow(symbol) {
   if (!symbol) return;
   if (!state.analyzingSymbols) state.analyzingSymbols = {};
@@ -13705,6 +13938,7 @@ document.addEventListener("click", (e) => {
       case "submit-investor-profile": submitInvestorProfile(); break;
       case "triggers-refresh":       runTriggersCheck(true); break;
       case "verdict-refresh":         runVerdict(true); break;
+      case "analyze-all":             analyzeAllSymbols(); break;
       case "vrow-analyze":            inlineAnalyzeFromRow(symbol); break;
       case "ack-trigger":             ackTrigger(target.dataset.symbol, target.dataset.text); break;
       case "triggers-ack-all":        ackAllTriggers(); break;
