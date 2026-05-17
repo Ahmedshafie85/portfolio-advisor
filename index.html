@@ -8630,16 +8630,49 @@ function renderVerdictZones() {
         is_placeholder: true, is_cash: false,
       };
     }
-    return {
-      symbol: v.symbol, name: v.name || h.name, asset_class: v.asset_class || h.asset_class,
-      verdict: v.verdict, action_line: v.action_line, severity: v.severity,
-      freshness: v.freshness, reasoning_short: v.reasoning_short,
-      missing_inputs: v.missing_inputs || [], fired_trigger: v.fired_trigger,
-      stance_echo: v.stance_echo || null, conviction: v.conviction || null,
-      key_signal: v.key_signal || "",
-      value: hm.value, pnl_pct: hm.pnlPct, day_change_pct: v.day_change_pct,
-      is_placeholder: false, is_cash: false,
-    };
+    return (() => {
+      // The server verdict exists. But the worker may not have seen a freshly
+      // run analysis (e.g. it queries Firestore on a path/field that didn't
+      // match). If the client has a local analysis for this symbol, trust it
+      // over the server's "missing"/"stale" freshness so the row doesn't
+      // wrongly say "no analysis exists" right after the user analyzed.
+      const localA = state.analyses[h.symbol];
+      let freshness = v.freshness;
+      let missing_inputs = v.missing_inputs || [];
+      let action_line = v.action_line;
+      let reasoning_short = v.reasoning_short;
+      let stance_echo = v.stance_echo || null;
+      let conviction = v.conviction || null;
+
+      if (localA && (v.freshness === "missing" || !v.stance_echo)) {
+        const decay = convictionDecay(localA, h.asset_class);
+        freshness = decay?.status || "fresh";
+        stance_echo = localA.stance || stance_echo;
+        conviction = localA.conviction || conviction;
+        if (localA.headline && !reasoning_short) reasoning_short = localA.headline;
+        // Drop any "no analysis" complaint the server attached.
+        missing_inputs = missing_inputs.filter(
+          x => !/no analysis|run analyze/i.test(String(x))
+        );
+        if (decay && decay.is_stale) {
+          missing_inputs = [`AI analysis on ${h.symbol} is ${decay.days_old.toFixed(0)}d old`];
+          action_line = `Re-analyze — last call ${decay.days_old.toFixed(0)}d old`;
+        } else if (/no analysis|run analyze for full/i.test(String(action_line))) {
+          action_line = "Verdict pending — pull to refresh";
+        }
+      }
+
+      return {
+        symbol: v.symbol, name: v.name || h.name, asset_class: v.asset_class || h.asset_class,
+        verdict: v.verdict, action_line, severity: v.severity,
+        freshness, reasoning_short,
+        missing_inputs, fired_trigger: v.fired_trigger,
+        stance_echo, conviction,
+        key_signal: v.key_signal || "",
+        value: hm.value, pnl_pct: hm.pnlPct, day_change_pct: v.day_change_pct,
+        is_placeholder: false, is_cash: false,
+      };
+    })();
   });
 
   const act   = rows.filter(r => r.verdict === "ACT");
@@ -10759,6 +10792,10 @@ async function runVerdict(force = false) {
         idToken,
         holdings: state.holdings,
         investor_profile: state.investorProfile,
+        // Send the client's analyses inline so the worker doesn't have to
+        // (and possibly fail to) query Firestore for them. A worker that
+        // reads this field will see fresh analyses immediately.
+        analyses: state.analyses,
       }),
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
