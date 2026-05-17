@@ -3599,10 +3599,6 @@ const state = {
   portfolioNote: localStorage.getItem("portfolioNote") || "",
   verdictsAt: localStorage.getItem("verdictsAt") || null,
   verdictsLoading: false,
-  // Set of symbols currently being analyzed via the inline ⚡ button. Used
-  // by renderVerdictRow to swap the icon for a spinner. Cleared per-symbol
-  // when the runAnalysis promise settles.
-  analyzingSymbols: new Set(),
   watchlist: [],
   watchlistSnapshot: {},
   triggers: [],
@@ -7505,11 +7501,11 @@ function renderOpportunityItem(o) {
         </div>
         <div class="oih-right">
           <span class="opp-net">net +${o.net.toFixed(1)}</span>
-          <button class="vrow-analyze ${state.analyzingSymbols.has(o.symbol) ? 'analyzing' : ''}"
+          <button class="vrow-analyze ${state.analyzingSymbols?.[o.symbol] ? 'analyzing' : ''}"
                   data-act="vrow-analyze" data-symbol="${escAttr(o.symbol)}"
                   title="Analyze ${escAttr(o.symbol)}"
-                  ${state.analyzingSymbols.has(o.symbol) ? 'disabled' : ''}>
-            ${state.analyzingSymbols.has(o.symbol)
+                  ${state.analyzingSymbols?.[o.symbol] ? 'disabled' : ''}>
+            ${state.analyzingSymbols?.[o.symbol]
               ? `<span class="spinner"></span>`
               : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`}
           </button>
@@ -8715,10 +8711,10 @@ function renderVerdictRow(r) {
     : "";
 
   // Inline Analyze button — visible on all non-cash rows. Spinner state is
-  // tracked by `state.analyzingSymbols` (a Set of in-flight symbols) so the
-  // button can show progress without re-renders being lossy. Stops the row
+  // tracked by `state.analyzingSymbols` (a plain-object dict of in-flight
+  // symbols, shared with the existing on-card analyze flow). Stops the row
   // click handler so tapping ⚡ doesn't also navigate to the asset page.
-  const isAnalyzing = state.analyzingSymbols && state.analyzingSymbols.has(r.symbol);
+  const isAnalyzing = !!(state.analyzingSymbols && state.analyzingSymbols[r.symbol]);
   const analyzeBtn = r.is_cash ? "" : `
     <button class="vrow-analyze ${isAnalyzing ? 'analyzing' : ''}"
             data-act="vrow-analyze" data-symbol="${escAttr(r.symbol)}"
@@ -10773,8 +10769,9 @@ async function runVerdict(force = false) {
 // Stops event propagation upstream — the row's tap-to-open shouldn't fire.
 async function inlineAnalyzeFromRow(symbol) {
   if (!symbol) return;
-  if (state.analyzingSymbols.has(symbol)) return;
-  state.analyzingSymbols.add(symbol);
+  if (!state.analyzingSymbols) state.analyzingSymbols = {};
+  if (state.analyzingSymbols[symbol]) return;
+  state.analyzingSymbols[symbol] = true;
   if (state.currentView === "portfolio") renderPortfolio();
   try {
     await runAnalysis(symbol);
@@ -10782,7 +10779,7 @@ async function inlineAnalyzeFromRow(symbol) {
   } catch (e) {
     // runAnalysis handles its own error toast — no double-toast here.
   } finally {
-    state.analyzingSymbols.delete(symbol);
+    if (state.analyzingSymbols) delete state.analyzingSymbols[symbol];
     if (state.currentView === "portfolio") renderPortfolio();
   }
 }
