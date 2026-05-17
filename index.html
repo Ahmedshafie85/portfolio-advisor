@@ -415,6 +415,52 @@ body {
 .vrow.vrow-hold { padding: 10px 14px; }
 .vrow.vrow-hold .vrow-verb { color: var(--ink-muted); }
 
+/* Inline Analyze button. Sits in the row head, doesn't compete with day-change
+   pill. Uses .spinner from the global spinner styles. */
+.vrow-analyze {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  border: 1px solid var(--rule);
+  background: var(--bg);
+  color: var(--ink-soft);
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+  padding: 0;
+  margin-left: 4px;
+}
+.vrow-analyze:hover {
+  border-color: var(--ink-muted);
+  color: var(--ink);
+  background: var(--bg-elev);
+}
+.vrow-analyze:disabled, .vrow-analyze.analyzing {
+  opacity: 0.7; cursor: wait;
+}
+.vrow-analyze .spinner {
+  width: 12px; height: 12px;
+}
+
+/* Stance + conviction badge — gives the row an anchor regardless of verb. */
+.vrow-stance {
+  font-family: var(--sans); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--bg-elev); color: var(--ink-soft);
+}
+.vrow-stance.vrow-stance-accumulate { background: rgba(22, 163, 74, 0.10); color: var(--green); }
+.vrow-stance.vrow-stance-trim       { background: rgba(202, 138, 4, 0.12); color: var(--gold); }
+.vrow-stance.vrow-stance-exit       { background: rgba(220, 38, 38, 0.12); color: var(--red); }
+.vrow-stance.vrow-stance-avoid      { background: rgba(220, 38, 38, 0.12); color: var(--red); }
+.vrow-stance.vrow-stance-hold       { background: var(--bg-elev); color: var(--ink-soft); }
+
+/* Key signal: single-line data point under the action. */
+.vrow-keysignal {
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft);
+  line-height: 1.4; margin-top: 4px; letter-spacing: 0.005em;
+}
+
 
 .section-head {
   display: flex; justify-content: space-between; align-items: baseline;
@@ -3553,6 +3599,10 @@ const state = {
   portfolioNote: localStorage.getItem("portfolioNote") || "",
   verdictsAt: localStorage.getItem("verdictsAt") || null,
   verdictsLoading: false,
+  // Set of symbols currently being analyzed via the inline ⚡ button. Used
+  // by renderVerdictRow to swap the icon for a spinner. Cleared per-symbol
+  // when the runAnalysis promise settles.
+  analyzingSymbols: new Set(),
   watchlist: [],
   watchlistSnapshot: {},
   triggers: [],
@@ -7455,6 +7505,14 @@ function renderOpportunityItem(o) {
         </div>
         <div class="oih-right">
           <span class="opp-net">net +${o.net.toFixed(1)}</span>
+          <button class="vrow-analyze ${state.analyzingSymbols.has(o.symbol) ? 'analyzing' : ''}"
+                  data-act="vrow-analyze" data-symbol="${escAttr(o.symbol)}"
+                  title="Analyze ${escAttr(o.symbol)}"
+                  ${state.analyzingSymbols.has(o.symbol) ? 'disabled' : ''}>
+            ${state.analyzingSymbols.has(o.symbol)
+              ? `<span class="spinner"></span>`
+              : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`}
+          </button>
           <button class="opp-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" title="Hide">×</button>
         </div>
       </div>
@@ -8569,7 +8627,9 @@ function renderVerdictZones() {
         symbol: h.symbol, name: h.name, asset_class: h.asset_class,
         verdict: "WATCH", action_line, severity: "low",
         freshness: a ? (decay?.status || "fresh") : "missing",
-        reasoning_short: "", missing_inputs: missing, fired_trigger: null,
+        reasoning_short: a?.headline || "", missing_inputs: missing, fired_trigger: null,
+        stance_echo: a?.stance || null, conviction: a?.conviction || null,
+        key_signal: "",
         value: hm.value, pnl_pct: hm.pnlPct, day_change_pct: null,
         is_placeholder: true, is_cash: false,
       };
@@ -8579,6 +8639,8 @@ function renderVerdictZones() {
       verdict: v.verdict, action_line: v.action_line, severity: v.severity,
       freshness: v.freshness, reasoning_short: v.reasoning_short,
       missing_inputs: v.missing_inputs || [], fired_trigger: v.fired_trigger,
+      stance_echo: v.stance_echo || null, conviction: v.conviction || null,
+      key_signal: v.key_signal || "",
       value: hm.value, pnl_pct: hm.pnlPct, day_change_pct: v.day_change_pct,
       is_placeholder: false, is_cash: false,
     };
@@ -8635,8 +8697,10 @@ function renderVerdictZones() {
 }
 
 // Single row renderer for the verdict list.
-// Stays compact: one line for verdict+action, one line for the reasoning when
-// present (ACT only). HOLD rows are deliberately tight — they're the quiet zone.
+// Every row is information-dense: stance + conviction + key signal + reasoning
+// alongside the verb. The right-side ⚡ Analyze button fires runAnalysis(symbol)
+// directly without leaving Portfolio — used to refresh a stale read or
+// re-evaluate a HOLD that feels wrong.
 function renderVerdictRow(r) {
   const verdictClass = `vrow-${r.verdict.toLowerCase()}`;
   const sevClass = r.verdict === "ACT" ? `vrow-sev-${r.severity}` : "";
@@ -8650,33 +8714,67 @@ function renderVerdictRow(r) {
     ? `<span class="vrow-value">$${fmtUSD(r.value, 0)}</span>`
     : "";
 
-  // ACT rows get a full row treatment: action line, reasoning, severity pill.
+  // Inline Analyze button — visible on all non-cash rows. Spinner state is
+  // tracked by `state.analyzingSymbols` (a Set of in-flight symbols) so the
+  // button can show progress without re-renders being lossy. Stops the row
+  // click handler so tapping ⚡ doesn't also navigate to the asset page.
+  const isAnalyzing = state.analyzingSymbols && state.analyzingSymbols.has(r.symbol);
+  const analyzeBtn = r.is_cash ? "" : `
+    <button class="vrow-analyze ${isAnalyzing ? 'analyzing' : ''}"
+            data-act="vrow-analyze" data-symbol="${escAttr(r.symbol)}"
+            title="Re-analyze ${escAttr(r.symbol)}"
+            ${isAnalyzing ? 'disabled' : ''}>
+      ${isAnalyzing
+        ? `<span class="spinner"></span>`
+        : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`}
+    </button>`;
+
+  // Stance + conviction badge — gives the row a "this is what the AI concluded"
+  // anchor even when verdict is HOLD/WATCH. Only renders when stance_echo present.
+  const stanceBadge = r.stance_echo
+    ? `<span class="vrow-stance vrow-stance-${escAttr(r.stance_echo.toLowerCase())}">${escAttr(r.stance_echo)}${r.conviction ? ` · ${escAttr(r.conviction)}` : ""}</span>`
+    : "";
+
+  // Key signal: one-line data point. Shows on all verdicts where present.
+  const keySignal = r.key_signal && !r.is_cash
+    ? `<div class="vrow-keysignal">${escAttr(r.key_signal)}</div>`
+    : "";
+
+  // ACT rows get the full treatment: action line, key signal, reasoning,
+  // severity pill, left-border accent.
   if (r.verdict === "ACT") {
     return `<div class="vrow ${verdictClass} ${sevClass}" data-act="open-asset" data-symbol="${escAttr(r.symbol)}">
       <div class="vrow-head">
         <span class="vrow-verb">ACT</span>
         <span class="vrow-symbol">${escAttr(r.symbol)}</span>
         <span class="vrow-sev-pill vrow-sev-pill-${escAttr(r.severity)}">${escAttr(r.severity)}</span>
+        ${stanceBadge}
         ${freshDot}
         <span class="vrow-spacer"></span>
         ${value}${dayChange}
+        ${analyzeBtn}
       </div>
       <div class="vrow-action">${escAttr(r.action_line)}</div>
+      ${keySignal}
       ${r.reasoning_short ? `<div class="vrow-reasoning">${escAttr(r.reasoning_short)}</div>` : ""}
     </div>`;
   }
 
-  // WATCH and HOLD rows are tighter — single line where possible, action_line
-  // on a second line if non-trivial.
+  // WATCH and HOLD rows: two-line treatment. Top line has verb/symbol/stance,
+  // bottom line has the action_line; reasoning shows when present.
   return `<div class="vrow ${verdictClass}" data-act="open-asset" data-symbol="${escAttr(r.symbol)}">
     <div class="vrow-head">
       <span class="vrow-verb">${r.verdict}</span>
       <span class="vrow-symbol">${escAttr(r.symbol)}</span>
+      ${stanceBadge}
       ${freshDot}
-      <span class="vrow-action-inline">${escAttr(r.action_line)}</span>
       <span class="vrow-spacer"></span>
       ${value}${dayChange}
+      ${analyzeBtn}
     </div>
+    <div class="vrow-action">${escAttr(r.action_line)}</div>
+    ${keySignal}
+    ${r.reasoning_short ? `<div class="vrow-reasoning">${escAttr(r.reasoning_short)}</div>` : ""}
   </div>`;
 }
 
@@ -10665,6 +10763,26 @@ async function runVerdict(force = false) {
     if (force) toast("Verdict refresh failed: " + (e.message || "").slice(0, 80), 3000, "error");
   } finally {
     state.verdictsLoading = false;
+    if (state.currentView === "portfolio") renderPortfolio();
+  }
+}
+
+// Inline-analyze entry point. Triggered by the ⚡ button on every Portfolio row
+// (and reused by Today's Opportunities entries). Wraps runAnalysis so the row
+// can show a spinner without the user having to drill into the asset detail.
+// Stops event propagation upstream — the row's tap-to-open shouldn't fire.
+async function inlineAnalyzeFromRow(symbol) {
+  if (!symbol) return;
+  if (state.analyzingSymbols.has(symbol)) return;
+  state.analyzingSymbols.add(symbol);
+  if (state.currentView === "portfolio") renderPortfolio();
+  try {
+    await runAnalysis(symbol);
+    // runAnalysis already toasts + triggers a /verdict refresh on success.
+  } catch (e) {
+    // runAnalysis handles its own error toast — no double-toast here.
+  } finally {
+    state.analyzingSymbols.delete(symbol);
     if (state.currentView === "portfolio") renderPortfolio();
   }
 }
@@ -13563,6 +13681,7 @@ document.addEventListener("click", (e) => {
       case "submit-investor-profile": submitInvestorProfile(); break;
       case "triggers-refresh":       runTriggersCheck(true); break;
       case "verdict-refresh":         runVerdict(true); break;
+      case "vrow-analyze":            inlineAnalyzeFromRow(symbol); break;
       case "ack-trigger":             ackTrigger(target.dataset.symbol, target.dataset.text); break;
       case "triggers-ack-all":        ackAllTriggers(); break;
       case "save-target-alloc":      saveTargetAlloc(); break;
