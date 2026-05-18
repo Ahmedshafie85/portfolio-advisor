@@ -182,6 +182,40 @@ body {
   font-size: 11px; color: var(--ink-muted); margin-top: 2px;
 }
 .triggers-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
+/* Drawdown gauge — sits between hero and verdict zones on Portfolio. Shows
+   how much of the user's stated drawdown_tolerance_pct has been used up. */
+.drawdown-gauge {
+  margin: 0 16px 14px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+}
+.drawdown-gauge .dd-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; margin-bottom: 8px;
+}
+.drawdown-gauge .dd-label {
+  font-family: var(--sans); font-size: 12.5px; font-weight: 600;
+  color: var(--ink);
+}
+.drawdown-gauge .dd-meta {
+  font-family: var(--sans); font-size: 10.5px; color: var(--ink-muted);
+  letter-spacing: 0.01em; text-align: right;
+}
+.drawdown-gauge .dd-bar {
+  height: 6px; background: var(--bg-elev); border-radius: 999px; overflow: hidden;
+}
+.drawdown-gauge .dd-fill {
+  height: 100%; border-radius: 999px;
+  transition: width .3s, background .3s;
+}
+.drawdown-gauge.dd-green .dd-fill { background: var(--green); }
+.drawdown-gauge.dd-gold  .dd-fill { background: var(--gold); }
+.drawdown-gauge.dd-red   .dd-fill { background: var(--red); }
+.drawdown-gauge.dd-gold  { border-color: rgba(202, 138, 4, 0.3); }
+.drawdown-gauge.dd-red   { border-color: rgba(220, 38, 38, 0.3); }
+
 /* Plan block on ACT rows — entry zone, invalidation, R:R, timeframe.
    Mono font for the values so price levels read like data, not prose.
    Two-column grid keeps it compact on mobile. */
@@ -231,6 +265,97 @@ body {
 @media (min-width: 600px) {
   .vplan { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* Confidence pills — three signals showing WHY an ACT severity landed where
+   it did. "on" state = signal present (icon-bright). "off" = signal absent
+   (muted). Lets the user see the inputs without expanding anything. */
+.vconf {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 10px;
+}
+.vconf-pill {
+  font-family: var(--sans); font-size: 10.5px;
+  padding: 3px 8px; border-radius: 999px;
+  background: var(--bg-elev); color: var(--ink-muted);
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.vconf-pill.on {
+  background: rgba(22, 163, 74, 0.10); color: var(--green);
+  border-color: rgba(22, 163, 74, 0.2);
+}
+.vconf-pill.off { opacity: 0.6; }
+
+/* Verb-change badge — surfaces "row used to be HOLD, now is ACT". Auto-clears
+   30 seconds after the verdict call returns. Subtle row pulse animates once. */
+.vrow-changed-badge {
+  font-family: var(--sans); font-size: 9.5px; font-weight: 600;
+  padding: 2px 7px; border-radius: 999px;
+  background: rgba(22, 163, 74, 0.12); color: var(--green);
+  letter-spacing: 0.02em;
+}
+.vrow-changed {
+  animation: vrowPulse 1.2s ease-out;
+}
+@keyframes vrowPulse {
+  0%   { background: rgba(22, 163, 74, 0.10); }
+  100% { background: var(--bg-card); }
+}
+
+/* ===========================================================================
+   Asset Verdict Block — appears at the top of every asset detail card.
+   Same conceptual shape as a Portfolio ACT row, but standalone and slightly
+   richer (shows held-vs-new-entry context, missing-inputs hints).
+   =========================================================================== */
+.asset-verdict-block {
+  margin: 14px 16px 18px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+}
+.asset-verdict-block.avb-act { border-left: 3px solid var(--ink-muted); }
+.asset-verdict-block.avb-act.avb-sev-high   { border-left-color: var(--red); }
+.asset-verdict-block.avb-act.avb-sev-medium { border-left-color: var(--gold); }
+.asset-verdict-block.avb-act.avb-sev-low    { border-left-color: var(--ink-muted); }
+.asset-verdict-block.avb-watch { border-left: 3px solid var(--gold); }
+.asset-verdict-block.avb-hold  { border-left: 3px solid var(--rule); }
+
+.avb-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.avb-verb {
+  font-family: var(--sans); font-size: 11px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--ink-soft); color: var(--bg);
+}
+.asset-verdict-block.avb-hold  .avb-verb { background: var(--bg-elev); color: var(--ink-muted); }
+.asset-verdict-block.avb-watch .avb-verb { background: rgba(202, 138, 4, 0.15); color: var(--gold); }
+.avb-context {
+  font-family: var(--sans); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--bg-elev); color: var(--ink-muted);
+}
+.avb-context-held { background: rgba(22, 163, 74, 0.10); color: var(--green); }
+.avb-action {
+  font-family: var(--sans); font-size: 14.5px; font-weight: 500;
+  color: var(--ink); line-height: 1.45;
+  margin-bottom: 4px;
+}
+.avb-missing {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--bg-elev);
+  border-radius: 8px;
+}
+.avb-missing-row {
+  font-family: var(--sans); font-size: 12px; color: var(--ink-soft);
+  line-height: 1.5;
+}
+.avb-missing-row + .avb-missing-row { margin-top: 4px; }
 
 .btn-ghost-sm {
   padding: 4px 10px; border: 1px solid var(--rule); background: transparent;
@@ -3689,6 +3814,10 @@ const state = {
   verdicts: JSON.parse(localStorage.getItem("verdictsCache_v2") || "[]"),
   portfolioNote: localStorage.getItem("portfolioNote_v2") || "",
   verdictsAt: localStorage.getItem("verdictsAt_v2") || null,
+  // Phase G — transient dict of verb changes per symbol from the most recent
+  // /verdict call. Cleared 30s after the call returns. Used to highlight rows
+  // whose verb shifted so the user notices fresh ACTs.
+  verdictChanges: {},
   verdictsLoading: false,
   watchlist: [],
   watchlistSnapshot: {},
@@ -6073,6 +6202,77 @@ function portfolioMetrics() {
   const dayPct = (totalValue - dayChangeAbs) > 0 ? (dayChangeAbs / (totalValue - dayChangeAbs)) * 100 : 0;
   return { totalValue, totalCost, totalPnL, totalPnLPct, dayChangeAbs, dayPct, alloc };
 }
+
+// ============================================================================
+// PHASE G — Drawdown tracker.
+// Track the running peak portfolio value in localStorage so we can compute
+// drawdown vs the user's drawdown_tolerance_pct. This is approximate — without
+// trade history we can't truly distinguish "drawdown from peak" from "we added
+// more capital." But for a portfolio that's mostly stable in cost basis, the
+// peak of (total_value) is a reasonable proxy for "how much risk budget have
+// I used up." The user can reset it from settings if they make a big deposit.
+//
+// Storage: localStorage["portfolioPeak"] = { value: number, date: ISO }
+// ============================================================================
+function updatePortfolioPeak(currentValue) {
+  if (currentValue == null || currentValue <= 0) return;
+  let peak = null;
+  try {
+    const raw = localStorage.getItem("portfolioPeak");
+    if (raw) peak = JSON.parse(raw);
+  } catch (e) { peak = null; }
+  if (!peak || currentValue > peak.value) {
+    peak = { value: currentValue, date: new Date().toISOString() };
+    localStorage.setItem("portfolioPeak", JSON.stringify(peak));
+  }
+  return peak;
+}
+
+function getDrawdownState() {
+  const m = portfolioMetrics();
+  if (!m.totalValue || m.totalValue <= 0) return null;
+  const peak = updatePortfolioPeak(m.totalValue);
+  if (!peak) return null;
+  const drawdownPct = peak.value > 0
+    ? ((m.totalValue - peak.value) / peak.value) * 100
+    : 0;
+  const tolerance = state.investorProfile?.drawdown_tolerance_pct ?? null;
+  // Risk budget utilization: (current drawdown abs / tolerance) * 100
+  // 0 means we're at peak, 100% means we've used the full budget.
+  const utilization = tolerance && tolerance > 0
+    ? Math.min(100, (Math.abs(Math.min(0, drawdownPct)) / tolerance) * 100)
+    : null;
+  return {
+    current_value: m.totalValue,
+    peak_value: peak.value,
+    peak_date: peak.date,
+    drawdown_pct: Number(drawdownPct.toFixed(2)),
+    tolerance_pct: tolerance,
+    utilization_pct: utilization == null ? null : Number(utilization.toFixed(1)),
+  };
+}
+
+// Render the drawdown gauge as an inline strip. Hides itself entirely when
+// we're at or above peak (utilization 0) — there's no information to convey
+// and the strip would just be visual noise. Color shifts: green<33%, gold
+// 33-66%, red 66%+.
+function renderDrawdownGauge() {
+  const dd = getDrawdownState();
+  if (!dd || dd.utilization_pct == null) return "";
+  if (dd.drawdown_pct >= 0) return ""; // at peak, no gauge needed
+  const u = dd.utilization_pct;
+  const colorClass = u < 33 ? "dd-green" : u < 66 ? "dd-gold" : "dd-red";
+  return `
+    <div class="drawdown-gauge ${colorClass}">
+      <div class="dd-row">
+        <div class="dd-label">Drawdown · ${Math.abs(dd.drawdown_pct).toFixed(1)}%</div>
+        <div class="dd-meta">Budget used: ${u.toFixed(0)}% of ${dd.tolerance_pct}% tolerance</div>
+      </div>
+      <div class="dd-bar"><div class="dd-fill" style="width:${u}%;"></div></div>
+    </div>
+  `;
+}
+
 
 // ============================================================================
 // PORTFOLIO RISK ANALYSIS — allocation drift + correlation/concentration.
@@ -8664,6 +8864,8 @@ function renderPortfolio() {
 
     ${emptyStateHtml}
 
+    ${renderDrawdownGauge()}
+
     ${renderVerdictZones()}
 
     ${renderTodaysOpportunitiesCard()}
@@ -8743,10 +8945,14 @@ function renderVerdictZones() {
   const watch = rows.filter(r => r.verdict === "WATCH");
   const hold  = rows.filter(r => r.verdict === "HOLD");
 
-  // Sort: ACT by severity (high→low) then size; WATCH by missing_inputs first;
-  // HOLD by portfolio value desc (biggest first).
+  // Sort: ACT primarily by severity, then by log(value) — so a high-severity
+  // ACT on a $15k position outranks a high-severity ACT on a $500 position
+  // (same severity bucket, but more money at stake). log() rather than raw
+  // value so a 30x size difference doesn't dominate severity ordering when
+  // they're in adjacent buckets.
   const sevRank = { high: 0, medium: 1, low: 2 };
-  act.sort((a, b) => (sevRank[a.severity] - sevRank[b.severity]) || ((b.value || 0) - (a.value || 0)));
+  const sortKey = r => sevRank[r.severity] * 10 - Math.log10((r.value || 1) + 1);
+  act.sort((a, b) => sortKey(a) - sortKey(b));
   watch.sort((a, b) => (b.missing_inputs.length - a.missing_inputs.length) || ((b.value || 0) - (a.value || 0)));
   hold.sort((a, b) => (b.value || 0) - (a.value || 0));
 
@@ -8805,6 +9011,111 @@ function renderVerdictZones() {
 // alongside the verb. The right-side ⚡ Analyze button fires runAnalysis(symbol)
 // directly without leaving Portfolio — used to refresh a stale read or
 // re-evaluate a HOLD that feels wrong.
+// ============================================================================
+// PHASE G — Per-symbol verdict block on the asset detail card.
+// Computed client-side via computeLocalVerdict so it appears the instant
+// runAnalysis() finishes, without waiting for portfolio /verdict.
+//
+// Works for any symbol — held, watchlist, opportunity, or one-off lookup.
+// The verb framing reframes based on isHeld:
+//   - HELD: ACT = trim/add/exit, HOLD = on plan, WATCH = data stale
+//   - NOT HELD: ACT = setup is live, HOLD = thesis intact but wait, WATCH = data stale
+// ============================================================================
+function renderAssetVerdictBlock(symbol, analysis, holding, currentPrice) {
+  const isHeld = !!holding && holding.asset_class !== "cash";
+  const decay = analysis ? convictionDecay(analysis, holding?.asset_class || "us_stock") : null;
+  const v = computeLocalVerdict(analysis, holding, {
+    isHeld,
+    currentPrice,
+    decay,
+  });
+
+  const verbClass = `avb-${v.verdict.toLowerCase()}`;
+  const sevClass = v.verdict === "ACT" ? `avb-sev-${v.severity}` : "";
+  const sevPill = v.verdict === "ACT"
+    ? `<span class="vrow-sev-pill vrow-sev-pill-${escAttr(v.severity)}">${escAttr(v.severity)}</span>`
+    : "";
+
+  // Stance badge
+  const stanceBadge = v.stance_echo
+    ? `<span class="vrow-stance vrow-stance-${escAttr(v.stance_echo.toLowerCase())}">${escAttr(v.stance_echo)}${v.conviction ? ` · ${escAttr(v.conviction)}` : ""}</span>`
+    : "";
+
+  // Freshness badge (only when not fresh)
+  const freshLabelMap = { aging: "AGING", stale: "OLD", very_stale: "OLD", missing: "NO ANALYSIS" };
+  const freshLabel = freshLabelMap[v.freshness];
+  const freshBadge = freshLabel
+    ? `<span class="vrow-fresh-badge vrow-fresh-${escAttr(v.freshness)}">${escAttr(freshLabel)}</span>`
+    : "";
+
+  // Held-context label so the user knows whose framing is being applied
+  const contextLabel = isHeld
+    ? `<span class="avb-context avb-context-held">YOUR POSITION</span>`
+    : `<span class="avb-context avb-context-new">${holding?.asset_class === "cash" ? "CASH" : "NEW ENTRY"}</span>`;
+
+  // Plan block for ACT — pulls from the underlying analysis the same way the
+  // Portfolio ACT rows do. Reused renderer logic, but inlined here so the
+  // function is self-contained.
+  let planBlock = "";
+  if (v.verdict === "ACT" && analysis) {
+    const parts = [];
+    if (analysis.action?.price_zone) {
+      parts.push(`<div class="vplan-row"><span class="vplan-k">Zone</span><span class="vplan-v">${escAttr(analysis.action.price_zone)}</span></div>`);
+    }
+    if (analysis.action?.invalidation && analysis.action.invalidation !== "N/A") {
+      parts.push(`<div class="vplan-row"><span class="vplan-k">Invalidate</span><span class="vplan-v">${escAttr(analysis.action.invalidation)}</span></div>`);
+    }
+    const rr = analysis.reward_risk?.ratio ?? analysis.computed_reward_risk?.ratio;
+    if (rr != null) {
+      parts.push(`<div class="vplan-row"><span class="vplan-k">R:R</span><span class="vplan-v">${typeof rr === "number" ? rr.toFixed(2) : escAttr(rr)}</span></div>`);
+    }
+    if (analysis.action?.timeframe) {
+      parts.push(`<div class="vplan-row"><span class="vplan-k">Timeframe</span><span class="vplan-v">${escAttr(analysis.action.timeframe)}</span></div>`);
+    }
+    if (parts.length > 0) {
+      planBlock = `<div class="vplan">${parts.join("")}</div>`;
+    }
+  }
+
+  // Missing-inputs prompt — direct action the user can take to upgrade the
+  // verdict's confidence (run analyze when missing/stale, etc.).
+  const missingBlock = (v.missing_inputs && v.missing_inputs.length > 0)
+    ? `<div class="avb-missing">
+         ${v.missing_inputs.map(s => `<div class="avb-missing-row">→ ${escAttr(s)}</div>`).join("")}
+       </div>`
+    : "";
+
+  // Inline Analyze button — same affordance as on Portfolio rows. Useful when
+  // the verdict is WATCH because the analysis is stale; tap to refresh and
+  // the verdict block updates automatically when runAnalysis completes.
+  const isAnalyzing = !!(state.analyzingSymbols && state.analyzingSymbols[symbol]);
+  const analyzeBtn = `<button class="vrow-analyze ${isAnalyzing ? 'analyzing' : ''}"
+            data-act="vrow-analyze" data-symbol="${escAttr(symbol)}"
+            title="${analysis ? "Re-analyze" : "Analyze"} ${escAttr(symbol)}"
+            ${isAnalyzing ? 'disabled' : ''}>
+      ${isAnalyzing
+        ? `<span class="spinner"></span>`
+        : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`}
+    </button>`;
+
+  return `<div class="asset-verdict-block ${verbClass} ${sevClass}">
+    <div class="avb-head">
+      <span class="avb-verb">${escAttr(v.verdict)}</span>
+      ${sevPill}
+      ${stanceBadge}
+      ${freshBadge}
+      ${contextLabel}
+      <span class="vrow-spacer"></span>
+      ${analyzeBtn}
+    </div>
+    <div class="avb-action">${escAttr(v.action_line)}</div>
+    ${v.key_signal ? `<div class="vrow-keysignal">${escAttr(v.key_signal)}</div>` : ""}
+    ${v.reasoning_short ? `<div class="vrow-reasoning">${escAttr(v.reasoning_short)}</div>` : ""}
+    ${planBlock}
+    ${missingBlock}
+  </div>`;
+}
+
 function renderVerdictRow(r) {
   const verdictClass = `vrow-${r.verdict.toLowerCase()}`;
   const sevClass = r.verdict === "ACT" ? `vrow-sev-${r.severity}` : "";
@@ -8845,6 +9156,15 @@ function renderVerdictRow(r) {
         ? `<span class="spinner"></span>`
         : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`}
     </button>`;
+
+  // Phase G — verb-change badge. If this symbol's verb changed on the most
+  // recent /verdict call, show a small arrow indicator showing the transition
+  // (e.g. HOLD → ACT) and add a class so CSS can briefly animate the row.
+  const change = state.verdictChanges && state.verdictChanges[r.symbol];
+  const changedClass = change ? " vrow-changed" : "";
+  const changedBadge = change
+    ? `<span class="vrow-changed-badge" title="Changed from ${escAttr(change.from)} to ${escAttr(change.to)}">↻ ${escAttr(change.from)}→${escAttr(change.to)}</span>`
+    : "";
 
   // Stance + conviction badge — gives the row a "this is what the AI concluded"
   // anchor even when verdict is HOLD/WATCH. Only renders when stance_echo present.
@@ -8898,13 +9218,31 @@ function renderVerdictRow(r) {
       ? `<div class="vplan">${planParts.join("")}</div>`
       : "";
 
-    return `<div class="vrow ${verdictClass} ${sevClass}" data-act="open-asset" data-symbol="${escAttr(r.symbol)}">
+    // Confidence pills — three binary inputs that built this ACT severity.
+    // Lets the user see WHY severity is what it is without trusting the badge.
+    //   🎯 trigger — did a stored bull/bear trigger fire today?
+    //   📐 R:R    — does the underlying analysis support 2:1+ reward:risk?
+    //   📊 size   — is this position ≥2% of book (i.e. material)?
+    const hasTrigger = !!r.fired_trigger;
+    const rrVal = a?.reward_risk?.ratio ?? a?.computed_reward_risk?.ratio;
+    const hasRR = rrVal != null && rrVal >= 2.0;
+    const totalVal = portfolioMetrics().totalValue || 1;
+    const weightPct = (r.value || 0) / totalVal * 100;
+    const hasSize = weightPct >= 2.0;
+    const confPills = `<div class="vconf">
+      <span class="vconf-pill ${hasTrigger ? "on" : "off"}" title="Trigger fired today">🎯 ${hasTrigger ? "Trigger" : "no trigger"}</span>
+      <span class="vconf-pill ${hasRR ? "on" : "off"}" title="Reward:Risk ratio">📐 ${rrVal != null ? `R:R ${typeof rrVal === "number" ? rrVal.toFixed(2) : rrVal}` : "no R:R"}</span>
+      <span class="vconf-pill ${hasSize ? "on" : "off"}" title="Position weight">📊 ${weightPct.toFixed(1)}% of book</span>
+    </div>`;
+
+    return `<div class="vrow ${verdictClass} ${sevClass}${changedClass}" data-act="open-asset" data-symbol="${escAttr(r.symbol)}">
       <div class="vrow-head">
         <span class="vrow-verb">ACT</span>
         <span class="vrow-symbol">${escAttr(r.symbol)}</span>
         <span class="vrow-sev-pill vrow-sev-pill-${escAttr(r.severity)}">${escAttr(r.severity)}</span>
         ${stanceBadge}
         ${freshBadge}
+        ${changedBadge}
         <span class="vrow-spacer"></span>
         ${value}${dayChange}
         ${analyzeBtn}
@@ -8912,6 +9250,7 @@ function renderVerdictRow(r) {
       <div class="vrow-action">${escAttr(r.action_line)}</div>
       ${keySignal}
       ${r.reasoning_short ? `<div class="vrow-reasoning">${escAttr(r.reasoning_short)}</div>` : ""}
+      ${confPills}
       ${firedBlock}
       ${planBlock}
     </div>`;
@@ -8919,12 +9258,13 @@ function renderVerdictRow(r) {
 
   // WATCH and HOLD rows: two-line treatment. Top line has verb/symbol/stance,
   // bottom line has the action_line; reasoning shows when present.
-  return `<div class="vrow ${verdictClass}" data-act="open-asset" data-symbol="${escAttr(r.symbol)}">
+  return `<div class="vrow ${verdictClass}${changedClass}" data-act="open-asset" data-symbol="${escAttr(r.symbol)}">
     <div class="vrow-head">
       <span class="vrow-verb">${r.verdict}</span>
       <span class="vrow-symbol">${escAttr(r.symbol)}</span>
       ${stanceBadge}
       ${freshBadge}
+      ${changedBadge}
       <span class="vrow-spacer"></span>
       ${value}${dayChange}
       ${analyzeBtn}
@@ -10126,6 +10466,16 @@ async function renderAssetDetail(symbol) {
   let aiCard = "";
   if (!isCash) aiCard = renderAiCard(symbol, analysis);
 
+  // Phase G — per-symbol verdict block on the asset detail card. Computed
+  // client-side from the latest analysis + live price + decay status. Updates
+  // the instant runAnalysis() finishes, without waiting for the portfolio
+  // /verdict round-trip. Works for any symbol — held, watchlist, opportunity,
+  // or one-off lookup. Verbs reframe based on isHeld.
+  let assetVerdictBlock = "";
+  if (!isCash) {
+    assetVerdictBlock = renderAssetVerdictBlock(symbol, analysis, holding, cur);
+  }
+
   let chartBlock = "";
   let sentBlock = "";
   if (!isCash) {
@@ -10151,6 +10501,7 @@ async function renderAssetDetail(symbol) {
       <div class="detail-price">$${fmtUSD(cur)}</div>
       ${!isCash ? `<div class="detail-change ${dayPct >= 0 ? 'pos' : 'neg'}">${dayPct >= 0 ? '+' : ''}$${fmtUSD(Math.abs((cur - price.prev_close)))} · ${fmtPct(dayPct)} today</div>` : `<div class="detail-change flat">Cash · fixed value</div>`}
     </div>
+    ${assetVerdictBlock}
     ${chartBlock}
     ${posCard}
     ${aiCard}
@@ -10204,6 +10555,253 @@ function convictionDecay(analysis, assetClass) {
     status,
   };
 }
+
+// ============================================================================
+// PHASE G — CLIENT-SIDE PER-SYMBOL VERDICT
+// Produces a verdict object (same schema as the server /verdict response)
+// from a single analysis. Used by:
+//   - Asset detail card (top-of-card verdict block, shown immediately after
+//     analysis completes — no waiting on the portfolio /verdict round-trip)
+//   - Placeholder rows on Portfolio (when /verdict hasn't returned yet)
+//
+// The verbs reframe based on context:
+//   - For HELD positions: ACT = trim/add/exit, HOLD = on plan, WATCH = data stale
+//   - For NON-HELD       : ACT = setup is live (open the position), HOLD = thesis
+//                          intact but no setup yet, WATCH = data stale
+// ============================================================================
+function computeLocalVerdict(analysis, holding, opts = {}) {
+  // opts: { isHeld: bool, currentPrice: number|null, decay: object|null }
+  const isHeld = opts.isHeld ?? !!holding;
+  const decay = opts.decay ?? (analysis ? convictionDecay(analysis, holding?.asset_class || analysis?.asset_class || "us_stock") : null);
+  const stance = (analysis?.stance || analysis?.signal || "").toUpperCase();
+  const conviction = (analysis?.conviction || "").toLowerCase();
+  const price = opts.currentPrice ?? null;
+
+  // ------ Missing / stale → WATCH --------------------------------------------
+  if (!analysis) {
+    return {
+      verdict: "WATCH",
+      action_line: "Run analyze for full read",
+      severity: "low",
+      freshness: "missing",
+      reasoning_short: "No analysis on file for this symbol.",
+      stance_echo: null, conviction: null, key_signal: "",
+      fired_trigger: null,
+      missing_inputs: ["No analysis exists — run analyze"],
+      _source: "local",
+    };
+  }
+  if (decay?.is_stale) {
+    return {
+      verdict: "WATCH",
+      action_line: `Re-analyze — last call ${Math.round(decay.days_old)}d old`,
+      severity: "low",
+      freshness: decay.status,
+      reasoning_short: "Analysis is past its decay window for this asset class.",
+      stance_echo: stance || null,
+      conviction: conviction || null,
+      key_signal: "",
+      fired_trigger: null,
+      missing_inputs: [`Analysis ${Math.round(decay.days_old)}d old`],
+      _source: "local",
+    };
+  }
+
+  // ------ Fresh analysis → derive ACT / HOLD ---------------------------------
+  // The deterministic rules echo the server prompt's decision table, so the
+  // local verdict reads consistent with what /verdict would produce.
+
+  // Map stance + price position + held/not-held → verdict + action_line.
+  // priceZone is the analysis.action.price_zone string, often like "$48-$50"
+  // or "Below $69". We parse it loosely for the in-zone check.
+  const priceZone = analysis.action?.price_zone || "";
+  const actionWhat = analysis.action?.what || "";
+  const inZone = priceInZone(price, priceZone);
+  const rr = analysis.reward_risk?.ratio ?? analysis.computed_reward_risk?.ratio ?? null;
+  const meetsRR = rr == null ? null : rr >= 2.0;
+
+  // Conviction-aware HOLD default: low-conviction stances shouldn't manufacture
+  // ACT regardless of stance. Sit tight, surface the weak conviction.
+  if (conviction === "low" && stance !== "EXIT" && stance !== "AVOID") {
+    return {
+      verdict: "HOLD",
+      action_line: isHeld ? "Low conviction — hold and reassess" : "Low conviction — wait for stronger setup",
+      severity: "low",
+      freshness: decay?.status || "fresh",
+      reasoning_short: "Original analysis flagged low conviction. Don't force a decisive read from indecisive source data.",
+      stance_echo: stance || null,
+      conviction,
+      key_signal: synthKeySignal(analysis),
+      fired_trigger: null,
+      missing_inputs: [],
+      _source: "local",
+    };
+  }
+
+  // HELD-position branches
+  if (isHeld) {
+    if (stance === "EXIT" || stance === "AVOID") {
+      return verdictObj({
+        verdict: "ACT", severity: "high",
+        action_line: actionWhat || "Exit position per analysis",
+        reasoning_short: `Original stance is ${stance}. Anti-portfolio fit fails — close the position.`,
+        stance, conviction, analysis, decay,
+      });
+    }
+    if (stance === "TRIM") {
+      if (inZone === true) {
+        return verdictObj({
+          verdict: "ACT", severity: "medium",
+          action_line: actionWhat || `Trim — price in zone (${priceZone})`,
+          reasoning_short: "Price has reached the trim zone in the original analysis.",
+          stance, conviction, analysis, decay,
+        });
+      }
+      return verdictObj({
+        verdict: "HOLD", severity: "low",
+        action_line: priceZone ? `Trim above ${priceZone}` : "Hold for now — trim level not reached",
+        reasoning_short: "Original stance is TRIM but price hasn't reached the level.",
+        stance, conviction, analysis, decay,
+      });
+    }
+    if (stance === "ACCUMULATE") {
+      if (inZone === true) {
+        return verdictObj({
+          verdict: "ACT", severity: "medium",
+          action_line: actionWhat || `Add — price in entry zone (${priceZone})`,
+          reasoning_short: "Entry zone hit. Cash available scales the add per profile.",
+          stance, conviction, analysis, decay,
+        });
+      }
+      return verdictObj({
+        verdict: "HOLD", severity: "low",
+        action_line: priceZone ? `Entry missed — wait for ${priceZone}` : "Hold — entry zone not reached",
+        reasoning_short: "Original stance favours adding, but price ran past the zone.",
+        stance, conviction, analysis, decay,
+      });
+    }
+    // Default HELD path: HOLD with original headline as reasoning
+    return verdictObj({
+      verdict: "HOLD", severity: "low",
+      action_line: actionWhat || "On plan",
+      reasoning_short: analysis.headline || "Position aligned with thesis.",
+      stance, conviction, analysis, decay,
+    });
+  }
+
+  // NON-HELD branches (watchlist / opportunity / one-off lookup)
+  // Verbs reframe: ACT = setup is live (open it), HOLD = thesis intact but wait
+  if (stance === "EXIT" || stance === "AVOID") {
+    return verdictObj({
+      verdict: "HOLD", severity: "low",
+      action_line: "Avoid — analysis flags exit/avoid",
+      reasoning_short: "Original stance is bearish on this name.",
+      stance, conviction, analysis, decay,
+    });
+  }
+  if (stance === "ACCUMULATE") {
+    if (inZone === true) {
+      return verdictObj({
+        verdict: "ACT", severity: "medium",
+        action_line: actionWhat || `Open position — price in entry zone (${priceZone})`,
+        reasoning_short: meetsRR === false ? "Setup live but R:R below 2 — size cautiously." : "Entry zone hit. Setup is live.",
+        stance, conviction, analysis, decay,
+      });
+    }
+    return verdictObj({
+      verdict: "HOLD", severity: "low",
+      action_line: priceZone ? `Wait for ${priceZone}` : "Wait for entry signal",
+      reasoning_short: "Thesis intact but entry setup not live yet.",
+      stance, conviction, analysis, decay,
+    });
+  }
+  if (stance === "TRIM") {
+    return verdictObj({
+      verdict: "HOLD", severity: "low",
+      action_line: "Stale for new buyers — analysis flags trim",
+      reasoning_short: "Stance is trim. Not a candidate for new positions.",
+      stance, conviction, analysis, decay,
+    });
+  }
+  // Default NON-HELD path
+  return verdictObj({
+    verdict: "HOLD", severity: "low",
+    action_line: actionWhat || "Tracking — no setup yet",
+    reasoning_short: analysis.headline || "Thesis on watch.",
+    stance, conviction, analysis, decay,
+  });
+}
+
+// Helper: build the verdict object with key_signal + fresh status pulled in.
+function verdictObj({ verdict, severity, action_line, reasoning_short, stance, conviction, analysis, decay }) {
+  return {
+    verdict,
+    action_line: String(action_line || "").slice(0, 140),
+    severity,
+    freshness: decay?.status || "fresh",
+    reasoning_short: String(reasoning_short || "").slice(0, 240),
+    stance_echo: stance || null,
+    conviction: conviction || null,
+    key_signal: synthKeySignal(analysis),
+    fired_trigger: null,
+    missing_inputs: [],
+    _source: "local",
+  };
+}
+
+// Synthesize a one-line "key signal" from analysis content. Picks the most
+// salient line: TA summary first, then headline, then base case. Caps at 80
+// chars so it fits the badge slot.
+function synthKeySignal(analysis) {
+  if (!analysis) return "";
+  const candidates = [
+    analysis.ta_summary,
+    analysis.headline,
+    analysis.scenarios?.base_case,
+  ].filter(Boolean);
+  if (candidates.length === 0) return "";
+  // Take first sentence of the first non-empty candidate
+  const first = candidates[0];
+  const sentenceEnd = first.search(/[.!?]/);
+  const slice = sentenceEnd > 0 ? first.slice(0, sentenceEnd) : first;
+  return slice.slice(0, 80);
+}
+
+// Loose price-zone parser. Returns true if price is in the zone, false if
+// definitively out, null if we can't tell. Accepts: "$48-$50", "$48 - $50",
+// "Below $69", "Above $76", "Near $50".
+function priceInZone(price, zoneStr) {
+  if (price == null || !zoneStr) return null;
+  const s = String(zoneStr).replace(/[$£€,]/g, "").toLowerCase();
+  // Range form "48-50" or "48 - 50"
+  const range = s.match(/(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)/);
+  if (range) {
+    const lo = Math.min(parseFloat(range[1]), parseFloat(range[2]));
+    const hi = Math.max(parseFloat(range[1]), parseFloat(range[2]));
+    return price >= lo * 0.98 && price <= hi * 1.02; // 2% tolerance
+  }
+  // "below X"
+  const below = s.match(/below\s*(\d+(?:\.\d+)?)/);
+  if (below) return price <= parseFloat(below[1]);
+  // "above X"
+  const above = s.match(/above\s*(\d+(?:\.\d+)?)/);
+  if (above) return price >= parseFloat(above[1]);
+  // "near X" / "at X" — within 3%
+  const near = s.match(/(?:near|at|around)\s*(\d+(?:\.\d+)?)/);
+  if (near) {
+    const target = parseFloat(near[1]);
+    return Math.abs(price - target) / target < 0.03;
+  }
+  // Single number — within 3%
+  const single = s.match(/(\d+(?:\.\d+)?)/);
+  if (single) {
+    const target = parseFloat(single[1]);
+    return Math.abs(price - target) / target < 0.03;
+  }
+  return null;
+}
+
+
 
 // ============================================================================
 // AI CARD
@@ -10591,9 +11189,16 @@ async function runAnalysis(symbol) {
     if (j.analysis) {
       state.analyses[symbol] = {
         ...j.analysis, symbol,
+        asset_class: state.holdings.find(h => h.symbol === symbol)?.asset_class
+                  || state.watchlist.find(w => w.symbol === symbol)?.asset_class
+                  || "us_stock",
         generated_at: new Date().toISOString(),
         current_price: j.current_price,
-        // Record the sanity-check signal so the analysis card can show it
+        // Surface the worker's server-side R-multiple. Without this, the
+        // per-symbol verdict block can't show R:R for symbols whose analysis
+        // didn't include reward_risk in the LLM output (worker computes it
+        // post-hoc from the scenarios).
+        computed_reward_risk: j.computed_reward_risk || null,
         data_sanity_note: preCheck && preCheck.severity !== "none"
           ? `Data sanity: ${preCheck.severity}. ${preCheck.issues.map(i => i.msg).join(" ")}`.slice(0, 240)
           : null,
@@ -10910,7 +11515,30 @@ async function runVerdict(force = false) {
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const j = await r.json();
-    state.verdicts = Array.isArray(j.verdicts) ? j.verdicts : [];
+    // Phase G — verb-delta tracking. Compare new verb vs previous verb per
+    // symbol. Symbols whose verb changed get marked so the row renderer can
+    // briefly highlight them. Auto-clears after 30 seconds so the indicator
+    // doesn't linger past its usefulness.
+    const prevBySym = new Map((state.verdicts || []).map(v => [v.symbol, v.verdict]));
+    const newVerdicts = Array.isArray(j.verdicts) ? j.verdicts : [];
+    state.verdictChanges = {};
+    for (const v of newVerdicts) {
+      const prev = prevBySym.get(v.symbol);
+      if (prev && prev !== v.verdict) {
+        state.verdictChanges[v.symbol] = { from: prev, to: v.verdict, at: Date.now() };
+      }
+    }
+    // Schedule clearing of the change indicators after 30s.
+    if (Object.keys(state.verdictChanges).length > 0) {
+      setTimeout(() => {
+        const cutoff = Date.now() - 30000;
+        for (const sym of Object.keys(state.verdictChanges)) {
+          if (state.verdictChanges[sym].at < cutoff) delete state.verdictChanges[sym];
+        }
+        if (state.currentView === "portfolio") renderPortfolio();
+      }, 31000);
+    }
+    state.verdicts = newVerdicts;
     state.portfolioNote = String(j.portfolio_note || "");
     state.verdictsAt = j.generated_at || new Date().toISOString();
     localStorage.setItem("verdictsCache_v2", JSON.stringify(state.verdicts));
