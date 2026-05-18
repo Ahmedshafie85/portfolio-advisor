@@ -10386,11 +10386,13 @@ function openAsset(symbol, fromView) {
   state.selectedSymbol = symbol;
   if (fromView) state._fromView = fromView;
   state.currentView = "discover";
+  // The destination is always the full asset detail page (chart + AI + verdict).
+  // The watchlist tab is just the return path for the back button — set it
+  // here so back-from-detail returns to Watchlist when fromView==="watchlist",
+  // but the detail render itself is always renderAssetDetail.
   state.discoverTab = (fromView === "watchlist") ? "watchlist" : "markets";
   $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === "discover"));
-  // Detail renderer writes into #view directly; pass through.
-  if (state.discoverTab === "watchlist") renderWatchDetail(symbol);
-  else renderAssetDetail(symbol);
+  renderAssetDetail(symbol);
 }
 function backToMarkets() {
   state.selectedSymbol = null;
