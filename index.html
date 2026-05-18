@@ -11624,6 +11624,9 @@ async function runVerdict(force = false) {
         idToken,
         holdings: state.holdings,
         investor_profile: state.investorProfile,
+        // Phase H1 — user-initiated refresh bypasses input-hash cache.
+        // Automatic 4h refreshes hit the cache so verdicts stay stable.
+        force: !!force,
       }),
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
