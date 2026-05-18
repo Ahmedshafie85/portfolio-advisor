@@ -357,6 +357,40 @@ body {
 }
 .avb-missing-row + .avb-missing-row { margin-top: 4px; }
 
+/* Substance sections inside the verdict block — Why / Read / Top risks /
+   Counter-argument. Each is a labeled, compact block surfacing one piece of
+   the analyst's reasoning so the verdict block reads as a real summary
+   instead of a placeholder. */
+.avb-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule-soft);
+}
+.avb-section-label {
+  font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 6px;
+}
+.avb-section-body {
+  font-family: var(--sans); font-size: 13px; color: var(--ink);
+  line-height: 1.55;
+}
+.avb-section-list {
+  margin: 0; padding-left: 16px;
+  font-family: var(--sans); font-size: 12.5px; color: var(--ink-soft);
+  line-height: 1.5;
+}
+.avb-section-list li + li { margin-top: 4px; }
+.avb-section-counter {
+  border-left: 2px solid var(--gold);
+  padding-left: 10px;
+  padding-top: 0;
+  margin-top: 12px;
+  border-top: none;
+}
+.avb-section-counter .avb-section-label { color: var(--gold); }
+
 .btn-ghost-sm {
   padding: 4px 10px; border: 1px solid var(--rule); background: transparent;
   color: var(--ink-soft); font-family: var(--sans); font-size: 11px;
@@ -9098,6 +9132,40 @@ function renderAssetVerdictBlock(symbol, analysis, holding, currentPrice) {
         : `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`}
     </button>`;
 
+  // Substance blocks — surface the analyst's real rationale (why, top risks,
+  // counter-argument). These are the fields the analyst spent the most time
+  // on; the verdict block summarizes them here so the user doesn't have to
+  // scroll to find the substance.
+  const whyBlock = v.why
+    ? `<div class="avb-section">
+         <div class="avb-section-label">Why</div>
+         <div class="avb-section-body">${escAttr(v.why)}</div>
+       </div>`
+    : "";
+
+  const readBlock = (v.read && v.read !== v.reasoning_short && v.read.length > 20)
+    ? `<div class="avb-section">
+         <div class="avb-section-label">Read</div>
+         <div class="avb-section-body">${escAttr(v.read)}</div>
+       </div>`
+    : "";
+
+  const risksBlock = (v.key_risks && v.key_risks.length > 0)
+    ? `<div class="avb-section avb-section-risks">
+         <div class="avb-section-label">Top risks</div>
+         <ul class="avb-section-list">
+           ${v.key_risks.map(r => `<li>${escAttr(r)}</li>`).join("")}
+         </ul>
+       </div>`
+    : "";
+
+  const counterBlock = v.counter_argument
+    ? `<div class="avb-section avb-section-counter">
+         <div class="avb-section-label">Counter-argument</div>
+         <div class="avb-section-body">${escAttr(v.counter_argument)}</div>
+       </div>`
+    : "";
+
   return `<div class="asset-verdict-block ${verbClass} ${sevClass}">
     <div class="avb-head">
       <span class="avb-verb">${escAttr(v.verdict)}</span>
@@ -9109,9 +9177,12 @@ function renderAssetVerdictBlock(symbol, analysis, holding, currentPrice) {
       ${analyzeBtn}
     </div>
     <div class="avb-action">${escAttr(v.action_line)}</div>
-    ${v.key_signal ? `<div class="vrow-keysignal">${escAttr(v.key_signal)}</div>` : ""}
     ${v.reasoning_short ? `<div class="vrow-reasoning">${escAttr(v.reasoning_short)}</div>` : ""}
     ${planBlock}
+    ${whyBlock}
+    ${readBlock}
+    ${risksBlock}
+    ${counterBlock}
     ${missingBlock}
   </div>`;
 }
@@ -10629,6 +10700,8 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
   // Only fall back to the generic line when action.what is empty.
   if (conviction === "low" && stance !== "EXIT" && stance !== "AVOID") {
     const explicitAction = actionWhat && actionWhat.length > 4 ? actionWhat : null;
+    const risks = (Array.isArray(analysis?.key_risks) ? analysis.key_risks : [])
+      .map(r => String(r || "").trim()).filter(Boolean).slice(0, 2);
     return {
       verdict: "HOLD",
       action_line: explicitAction
@@ -10642,6 +10715,10 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
       key_signal: synthKeySignal(analysis),
       fired_trigger: null,
       missing_inputs: [],
+      why: String(analysis?.action?.why || "").slice(0, 400),
+      read: String(analysis?.read || "").slice(0, 320),
+      key_risks: risks,
+      counter_argument: String(analysis?.counter_argument || "").slice(0, 320),
       _source: "local",
     };
   }
@@ -10744,18 +10821,33 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
 }
 
 // Helper: build the verdict object with key_signal + fresh status pulled in.
+// Also pulls four substantive content fields from the analysis (when present)
+// so the verdict block can surface the analyst's real rationale, top risks,
+// and counter-argument — not just a one-line action.
 function verdictObj({ verdict, severity, action_line, reasoning_short, stance, conviction, analysis, decay }) {
+  // Top 2 key risks, shortened. The analysis stores these as full sentences;
+  // we pick the most distinctive nouns/clauses for the verdict surface.
+  const risks = (Array.isArray(analysis?.key_risks) ? analysis.key_risks : [])
+    .map(r => String(r || "").trim())
+    .filter(Boolean)
+    .slice(0, 2);
   return {
     verdict,
-    action_line: String(action_line || "").slice(0, 140),
+    action_line: String(action_line || "").slice(0, 160),
     severity,
     freshness: decay?.status || "fresh",
-    reasoning_short: String(reasoning_short || "").slice(0, 240),
+    reasoning_short: String(reasoning_short || "").slice(0, 320),
     stance_echo: stance || null,
     conviction: conviction || null,
     key_signal: synthKeySignal(analysis),
     fired_trigger: null,
     missing_inputs: [],
+    // Phase G+ — richer content fields. The verdict block surfaces these so
+    // the user reads the analyst's actual rationale, not a placeholder.
+    why: String(analysis?.action?.why || "").slice(0, 400),
+    read: String(analysis?.read || "").slice(0, 320),
+    key_risks: risks,
+    counter_argument: String(analysis?.counter_argument || "").slice(0, 320),
     _source: "local",
   };
 }
