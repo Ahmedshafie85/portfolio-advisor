@@ -10623,14 +10623,20 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
   const meetsRR = rr == null ? null : rr >= 2.0;
 
   // Conviction-aware HOLD default: low-conviction stances shouldn't manufacture
-  // ACT regardless of stance. Sit tight, surface the weak conviction.
+  // ACT regardless of stance. BUT — the analysis often has an explicit
+  // recommendation in action.what (e.g. "Pass. Liquidity trap.") even when
+  // conviction is low. Surface THAT, not a generic "wait for stronger setup."
+  // Only fall back to the generic line when action.what is empty.
   if (conviction === "low" && stance !== "EXIT" && stance !== "AVOID") {
+    const explicitAction = actionWhat && actionWhat.length > 4 ? actionWhat : null;
     return {
       verdict: "HOLD",
-      action_line: isHeld ? "Low conviction — hold and reassess" : "Low conviction — wait for stronger setup",
+      action_line: explicitAction
+        || (isHeld ? "Low conviction — hold and reassess" : "Low conviction — wait for stronger setup"),
       severity: "low",
       freshness: decay?.status || "fresh",
-      reasoning_short: "Original analysis flagged low conviction. Don't force a decisive read from indecisive source data.",
+      reasoning_short: analysis.headline
+        || "Original analysis flagged low conviction. Don't force a decisive read from indecisive source data.",
       stance_echo: stance || null,
       conviction,
       key_signal: synthKeySignal(analysis),
@@ -10646,7 +10652,8 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
       return verdictObj({
         verdict: "ACT", severity: "high",
         action_line: actionWhat || "Exit position per analysis",
-        reasoning_short: `Original stance is ${stance}. Anti-portfolio fit fails — close the position.`,
+        reasoning_short: analysis.headline
+          || `Original stance is ${stance}. Anti-portfolio fit fails — close the position.`,
         stance, conviction, analysis, decay,
       });
     }
@@ -10655,14 +10662,14 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
         return verdictObj({
           verdict: "ACT", severity: "medium",
           action_line: actionWhat || `Trim — price in zone (${priceZone})`,
-          reasoning_short: "Price has reached the trim zone in the original analysis.",
+          reasoning_short: analysis.headline || "Price has reached the trim zone in the original analysis.",
           stance, conviction, analysis, decay,
         });
       }
       return verdictObj({
         verdict: "HOLD", severity: "low",
-        action_line: priceZone ? `Trim above ${priceZone}` : "Hold for now — trim level not reached",
-        reasoning_short: "Original stance is TRIM but price hasn't reached the level.",
+        action_line: priceZone ? `Trim above ${priceZone}` : (actionWhat || "Hold for now — trim level not reached"),
+        reasoning_short: analysis.headline || "Original stance is TRIM but price hasn't reached the level.",
         stance, conviction, analysis, decay,
       });
     }
@@ -10671,14 +10678,14 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
         return verdictObj({
           verdict: "ACT", severity: "medium",
           action_line: actionWhat || `Add — price in entry zone (${priceZone})`,
-          reasoning_short: "Entry zone hit. Cash available scales the add per profile.",
+          reasoning_short: analysis.headline || "Entry zone hit. Cash available scales the add per profile.",
           stance, conviction, analysis, decay,
         });
       }
       return verdictObj({
         verdict: "HOLD", severity: "low",
-        action_line: priceZone ? `Entry missed — wait for ${priceZone}` : "Hold — entry zone not reached",
-        reasoning_short: "Original stance favours adding, but price ran past the zone.",
+        action_line: priceZone ? `Entry missed — wait for ${priceZone}` : (actionWhat || "Hold — entry zone not reached"),
+        reasoning_short: analysis.headline || "Original stance favours adding, but price ran past the zone.",
         stance, conviction, analysis, decay,
       });
     }
@@ -10696,8 +10703,8 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
   if (stance === "EXIT" || stance === "AVOID") {
     return verdictObj({
       verdict: "HOLD", severity: "low",
-      action_line: "Avoid — analysis flags exit/avoid",
-      reasoning_short: "Original stance is bearish on this name.",
+      action_line: actionWhat || "Avoid — analysis flags exit/avoid",
+      reasoning_short: analysis.headline || "Original stance is bearish on this name.",
       stance, conviction, analysis, decay,
     });
   }
@@ -10706,22 +10713,24 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
       return verdictObj({
         verdict: "ACT", severity: "medium",
         action_line: actionWhat || `Open position — price in entry zone (${priceZone})`,
-        reasoning_short: meetsRR === false ? "Setup live but R:R below 2 — size cautiously." : "Entry zone hit. Setup is live.",
+        reasoning_short: meetsRR === false
+          ? "Setup live but R:R below 2 — size cautiously."
+          : (analysis.headline || "Entry zone hit. Setup is live."),
         stance, conviction, analysis, decay,
       });
     }
     return verdictObj({
       verdict: "HOLD", severity: "low",
-      action_line: priceZone ? `Wait for ${priceZone}` : "Wait for entry signal",
-      reasoning_short: "Thesis intact but entry setup not live yet.",
+      action_line: priceZone ? `Wait for ${priceZone}` : (actionWhat || "Wait for entry signal"),
+      reasoning_short: analysis.headline || "Thesis intact but entry setup not live yet.",
       stance, conviction, analysis, decay,
     });
   }
   if (stance === "TRIM") {
     return verdictObj({
       verdict: "HOLD", severity: "low",
-      action_line: "Stale for new buyers — analysis flags trim",
-      reasoning_short: "Stance is trim. Not a candidate for new positions.",
+      action_line: actionWhat || "Stale for new buyers — analysis flags trim",
+      reasoning_short: analysis.headline || "Stance is trim. Not a candidate for new positions.",
       stance, conviction, analysis, decay,
     });
   }
@@ -10756,17 +10765,27 @@ function verdictObj({ verdict, severity, action_line, reasoning_short, stance, c
 // chars so it fits the badge slot.
 function synthKeySignal(analysis) {
   if (!analysis) return "";
+  // Prefer headline first — it's the AI's own one-line distillation, written
+  // to be the read-at-a-glance summary. ta_summary is verbose and full of
+  // numbers that look ugly truncated. Fall through to scenarios.base_case
+  // only if neither is present.
   const candidates = [
-    analysis.ta_summary,
     analysis.headline,
+    analysis.ta_summary,
     analysis.scenarios?.base_case,
   ].filter(Boolean);
   if (candidates.length === 0) return "";
-  // Take first sentence of the first non-empty candidate
-  const first = candidates[0];
-  const sentenceEnd = first.search(/[.!?]/);
-  const slice = sentenceEnd > 0 ? first.slice(0, sentenceEnd) : first;
-  return slice.slice(0, 80);
+  const first = String(candidates[0]).trim();
+  // Take first sentence
+  const sentenceEnd = first.search(/[.!?](?:\s|$)/);
+  let slice = sentenceEnd > 0 ? first.slice(0, sentenceEnd) : first;
+  // Cap at 90 chars but break on a word boundary so we don't chop mid-word
+  if (slice.length > 90) {
+    const cut = slice.slice(0, 90);
+    const lastSpace = cut.lastIndexOf(" ");
+    slice = (lastSpace > 50 ? cut.slice(0, lastSpace) : cut) + "…";
+  }
+  return slice;
 }
 
 // Loose price-zone parser. Returns true if price is in the zone, false if
