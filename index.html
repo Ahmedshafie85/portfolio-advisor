@@ -397,6 +397,239 @@ body {
   font-style: italic;
 }
 
+/* ============================================================
+   Phase H4 — Track Record dashboard (Settings)
+   ============================================================ */
+.tr-overall {
+  background: var(--bg-card);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.tr-overall-top {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px;
+}
+.tr-overall-label {
+  font-family: var(--sans); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted);
+}
+.tr-overall-rate { display: flex; align-items: baseline; gap: 6px; }
+.tr-rate-big {
+  font-family: var(--display); font-size: 30px; font-weight: 500;
+  letter-spacing: -0.02em; color: var(--ink);
+}
+.tr-overall-meta {
+  font-family: var(--sans); font-size: 11.5px; color: var(--ink-muted);
+  line-height: 1.5; margin-top: 6px;
+}
+
+.tr-block { margin-bottom: 16px; }
+.tr-block-label {
+  font-family: var(--sans); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted);
+  padding: 0 4px 6px;
+}
+.tr-table {
+  width: 100%; border-collapse: collapse;
+  background: var(--bg-card);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.tr-table th, .tr-table td {
+  padding: 8px 10px;
+  font-family: var(--sans); font-size: 12px;
+  text-align: left;
+  border-top: 1px solid var(--rule-soft);
+}
+.tr-table thead th {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-muted);
+  background: var(--bg-elev);
+  border-top: none;
+}
+.tr-table tbody tr:first-child td { border-top: none; }
+.tr-key {
+  font-family: var(--mono); font-weight: 600; color: var(--ink);
+  text-transform: uppercase; font-size: 11px;
+}
+.tr-count {
+  font-family: var(--mono); color: var(--ink-soft);
+  width: 36px;
+}
+.tr-rate-cell {
+  font-family: var(--sans);
+}
+.tr-rate { font-weight: 600; color: var(--ink); }
+.tr-rate-detail { color: var(--ink-muted); font-size: 11px; }
+.tr-rate-empty { color: var(--ink-muted); font-size: 11px; font-style: italic; }
+.tr-active { color: var(--gold); }
+.tr-days {
+  font-family: var(--mono); color: var(--ink-soft);
+  width: 60px; text-align: right;
+}
+
+.tr-disclaimer {
+  margin-top: 10px; padding: 0 4px;
+  font-family: var(--sans); font-size: 10.5px; color: var(--ink-muted);
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Phase M — Paper-trade toggle in Log Trade modal
+   ============================================================ */
+.lt-paper-row {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: var(--bg-elev);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+.lt-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  cursor: pointer;
+  font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--ink);
+}
+.lt-toggle input[type="checkbox"] {
+  width: 16px; height: 16px; margin: 0;
+  cursor: pointer;
+  accent-color: var(--ink);
+}
+.lt-paper-hint {
+  font-family: var(--sans); font-size: 10.5px; color: var(--ink-muted);
+  line-height: 1.4; flex: 1; min-width: 200px;
+}
+
+/* Paper badge in the trade log row */
+.trade-paper-badge {
+  font-family: var(--sans); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 999px;
+  background: rgba(120, 120, 200, 0.12);
+  color: var(--ink-soft);
+}
+
+/* Inline action buttons — used on Watchlist + Opportunity rows for Analyze
+   + Verdict expanders. Distinct from the verdict-zone Analyze button (which
+   is icon-only); these have small labels because they sit inside rows that
+   also display row-open click affordance. */
+.watch-actions, .opp-actions-row {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px;
+}
+.inline-action-btn {
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 5px 10px;
+  background: var(--bg-elev);
+  color: var(--ink-soft);
+  border: 1px solid var(--rule-soft);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.inline-action-btn:hover {
+  background: var(--rule-soft);
+  color: var(--ink);
+}
+
+/* Inline verdict expander block. Same data source (computeLocalVerdict) as
+   the asset detail page; tighter layout. Left-border accent matches the
+   verdict zone styling on Portfolio. */
+.inline-verdict {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--bg-elev);
+  border-radius: 8px;
+  border-left: 3px solid var(--ink-muted);
+  cursor: default;
+}
+.inline-verdict.verb-act    { border-left-color: var(--red); }
+.inline-verdict.verb-watch  { border-left-color: var(--gold); }
+.inline-verdict.verb-hold   { border-left-color: var(--ink-muted); }
+.inline-verdict-empty {
+  font-family: var(--sans); font-size: 12px; color: var(--ink-muted);
+  font-style: italic;
+}
+.iv-head {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 6px; margin-bottom: 8px;
+}
+.iv-verb {
+  font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; padding: 2px 7px; border-radius: 999px;
+  background: var(--ink-soft); color: var(--bg);
+}
+.inline-verdict.verb-act .iv-verb    { background: var(--red); color: var(--bg); }
+.inline-verdict.verb-watch .iv-verb  { background: var(--gold); color: var(--bg); }
+.iv-sev {
+  font-family: var(--sans); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted);
+}
+.iv-stance, .iv-conviction {
+  font-family: var(--sans); font-size: 10px; color: var(--ink-muted);
+  padding: 2px 6px; border-radius: 4px;
+  background: var(--bg);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.iv-action {
+  font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--ink);
+  line-height: 1.4; margin-bottom: 6px;
+}
+.iv-reasoning {
+  font-family: var(--sans); font-size: 11.5px; color: var(--ink-soft);
+  line-height: 1.5; margin-bottom: 10px;
+}
+.iv-section {
+  margin-top: 8px;
+}
+.iv-section-label {
+  font-family: var(--sans); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted);
+  margin-bottom: 3px;
+}
+.iv-section-body {
+  font-family: var(--sans); font-size: 11.5px; color: var(--ink); line-height: 1.5;
+}
+
+/* Track Record split: paper vs real side-by-side rows */
+.tr-overall-split {
+  background: var(--bg-card);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+  padding: 4px 0;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.tr-split-row {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--rule-soft);
+}
+.tr-split-row:first-child { border-top: none; }
+.tr-split-label {
+  font-family: var(--sans); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-muted);
+}
+.tr-split-rate {
+  font-family: var(--display);
+}
+.tr-split-pct {
+  font-size: 20px; font-weight: 500; color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.tr-split-meta {
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted);
+}
+
+
 /* Verb-change badge — surfaces "row used to be HOLD, now is ACT". Auto-clears
    30 seconds after the verdict call returns. Subtle row pulse animates once. */
 .vrow-changed-badge {
@@ -3971,6 +4204,9 @@ const state = {
   // H3 — which trade rows in Settings are showing their outcome trajectory.
   // Cleared on app open; in-memory only.
   expandedTrades: {},
+  // Phase M — which Watchlist/Opportunity rows have their inline verdict open.
+  // Symbol-keyed bool. In-memory only; resets on reload.
+  expandedVerdicts: {},
   breakoutPromptDismissed: localStorage.getItem("breakoutPromptDismissed") === "1",
   // News (big-opportunity filter) — hydrate from localStorage so opportunities
   // survive iOS tab unloading and page reloads (within TTL window)
@@ -4407,7 +4643,10 @@ async function loadInitialData() {
     runEvaluator().then(r => {
       if (r.evaluated > 0) {
         toast(`Evaluated ${r.evaluated} trade${r.evaluated === 1 ? "" : "s"}${r.finalized ? `, ${r.finalized} finalized` : ""}`);
-        if (state.currentView === "settings") populateTradeLogList();
+        if (state.currentView === "settings") {
+          populateTradeLogList();
+          populateTrackRecord();
+        }
       }
     }).catch(() => {});
   }, 5500);
@@ -7555,6 +7794,15 @@ function renderOpportunityItem(o) {
 
   const onWatchlist = state.watchlist.some(w => w.symbol === o.symbol);
 
+  // Phase M — inline verdict block for opportunity rows. Uses the analysis
+  // if one exists; falls back to a "no analysis yet" hint that nudges the
+  // user to tap the existing ⚡ Analyze button.
+  const isVerdictExpanded = !!state.expandedVerdicts?.[o.symbol];
+  const oppAnalysis = state.analyses?.[o.symbol];
+  const oppVerdictBlock = isVerdictExpanded
+    ? renderInlineVerdictBlock(o.symbol, oppAnalysis, null, state.prices[o.symbol]?.current_price)
+    : "";
+
   // Build opportunity entry plan (Round 3) — only for CONSIDER/STARTER, not WATCH.
   // Collapsed by default — tap to expand. Same UX pattern as held verdicts.
   const oppPlan = buildOpportunityPlan(o);
@@ -7614,10 +7862,11 @@ function renderOpportunityItem(o) {
       ${actionLine ? `<div class="opp-action-line">${escAttr(actionLine)}</div>` : ""}
       <div class="opp-votes">${voteChips}</div>
       ${oppPlanHtml}
-      ${!onWatchlist && o.action !== "STARTER" ? `
-      <div class="opp-quick-actions">
-        <button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(o.symbol)}" data-name="${escAttr(o.symbol)}">+ Watch</button>
-      </div>` : ""}
+      <div class="opp-actions-row">
+        <button class="inline-action-btn" data-act="toggle-inline-verdict" data-symbol="${escAttr(o.symbol)}">${isVerdictExpanded ? "▴ Verdict" : "▾ Verdict"}</button>
+        ${!onWatchlist && o.action !== "STARTER" ? `<button class="inline-action-btn" data-act="add-curated" data-symbol="${escAttr(o.symbol)}" data-name="${escAttr(o.symbol)}">+ Watch</button>` : ""}
+      </div>
+      ${oppVerdictBlock}
     </div>
   `;
 }
@@ -9178,6 +9427,16 @@ function renderWatchlist() {
       }
     }
 
+    // Inline Verdict expander state (Phase M). Tap "Verdict" → row expands
+    // showing the per-symbol local verdict (target, action, reasoning). Tap
+    // again to collapse. Uses computeLocalVerdict — consistent with what the
+    // asset detail page shows. Falls back gracefully when no analysis exists.
+    const isVerdictExpanded = !!state.expandedVerdicts?.[w.symbol];
+    const analysis = state.analyses?.[w.symbol];
+    const verdictBlock = isVerdictExpanded
+      ? renderInlineVerdictBlock(w.symbol, analysis, null, snap?.current_price)
+      : "";
+
     return `
       <div class="watch-row ${hasTrigger ? 'has-trigger' : ''}" data-act="open-watch" data-symbol="${escAttr(w.symbol)}">
         <div class="watch-head">
@@ -9196,6 +9455,11 @@ function renderWatchlist() {
         </div>
         ${condPills ? `<div class="watch-cond-pills">${condPills}</div>` : ""}
         ${suggestStrip}
+        <div class="watch-actions">
+          <button class="inline-action-btn" data-act="run-analysis-inline" data-symbol="${escAttr(w.symbol)}">⚡ Analyze</button>
+          <button class="inline-action-btn" data-act="toggle-inline-verdict" data-symbol="${escAttr(w.symbol)}">${isVerdictExpanded ? "▴ Verdict" : "▾ Verdict"}</button>
+        </div>
+        ${verdictBlock}
       </div>
     `;
   }).join("");
@@ -10505,6 +10769,46 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
     reasoning_short: analysis.headline || "Thesis on watch.",
     stance, conviction, analysis, decay,
   });
+}
+
+// Phase M — Inline verdict block. Used by the Verdict expanders on Watchlist
+// and Today's Opportunities rows. Lightweight version of renderAssetVerdictBlock
+// — same data source (computeLocalVerdict) but tighter visual treatment so it
+// fits inside a row without dominating it.
+function renderInlineVerdictBlock(symbol, analysis, holding, currentPrice) {
+  if (!analysis) {
+    return `<div class="inline-verdict inline-verdict-empty">
+      No analysis yet. Tap ⚡ Analyze to generate one (~$0.02).
+    </div>`;
+  }
+  const v = computeLocalVerdict(analysis, holding, { currentPrice });
+  if (!v) {
+    return `<div class="inline-verdict inline-verdict-empty">Verdict unavailable.</div>`;
+  }
+  const verbClass = `verb-${v.verdict.toLowerCase()}`;
+  const sevClass = v.verdict === "ACT" ? `sev-${v.severity}` : "";
+  const stanceTag = v.stance_echo ? `<span class="iv-stance">${escAttr(v.stance_echo)}</span>` : "";
+  const convictionTag = v.conviction ? `<span class="iv-conviction">${escAttr(v.conviction)} conviction</span>` : "";
+  const why = v.why ? `<div class="iv-section"><div class="iv-section-label">Why</div><div class="iv-section-body">${escAttr(v.why)}</div></div>` : "";
+  const read = v.read ? `<div class="iv-section"><div class="iv-section-label">Read</div><div class="iv-section-body">${escAttr(v.read)}</div></div>` : "";
+  const risks = (v.key_risks || []).length > 0
+    ? `<div class="iv-section"><div class="iv-section-label">Top risks</div><div class="iv-section-body">${v.key_risks.slice(0, 2).map(r => escAttr(r)).join(" · ")}</div></div>`
+    : "";
+  const counter = v.counter_argument ? `<div class="iv-section"><div class="iv-section-label">Counter</div><div class="iv-section-body">${escAttr(v.counter_argument)}</div></div>` : "";
+  return `<div class="inline-verdict ${verbClass} ${sevClass}" data-act="noop" onclick="event.stopPropagation()">
+    <div class="iv-head">
+      <span class="iv-verb">${escAttr(v.verdict)}</span>
+      ${v.verdict === "ACT" ? `<span class="iv-sev">${escAttr(v.severity)}</span>` : ""}
+      ${stanceTag}
+      ${convictionTag}
+    </div>
+    <div class="iv-action">${escAttr(v.action_line)}</div>
+    ${v.reasoning_short ? `<div class="iv-reasoning">${escAttr(v.reasoning_short)}</div>` : ""}
+    ${why}
+    ${read}
+    ${risks}
+    ${counter}
+  </div>`;
 }
 
 // Helper: build the verdict object with key_signal + fresh status pulled in.
@@ -12163,6 +12467,14 @@ function renderSettings() {
         <div class="setting-row" style="color:var(--ink-muted);font-size:12px;">Loading trades…</div>
       </div>
     </div>
+    <div id="trackRecordSlot">
+      <div class="settings-group">
+        <div class="section-head" style="padding: 0 4px 8px;">
+          <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Track Record</h3>
+        </div>
+        <div class="setting-row" style="color:var(--ink-muted);font-size:12px;">Loading…</div>
+      </div>
+    </div>
     <div class="empty-state" style="padding: 30px 20px;">
       <p style="font-size:11px;color:var(--ink-muted);line-height:1.6;">
         This app is a tool, not an advisor. All signals are inputs, not recommendations.<br>
@@ -12173,6 +12485,8 @@ function renderSettings() {
   // Async-load trades and re-render the list slot. Async because trades live
   // in Firestore and we don't want to block the Settings render on the network.
   populateTradeLogList().catch(e => console.warn("trade log load:", e));
+  // H4 — same pattern for the track record dashboard.
+  populateTrackRecord().catch(e => console.warn("track record load:", e));
 }
 
 // Render the trade log list inside its slot. Called by renderSettings after
@@ -12222,6 +12536,7 @@ async function populateTradeLogList() {
             <div class="trade-row-head">
               <span class="trade-dir" style="color:${dirColor};">${escAttr(dir)}</span>
               <span class="trade-sym">${escAttr(t.symbol)}</span>
+              ${t.is_paper === true ? `<span class="trade-paper-badge">paper</span>` : ""}
               <span class="trade-qty">${fmtNum(t.quantity, 4)} @ $${fmtUSD(t.price, 2)}${notional}</span>
             </div>
             <div class="trade-row-meta">
@@ -12253,7 +12568,10 @@ async function confirmDeleteTrade(tradeId) {
   try {
     await deleteTrade(tradeId);
     toast("Trade deleted");
-    if (state.currentView === "settings") populateTradeLogList();
+    if (state.currentView === "settings") {
+      populateTradeLogList();
+      populateTrackRecord();
+    }
   } catch (e) {
     toast(`Delete failed: ${e.message || e}`, 3000, "error");
   }
@@ -12273,9 +12591,252 @@ async function runEvaluatorManual() {
     } else {
       toast(`Evaluated ${r.evaluated} trade${r.evaluated === 1 ? "" : "s"}${r.finalized ? `, ${r.finalized} finalized` : ""}`);
     }
-    if (state.currentView === "settings") populateTradeLogList();
+    if (state.currentView === "settings") {
+      populateTradeLogList();
+      populateTrackRecord();
+    }
   } catch (e) {
     toast(`Evaluator failed: ${e.message || e}`, 3000, "error");
+  }
+}
+
+// ============================================================================
+// PHASE H4 — Track Record.
+//
+// Pure aggregator over the trades collection. Reads outcomes/stance/conviction
+// from each trade and produces three summary blocks: overall success rate,
+// by stance, by conviction.
+//
+// Denominator policy (option B): active trades are counted using their
+// latest evaluation. Success rates can drift week-to-week as active trades
+// re-classify. The UI marks how many of the denominator are still active.
+//
+// What counts as "success" in the rate:
+//   successful + partial_success → numerator
+//   failed                       → denominator only
+//   ambiguous, no outcome yet    → excluded (would inflate denominator with noise)
+// ============================================================================
+
+function computeTrackRecord(trades) {
+  // Trades that have at least one evaluation row OR a denormalized outcome.
+  const evaluated = trades.filter(t => {
+    const hasOutcome = t.outcome && t.outcome !== "pending";
+    const hasTrajectory = Array.isArray(t.outcomes) && t.outcomes.length > 0;
+    return hasOutcome || hasTrajectory;
+  });
+
+  const isWin     = t => t.outcome === "successful" || t.outcome === "partial_success";
+  const isLoss    = t => t.outcome === "failed";
+  const isCounted = t => isWin(t) || isLoss(t);
+  const isActive  = t => t.outcome_status !== "final";
+
+  // Compute headline stats over a given subset (used for paper vs real splits)
+  function blockFor(subset) {
+    const subsetEvaluated = subset.filter(t => {
+      const hasOutcome = t.outcome && t.outcome !== "pending";
+      const hasTrajectory = Array.isArray(t.outcomes) && t.outcomes.length > 0;
+      return hasOutcome || hasTrajectory;
+    });
+    const counted = subsetEvaluated.filter(isCounted);
+    const wins = counted.filter(isWin).length;
+    return {
+      total_logged: subset.length,
+      total_evaluated: subsetEvaluated.length,
+      counted_total: counted.length,
+      counted_active: counted.filter(isActive).length,
+      wins,
+      losses: counted.length - wins,
+      success_rate_pct: counted.length > 0 ? Number((wins / counted.length * 100).toFixed(1)) : null,
+      ambiguous: subsetEvaluated.filter(t => t.outcome === "ambiguous").length,
+      pending: subset.length - subsetEvaluated.length,
+    };
+  }
+
+  // Paper trades are marked is_paper === true. Anything else (false, undefined,
+  // legacy trades from before the field existed) is treated as real.
+  const paperTrades = trades.filter(t => t.is_paper === true);
+  const realTrades  = trades.filter(t => t.is_paper !== true);
+
+  const overall = blockFor(trades);
+  const paper   = blockFor(paperTrades);
+  const real    = blockFor(realTrades);
+
+  // Helper: group + roll up (unchanged from before — operates over all evaluated)
+  function groupRollup(picker) {
+    const groups = {};
+    for (const t of evaluated) {
+      const key = picker(t) || "—";
+      (groups[key] = groups[key] || []).push(t);
+    }
+    return Object.entries(groups).map(([key, ts]) => {
+      const c = ts.filter(isCounted);
+      const w = c.filter(isWin).length;
+      const active = c.filter(isActive).length;
+      const finalTs = ts.filter(t => t.outcome_status === "final");
+      const ages = finalTs.map(t => {
+        const start = new Date(t.trade_date || t.created_at || 0).getTime();
+        const last = (t.outcomes && t.outcomes.length > 0)
+          ? new Date(t.outcomes[t.outcomes.length - 1].evaluated_at).getTime()
+          : null;
+        if (!start || !last) return null;
+        return (last - start) / 86400000;
+      }).filter(d => d != null);
+      const avgDays = ages.length > 0 ? ages.reduce((a, b) => a + b, 0) / ages.length : null;
+      return {
+        key,
+        count: ts.length,
+        counted: c.length,
+        active,
+        wins: w,
+        losses: c.length - w,
+        success_rate_pct: c.length > 0 ? Number((w / c.length * 100).toFixed(1)) : null,
+        avg_days_to_resolution: avgDays != null ? Number(avgDays.toFixed(1)) : null,
+      };
+    }).sort((a, b) => b.count - a.count);
+  }
+
+  const by_stance = groupRollup(t => {
+    const s = t.analysis_snapshot?.stance;
+    return s ? String(s).toUpperCase() : "—";
+  });
+
+  const by_conviction = groupRollup(t => {
+    const c = t.analysis_snapshot?.conviction;
+    return c ? String(c).toLowerCase() : "—";
+  });
+
+  return { overall, paper, real, by_stance, by_conviction };
+}
+
+// Render the Track Record section. Three blocks. Empty-state strings make
+// the surface usable even before any trades have outcomes.
+function renderTrackRecord(stats) {
+  const o = stats.overall;
+  if (o.total_logged === 0) {
+    return `<div class="settings-group">
+      <div class="section-head" style="padding: 0 4px 8px;">
+        <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Track Record</h3>
+      </div>
+      <div class="setting-row" style="color:var(--ink-muted);font-size:12px;line-height:1.5;">
+        No trades logged yet. The track record dashboard activates once you've logged trades and the weekly evaluator has classified some outcomes.
+      </div>
+    </div>`;
+  }
+
+  // Helper: format a success rate line with active-count annotation.
+  function rateLine(r) {
+    if (r.success_rate_pct == null) {
+      return `<span class="tr-rate-empty">${r.counted === 0 ? "no graded trades yet" : ""}</span>`;
+    }
+    const activeNote = r.active > 0 ? ` <span class="tr-active">(${r.active} active)</span>` : "";
+    return `<span class="tr-rate">${r.success_rate_pct}%</span> <span class="tr-rate-detail">${r.wins} of ${r.counted}${activeNote}</span>`;
+  }
+
+  // Helper: compact overall stat row (used for paper+real split)
+  function overallStatRow(label, b) {
+    if (b.total_logged === 0) {
+      return `<div class="tr-split-row">
+        <div class="tr-split-label">${escAttr(label)}</div>
+        <div class="tr-split-rate"><span class="tr-rate-empty">no trades</span></div>
+      </div>`;
+    }
+    const rateText = b.success_rate_pct != null
+      ? `<span class="tr-split-pct">${b.success_rate_pct}%</span>`
+      : `<span class="tr-rate-empty">no grades yet</span>`;
+    const meta = `${b.wins}W ${b.losses}L${b.counted_active > 0 ? ` · ${b.counted_active} active` : ""}${b.pending > 0 ? ` · ${b.pending} pending` : ""}`;
+    return `<div class="tr-split-row">
+      <div class="tr-split-label">${escAttr(label)}</div>
+      <div class="tr-split-rate">${rateText}</div>
+      <div class="tr-split-meta">${meta}</div>
+    </div>`;
+  }
+
+  // Block 1 — Overall, with paper/real breakdown if both exist
+  const hasPaper = stats.paper.total_logged > 0;
+  const hasReal  = stats.real.total_logged > 0;
+  const showSplit = hasPaper && hasReal;
+
+  const overallBlock = showSplit
+    ? `<div class="tr-overall-split">
+         ${overallStatRow("Paper", stats.paper)}
+         ${overallStatRow("Real", stats.real)}
+         ${overallStatRow("Combined", o)}
+       </div>`
+    : `<div class="tr-overall">
+         <div class="tr-overall-top">
+           <div class="tr-overall-label">${hasPaper ? "Paper trades" : (hasReal ? "Real trades" : "Overall")}</div>
+           <div class="tr-overall-rate">
+             ${o.success_rate_pct != null ? `<span class="tr-rate-big">${o.success_rate_pct}%</span>` : `<span class="tr-rate-empty">—</span>`}
+           </div>
+         </div>
+         <div class="tr-overall-meta">
+           ${o.wins} successful, ${o.losses} failed${o.counted_active > 0 ? ` · ${o.counted_active} still active` : ""}
+           ${o.ambiguous > 0 ? ` · ${o.ambiguous} ambiguous (excluded)` : ""}
+           ${o.pending > 0 ? ` · ${o.pending} pending eval` : ""}
+         </div>
+       </div>`;
+
+  // Block 2
+  const stanceBlock = stats.by_stance.length > 0
+    ? `<div class="tr-block">
+         <div class="tr-block-label">By stance</div>
+         <table class="tr-table">
+           <thead><tr><th>Stance</th><th>n</th><th>Success</th><th>Avg days</th></tr></thead>
+           <tbody>
+             ${stats.by_stance.map(r => `
+               <tr>
+                 <td class="tr-key">${escAttr(r.key)}</td>
+                 <td class="tr-count">${r.count}</td>
+                 <td class="tr-rate-cell">${rateLine(r)}</td>
+                 <td class="tr-days">${r.avg_days_to_resolution != null ? `${r.avg_days_to_resolution}d` : "—"}</td>
+               </tr>`).join("")}
+           </tbody>
+         </table>
+       </div>`
+    : "";
+
+  // Block 3
+  const convictionBlock = stats.by_conviction.length > 0
+    ? `<div class="tr-block">
+         <div class="tr-block-label">By conviction</div>
+         <table class="tr-table">
+           <thead><tr><th>Conviction</th><th>n</th><th>Success</th><th>Avg days</th></tr></thead>
+           <tbody>
+             ${stats.by_conviction.map(r => `
+               <tr>
+                 <td class="tr-key">${escAttr(r.key)}</td>
+                 <td class="tr-count">${r.count}</td>
+                 <td class="tr-rate-cell">${rateLine(r)}</td>
+                 <td class="tr-days">${r.avg_days_to_resolution != null ? `${r.avg_days_to_resolution}d` : "—"}</td>
+               </tr>`).join("")}
+           </tbody>
+         </table>
+       </div>`
+    : "";
+
+  return `<div class="settings-group">
+    <div class="section-head" style="padding: 0 4px 8px;">
+      <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Track Record</h3>
+    </div>
+    ${overallBlock}
+    ${stanceBlock}
+    ${convictionBlock}
+    <div class="tr-disclaimer">Success = price reached the target zone (or trim was vindicated). Ambiguous trades excluded from rate. Active trades counted using latest weekly evaluation.</div>
+  </div>`;
+}
+
+// Async loader for the Track Record slot in Settings. Mirrors the pattern
+// used by populateTradeLogList: render placeholder synchronously, fetch in
+// the background, swap when ready.
+async function populateTrackRecord() {
+  const slot = document.getElementById("trackRecordSlot");
+  if (!slot) return;
+  try {
+    const trades = await loadTrades(500);
+    const stats = computeTrackRecord(trades);
+    slot.innerHTML = renderTrackRecord(stats);
+  } catch (e) {
+    slot.innerHTML = `<div class="settings-group"><div class="setting-row" style="color:var(--red);font-size:12px;">Failed to load track record: ${escAttr(e.message || e)}</div></div>`;
   }
 }
 
@@ -12649,20 +13210,89 @@ async function submitAddHolding() {
 // and attached to the trade on save — invisible to the user but essential
 // for the audit layer (H3+) to evaluate outcomes.
 // ============================================================================
+// Parse a magnitude hint out of an action_line. Used to pre-fill quantity
+// in the Log Trade modal when the verdict action is explicit about size.
+//
+// Returns {kind: "pct"|"dollars"|"shares"|null, value: number|null, note: string}
+//   "Trim 50%"     → {kind: "pct",     value: 50,  note: "50% of holding"}
+//   "Add $200"     → {kind: "dollars", value: 200, note: "$200 worth"}
+//   "Exit"         → {kind: "pct",     value: 100, note: "Full exit"}
+//   "Trim some"    → {kind: null,      value: null, note: ""}
+function parseActionMagnitude(actionLine) {
+  if (!actionLine) return { kind: null, value: null, note: "" };
+  const text = String(actionLine).toLowerCase();
+  // Full exit signals — 100% of position
+  if (/\b(exit|close|sell\s+(all|fully|entirely))\b/.test(text) && !/exit\s+strategy/.test(text)) {
+    return { kind: "pct", value: 100, note: "Full position" };
+  }
+  // Percentage hint: "trim 50%", "add 25%", "reduce by 30%"
+  const pctMatch = text.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (pctMatch) {
+    const pct = parseFloat(pctMatch[1]);
+    return { kind: "pct", value: pct, note: `${pct}% of holding` };
+  }
+  // Dollar hint: "add $200", "buy $500 worth", "$1000 position"
+  const dollarMatch = text.match(/\$\s*(\d+(?:[,.]?\d+)*(?:\.\d+)?)/);
+  if (dollarMatch) {
+    const dollars = parseFloat(dollarMatch[1].replace(/,/g, ""));
+    return { kind: "dollars", value: dollars, note: `$${dollars.toFixed(0)} worth` };
+  }
+  // Share hint: "buy 10 shares", "add 5"
+  const shareMatch = text.match(/(\d+(?:\.\d+)?)\s*shares?\b/);
+  if (shareMatch) {
+    const shares = parseFloat(shareMatch[1]);
+    return { kind: "shares", value: shares, note: `${shares} shares` };
+  }
+  return { kind: null, value: null, note: "" };
+}
+
+// Compute the suggested quantity from a magnitude hint + current context.
+// Returns {qty: number, explanation: string} or {qty: null, explanation: ""}
+function suggestQuantity(magnitude, currentHoldingQty, livePrice, direction) {
+  if (!magnitude || magnitude.kind == null || magnitude.value == null) {
+    return { qty: null, explanation: "" };
+  }
+  const isReduce = ["trim", "sell", "exit"].includes(direction);
+  if (magnitude.kind === "pct") {
+    if (isReduce && currentHoldingQty) {
+      const q = currentHoldingQty * (magnitude.value / 100);
+      return { qty: q, explanation: `${magnitude.note} (${q.toFixed(4)} of ${currentHoldingQty.toFixed(4)} shares)` };
+    }
+    if (!isReduce) {
+      // % for an add is ambiguous (% of what?) — show note but no auto-fill
+      return { qty: null, explanation: `Verdict says ${magnitude.note} — fill in quantity manually` };
+    }
+  }
+  if (magnitude.kind === "dollars" && livePrice) {
+    const q = magnitude.value / livePrice;
+    return { qty: q, explanation: `${magnitude.note} ÷ $${livePrice.toFixed(2)} = ${q.toFixed(4)} shares` };
+  }
+  if (magnitude.kind === "shares") {
+    return { qty: magnitude.value, explanation: magnitude.note };
+  }
+  return { qty: null, explanation: "" };
+}
+
 function openLogTrade(symbol, prefillDirection) {
   if (!state.uid) { toast("Sign in to log trades", 2400, "error"); return; }
   const sym = String(symbol || "").toUpperCase();
   if (!sym) { toast("Symbol required", 2400, "error"); return; }
   const holding = state.holdings.find(h => h.symbol === sym);
   const isHeld = !!holding && holding.asset_class !== "cash";
+  const currentQty = holding?.quantity ?? null;
   const verdict = (state.verdicts || []).find(v => v.symbol === sym);
   const livePrice = state.prices?.[sym]?.current_price ?? null;
   const direction = prefillDirection
     || (verdict ? inferDirectionFromVerdict(verdict, isHeld) : (isHeld ? "trim" : "buy"));
   const today = new Date().toISOString().slice(0, 10);
 
-  // Show the verdict context (read-only) at the top so the user sees what
-  // they're acting on. This is also what gets snapshotted into the trade.
+  // Smart auto-fill — parse the action_line and pre-compute a quantity hint.
+  const magnitude = parseActionMagnitude(verdict?.action_line);
+  const suggested = suggestQuantity(magnitude, currentQty, livePrice, direction);
+  // For paper trades with no magnitude hint, default to qty=1 (the H3 evaluator
+  // is direction-based, doesn't care about size, so 1 is a fine placeholder).
+  const defaultPaperQty = suggested.qty != null ? suggested.qty : 1;
+
   const ctxHtml = verdict
     ? `<div class="trade-ctx">
          <div class="trade-ctx-label">From verdict</div>
@@ -12673,9 +13303,25 @@ function openLogTrade(symbol, prefillDirection) {
        </div>`
     : `<div class="trade-ctx trade-ctx-empty">No verdict on record — this trade will be logged without verdict context.</div>`;
 
+  const suggestedHint = suggested.explanation
+    ? `<div class="field-hint">${escAttr(suggested.explanation)}</div>`
+    : (isHeld && currentQty ? `<div class="field-hint">You hold ${currentQty.toFixed(4)} shares · current $${(livePrice * currentQty).toFixed(2)} value</div>` : "");
+
   openModal(`
     <div class="modal-head"><h3>Log Trade — ${escAttr(sym)}</h3></div>
     ${ctxHtml}
+
+    <!-- Paper trade toggle. Default ON because this app is currently a
+         decision-audit tool, not a portfolio manager — most logs are paper
+         tests of the verdict's accuracy, not real broker trades. -->
+    <div class="lt-paper-row">
+      <label class="lt-toggle">
+        <input id="lt_paper" type="checkbox" checked />
+        <span>Paper trade</span>
+      </label>
+      <span class="lt-paper-hint">Test the verdict without placing a real order. Paper trades are tracked separately in Track Record.</span>
+    </div>
+
     <div class="field">
       <label>Direction</label>
       <select id="lt_dir">
@@ -12683,9 +13329,16 @@ function openLogTrade(symbol, prefillDirection) {
       </select>
     </div>
     <div class="field-row">
-      <div class="field"><label>Quantity</label><input id="lt_qty" type="number" step="any" placeholder="0" /></div>
-      <div class="field"><label>Price (USD)</label><input id="lt_px" type="number" step="any" value="${livePrice != null ? livePrice : ""}" /></div>
+      <div class="field">
+        <label>Quantity</label>
+        <input id="lt_qty" type="number" step="any" placeholder="0" value="${defaultPaperQty != null ? defaultPaperQty : ""}" />
+      </div>
+      <div class="field">
+        <label>Price (USD)</label>
+        <input id="lt_px" type="number" step="any" value="${livePrice != null ? livePrice : ""}" />
+      </div>
     </div>
+    ${suggestedHint}
     <div class="field">
       <label>Trade Date</label>
       <input id="lt_date" type="date" value="${today}" max="${today}" />
@@ -12705,6 +13358,7 @@ async function submitLogTrade(symbol) {
   const px  = parseFloat($("#lt_px")?.value);
   const date = $("#lt_date")?.value;
   const notes = ($("#lt_notes")?.value || "").trim().slice(0, 400);
+  const isPaper = $("#lt_paper")?.checked ?? true;
   if (!sym)              { toast("Symbol missing", 2400, "error"); return; }
   if (!dir)              { toast("Direction required", 2400, "error"); return; }
   if (!qty || qty <= 0)  { toast("Enter a valid quantity", 2400, "error"); return; }
@@ -12719,11 +13373,11 @@ async function submitLogTrade(symbol) {
       price: px,
       trade_date: date,
       notes,
+      is_paper: isPaper,
       ...ctx,
     });
-    toast("Trade logged");
+    toast(isPaper ? "Paper trade logged" : "Trade logged");
     closeModal();
-    // If the user is on Settings (where the trade list lives), refresh it.
     if (state.currentView === "settings") renderSettings();
   } catch (e) {
     toast(`Failed to log: ${e.message || e}`, 3000, "error");
@@ -13095,6 +13749,18 @@ document.addEventListener("click", (e) => {
       case "rescan":                 rescan(); break;
       case "open-trigger":           openTrigger(symbol, target.dataset.triggerId); break;
       case "log-trade":              openLogTrade(symbol, target.dataset.recKey); break;
+      case "toggle-inline-verdict":
+        // Phase M: expand/collapse verdict block on Watchlist + Opportunity rows.
+        state.expandedVerdicts = state.expandedVerdicts || {};
+        state.expandedVerdicts[symbol] = !state.expandedVerdicts[symbol];
+        renderCurrentView();
+        break;
+      case "run-analysis-inline":
+        // Phase M: same as run-analysis but doesn't navigate away. Stays
+        // on the current row so the verdict expander can reflect the new
+        // analysis once it lands.
+        runAnalysis(symbol);
+        break;
       case "add-holding":            openAddHolding(); break;
       case "submit-add":             submitAddHolding(); break;
       case "edit-holding":           openEditHolding(symbol); break;
