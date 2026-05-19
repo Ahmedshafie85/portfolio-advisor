@@ -629,6 +629,47 @@ body {
   font-family: var(--mono); font-size: 10.5px; color: var(--ink-muted);
 }
 
+/* ============================================================
+   Phase N — Error modal (long/structured errors)
+   ============================================================ */
+.err-modal-message {
+  font-family: var(--sans); font-size: 14px; color: var(--ink);
+  line-height: 1.5;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: rgba(220, 38, 38, 0.06);
+  border-left: 3px solid var(--red);
+  border-radius: 6px;
+  word-wrap: break-word;
+}
+.err-modal-details {
+  margin: 0 0 14px;
+  font-family: var(--sans); font-size: 12px;
+}
+.err-modal-details summary {
+  cursor: pointer;
+  color: var(--ink-muted);
+  padding: 6px 0;
+  user-select: none;
+}
+.err-modal-details summary:hover { color: var(--ink); }
+.err-modal-raw {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-soft); line-height: 1.5;
+  background: var(--bg-elev);
+  padding: 10px 12px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+.err-modal-actions {
+  display: flex; gap: 8px;
+  margin-top: 4px;
+}
+
 
 /* Verb-change badge — surfaces "row used to be HOLD, now is ACT". Auto-clears
    30 seconds after the verdict call returns. Subtle row pulse animates once. */
@@ -4313,6 +4354,80 @@ function toast(msg, ms = 2400, type = "default") {
   clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.remove("show"), ms);
 }
+
+// Phase N — intelligent error surface. When an error is short and atomic,
+// a toast is fine. When it carries structured payload (nested JSON, stack
+// traces, embedded API error envelopes), the toast truncates at ~60 chars
+// and HIDES the actual useful information. This helper detects "long or
+// structured" errors and routes them to a copyable modal instead.
+//
+// Pattern: replace `toast(`Foo failed: ${err}`, 3000, "error")` calls with
+// `errorToast("Foo", err)`. Short errors still show as a toast; structured
+// or long ones get the modal.
+function errorToast(context, err) {
+  const raw = (err && err.message) ? String(err.message) : String(err || "Unknown error");
+  let humanMessage = raw;
+  let structuredJson = null;
+  const jsonStart = raw.indexOf("{");
+  if (jsonStart >= 0) {
+    const jsonPart = raw.slice(jsonStart);
+    try {
+      const parsed = JSON.parse(jsonPart);
+      structuredJson = parsed;
+      // Walk common error-envelope shapes for the actual human-readable cause.
+      humanMessage = parsed?.error?.message
+                  || parsed?.message
+                  || parsed?.error?.type
+                  || raw;
+    } catch (_) { /* not JSON, keep raw */ }
+  }
+  const prefix = context ? `${context}: ` : "";
+  const isLong = (prefix + humanMessage).length > 110;
+  const hasStructure = !!structuredJson;
+  if (!isLong && !hasStructure) {
+    toast(prefix + humanMessage, 3500, "error");
+    return;
+  }
+  openErrorModal({ context, humanMessage, raw, structuredJson });
+}
+
+function openErrorModal({ context, humanMessage, raw, structuredJson }) {
+  const title = context ? `${context} failed` : "Error";
+  const fullText = structuredJson ? JSON.stringify(structuredJson, null, 2) : raw;
+  openModal(`
+    <div class="modal-head"><h3>${escAttr(title)}</h3></div>
+    <div class="err-modal-message">${escAttr(humanMessage)}</div>
+    <details class="err-modal-details">
+      <summary>Show full error</summary>
+      <pre class="err-modal-raw">${escAttr(fullText)}</pre>
+    </details>
+    <div class="err-modal-actions">
+      <button class="btn btn-sm" data-act="copy-error" data-error-text="${escAttr(fullText)}">Copy error</button>
+      <button class="btn btn-secondary btn-sm" data-act="close-modal">Dismiss</button>
+    </div>
+  `);
+}
+
+async function copyToClipboard(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      toast("Copied");
+    } else {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      toast("Copied");
+    }
+  } catch (e) {
+    toast("Copy failed — select manually", 2400, "error");
+  }
+}
+
 function escAttr(s) {
   return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
@@ -10167,7 +10282,7 @@ async function analyzeFromDiscover(symbol, name) {
   // After view is rendered, trigger the analysis (with sanity check)
   setTimeout(() => {
     runAnalysis(symbol).catch(e => {
-      toast(`Analysis failed: ${(e.message || e).slice(0, 100)}`, 3000, "error");
+      errorToast("Analysis", e);
     });
   }, 300);
 }
@@ -11293,7 +11408,7 @@ async function runAnalysis(symbol) {
       runVerdict(true).catch(() => {});
     } else throw new Error("No analysis returned");
   } catch (e) {
-    toast("Analysis failed: " + (e.message || "unknown error").slice(0, 80), 3000, "error");
+    errorToast("Analysis", e);
     if (btn) { btn.innerHTML = "Try Again"; btn.disabled = false; }
   }
 }
@@ -11540,7 +11655,7 @@ async function runPortfolioAnalysis() {
       renderPortfolio();
     } else throw new Error("No analysis returned");
   } catch (e) {
-    toast("Portfolio analysis failed: " + (e.message || "unknown").slice(0, 80), 3000, "error");
+    errorToast("Portfolio analysis", e);
     if (btn) {
       btn.style.opacity = "1"; btn.style.pointerEvents = "all";
       const lbl = btn.querySelector(".lbl");
@@ -11631,7 +11746,7 @@ async function runVerdict(force = false) {
     localStorage.setItem("portfolioNote_v2", state.portfolioNote);
     localStorage.setItem("verdictsAt_v2", state.verdictsAt);
   } catch (e) {
-    if (force) toast("Verdict refresh failed: " + (e.message || "").slice(0, 80), 3000, "error");
+    if (force) errorToast("Verdict refresh", e);
   } finally {
     state.verdictsLoading = false;
     if (state.currentView === "portfolio") renderPortfolio();
@@ -11786,7 +11901,7 @@ async function runTriggersCheck(force = false) {
     localStorage.setItem("triggersCheckedAt", state.triggersCheckedAt);
   } catch (e) {
     // Soft-fail: keep whatever's in state, don't toast on background runs.
-    if (force) toast("Trigger check failed: " + (e.message || "").slice(0, 80), 3000, "error");
+    if (force) errorToast("Trigger check", e);
   } finally {
     state.triggersLoading = false;
     if (state.currentView === "portfolio") renderPortfolio();
@@ -13767,6 +13882,8 @@ document.addEventListener("click", (e) => {
       case "submit-edit":            submitEditHolding(symbol); break;
       case "delete-holding":         confirmDeleteHolding(symbol); break;
       case "submit-log-trade":       submitLogTrade(target.dataset.symbol); break;
+      case "copy-error":             copyToClipboard(target.dataset.errorText || ""); break;
+      case "close-modal":            closeModal(); break;
       case "delete-trade":           confirmDeleteTrade(target.dataset.tradeId); break;
       case "run-evaluator":          runEvaluatorManual(); break;
       case "toggle-trade-traj":
