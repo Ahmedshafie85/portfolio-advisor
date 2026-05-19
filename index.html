@@ -4311,6 +4311,9 @@ const state = {
   // Phase M — which Watchlist/Opportunity rows have their inline verdict open.
   // Symbol-keyed bool. In-memory only; resets on reload.
   expandedVerdicts: {},
+  // Phase Q — Telegram notifications profile. Hydrated from Firestore on
+  // boot via loadNotifications(). { enabled: bool, telegram_chat_id: string }
+  notifications: null,
   breakoutPromptDismissed: localStorage.getItem("breakoutPromptDismissed") === "1",
   // News (big-opportunity filter) — hydrate from localStorage so opportunities
   // survive iOS tab unloading and page reloads (within TTL window)
@@ -4806,6 +4809,7 @@ async function loadInitialData() {
   await loadWatchlist();
   if (state.watchlist.length === 0) await seedWatchlist();
   await loadTriggers();
+  await loadNotifications();
   await refreshAllPrices();
   renderCurrentView();
   // Background scan after first render
@@ -12705,6 +12709,7 @@ function renderSettings() {
     </div>
     ${renderInvestorProfileSection()}
     ${renderRiskSettings()}
+    ${renderNotificationsSection()}
     <div class="settings-group">
       <div class="section-head" style="padding: 0 4px 8px; display:flex; justify-content:space-between; align-items:baseline;">
         <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Holdings</h3>
@@ -13299,6 +13304,117 @@ function renderRiskSettings() {
       </div>
     </div>
   `;
+}
+
+// ============================================================================
+// Phase Q — Notifications (Telegram alerts via cron)
+// Stored at users/{uid}/profile/notifications:
+//   { enabled: bool, telegram_chat_id: string, updated_at: ISO }
+// The cron worker reads this on each tick to decide whether to message you.
+// ============================================================================
+
+function renderNotificationsSection() {
+  const n = state.notifications || {};
+  const enabled = !!n.enabled;
+  const chatId = n.telegram_chat_id || "";
+  return `
+    <div class="settings-group" id="notificationsSection">
+      <div class="section-head" style="padding: 0 4px 8px;">
+        <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Notifications</h3>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="lbl">Telegram alerts</div>
+          <div class="sub">${enabled ? "On — bull/bear trigger fires push to Telegram." : "Off — no push alerts. The cron still records fires for the app to show later."}</div>
+        </div>
+        <label class="lt-toggle">
+          <input id="notif_enabled" type="checkbox" ${enabled ? "checked" : ""} data-act="notif-toggle" />
+          <span>${enabled ? "On" : "Off"}</span>
+        </label>
+      </div>
+      <div class="setting-row" style="flex-direction:column; align-items:stretch;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+          <div class="lbl">Telegram chat ID</div>
+          <div class="sub" style="font-family:var(--mono);font-size:10.5px;">Your numeric ID from @userinfobot</div>
+        </div>
+        <input id="notif_chat_id" type="text" inputmode="numeric" value="${escAttr(chatId)}" placeholder="e.g. 123456789"
+               style="font-family:var(--mono); padding:8px 10px; border:1px solid var(--rule); border-radius:6px; background:var(--bg); color:var(--ink);" />
+      </div>
+      <div class="setting-row" style="gap: 8px;">
+        <button class="btn btn-sm" data-act="save-notifications">Save</button>
+        <button class="btn btn-secondary btn-sm" data-act="test-notification">Send Test Message</button>
+      </div>
+      <div class="setting-row" style="color:var(--ink-muted);font-size:11px;line-height:1.5;">
+        Setup: message <b>@BotFather</b> on Telegram to create a bot, then <b>@userinfobot</b> to get your chat ID. Make sure to <b>tap Start</b> on your bot first or Telegram won't let it message you.
+      </div>
+    </div>
+  `;
+}
+
+async function loadNotifications() {
+  if (!state.uid) return;
+  try {
+    const snap = await db.collection("users").doc(state.uid).collection("profile").doc("notifications").get();
+    if (snap.exists) {
+      state.notifications = snap.data();
+    } else {
+      state.notifications = { enabled: false, telegram_chat_id: "" };
+    }
+  } catch (e) {
+    console.warn("loadNotifications failed:", e);
+    state.notifications = { enabled: false, telegram_chat_id: "" };
+  }
+}
+
+async function saveNotifications() {
+  if (!state.uid) { toast("Sign in first", 2400, "error"); return; }
+  const enabled = !!$("#notif_enabled")?.checked;
+  const chatId = ($("#notif_chat_id")?.value || "").trim();
+  if (enabled && !chatId) {
+    toast("Enter your Telegram chat ID before enabling", 3000, "error");
+    return;
+  }
+  // Reject obvious garbage — chat IDs are numeric (possibly negative for groups).
+  if (chatId && !/^-?\d+$/.test(chatId)) {
+    toast("Chat ID should be all digits (e.g. 123456789)", 3000, "error");
+    return;
+  }
+  const doc = {
+    enabled,
+    telegram_chat_id: chatId,
+    updated_at: new Date().toISOString(),
+  };
+  try {
+    await db.collection("users").doc(state.uid).collection("profile").doc("notifications").set(doc, { merge: true });
+    state.notifications = doc;
+    toast(enabled ? "Notifications saved — on" : "Notifications saved — off");
+  } catch (e) {
+    errorToast("Save notifications", e);
+  }
+}
+
+async function sendTestNotification() {
+  const chatId = ($("#notif_chat_id")?.value || "").trim();
+  if (!chatId) { toast("Enter your chat ID first", 2400, "error"); return; }
+  if (!/^-?\d+$/.test(chatId)) {
+    toast("Chat ID should be all digits", 3000, "error");
+    return;
+  }
+  toast("Sending test message…");
+  try {
+    const r = await fetch(`${WORKER_URL}/telegram-test`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(j.error || `HTTP ${r.status}`);
+    }
+    toast("Test sent — check your Telegram");
+  } catch (e) {
+    errorToast("Test message", e);
+  }
 }
 
 function saveTargetAlloc() {
@@ -14045,6 +14161,14 @@ document.addEventListener("click", (e) => {
       case "edit-holding":           openEditHolding(symbol); break;
       case "submit-edit":            submitEditHolding(symbol); break;
       case "delete-holding":         confirmDeleteHolding(symbol); break;
+      case "save-notifications":     saveNotifications(); break;
+      case "test-notification":      sendTestNotification(); break;
+      case "notif-toggle": {
+        // Live-update the label text on the toggle without re-rendering.
+        const span = target.parentElement?.querySelector("span");
+        if (span) span.textContent = target.checked ? "On" : "Off";
+        break;
+      }
       case "submit-log-trade":       submitLogTrade(target.dataset.symbol); break;
       case "copy-error":             copyToClipboard(target.dataset.errorText || ""); break;
       case "close-modal":            closeModal(); break;
