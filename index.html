@@ -670,6 +670,35 @@ body {
   margin-top: 4px;
 }
 
+/* ============================================================
+   Phase O — Price-feed anomaly indicators
+   ============================================================ */
+.price-anomaly-banner {
+  margin: 14px 0;
+  padding: 12px 14px;
+  font-family: var(--sans); font-size: 12.5px; line-height: 1.5;
+  color: var(--gold);
+  background: rgba(202, 138, 4, 0.08);
+  border-left: 3px solid var(--gold);
+  border-radius: 8px;
+}
+.vrow-day-anomaly {
+  font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 7px; border-radius: 999px;
+  background: rgba(202, 138, 4, 0.14);
+  color: var(--gold);
+  cursor: help;
+  white-space: nowrap;
+}
+.watch-day-anomaly {
+  font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: right;
+  color: var(--gold);
+  cursor: help;
+}
+
 
 /* Verb-change badge — surfaces "row used to be HOLD, now is ACT". Auto-clears
    30 seconds after the verdict call returns. Subtle row pulse animates once. */
@@ -6651,6 +6680,49 @@ async function markTriggerSeen(triggerId) {
 // ============================================================================
 // METRICS
 // ============================================================================
+
+// Phase O — price-feed sanity check. We've been bitten three times by stale
+// or wrong prev_close values producing impossible day-change percentages
+// (URNU.L cross-currency, PPLT quantity, SWRD stale prev_close). Defense is
+// at the row-render layer: if a symbol's day-change exceeds reasonable
+// per-asset-class bounds, we flag it as a price anomaly rather than trusting
+// the number.
+//
+// Bounds are deliberately loose — these are "obviously wrong" thresholds,
+// not normal-volatility thresholds. A 14% day move on a single stock is
+// extreme but possible; on an index ETF tracking 1,500 names it's not.
+//
+// Returns { anomaly: bool, reason: string|null }
+function priceAnomaly(symbol, assetClass) {
+  const p = state.prices?.[symbol];
+  if (!p || p.current_price == null || p.prev_close == null) {
+    return { anomaly: false, reason: null };
+  }
+  const ratio = p.current_price / p.prev_close;
+  if (!isFinite(ratio) || p.prev_close <= 0) {
+    return { anomaly: true, reason: "Invalid price ratio" };
+  }
+  const movePct = (ratio - 1) * 100;
+  // Per-asset-class thresholds. ETFs should never move >15% in a day under
+  // any normal circumstance. Single stocks can occasionally on earnings/news.
+  // Crypto is bonkers and trades 24/7 — only flag clearly broken feeds.
+  let threshold;
+  switch (assetClass) {
+    case "etf":    threshold = 15; break;
+    case "metal":  threshold = 10; break;
+    case "us_stock": threshold = 30; break;
+    case "crypto": threshold = 40; break;
+    default:       threshold = 25; break;
+  }
+  if (Math.abs(movePct) > threshold) {
+    return {
+      anomaly: true,
+      reason: `Day change ${movePct >= 0 ? "+" : ""}${movePct.toFixed(1)}% exceeds ${threshold}% ${assetClass || "asset"} threshold — likely stale prev_close`,
+    };
+  }
+  return { anomaly: false, reason: null };
+}
+
 function holdingMetrics(h) {
   // Cash is special: h.quantity already IS the USD value. The edit form stores
   // it that way (single "Amount (USD)" field), and the deployment scan reads it
@@ -6687,6 +6759,11 @@ function portfolioMetrics() {
   let totalValue = 0, totalCost = 0;
   let alloc = {};
   let dayChangeAbs = 0;
+  // Phase O — when summing day-change, skip holdings whose price feed shows
+  // an obviously-broken move. The per-row UI surfaces the anomaly separately;
+  // we don't want one bad price feed to throw off the whole portfolio's
+  // "+$X today" number.
+  let anomalyCount = 0;
   for (const h of state.holdings) {
     const m = holdingMetrics(h);
     if (m.value != null) {
@@ -6694,8 +6771,13 @@ function portfolioMetrics() {
       alloc[h.asset_class] = (alloc[h.asset_class] || 0) + m.value;
       const p = state.prices[h.symbol];
       if (p && p.prev_close) {
-        const prevValue = p.prev_close * h.quantity;
-        dayChangeAbs += (m.value - prevValue);
+        const anomaly = priceAnomaly(h.symbol, h.asset_class);
+        if (anomaly.anomaly) {
+          anomalyCount++;
+        } else {
+          const prevValue = p.prev_close * h.quantity;
+          dayChangeAbs += (m.value - prevValue);
+        }
       }
     }
     totalCost += h.avg_cost_total;
@@ -6703,7 +6785,7 @@ function portfolioMetrics() {
   const totalPnL = totalValue - totalCost;
   const totalPnLPct = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
   const dayPct = (totalValue - dayChangeAbs) > 0 ? (dayChangeAbs / (totalValue - dayChangeAbs)) * 100 : 0;
-  return { totalValue, totalCost, totalPnL, totalPnLPct, dayChangeAbs, dayPct, alloc };
+  return { totalValue, totalCost, totalPnL, totalPnLPct, dayChangeAbs, dayPct, alloc, anomalyCount };
 }
 
 // ============================================================================
@@ -9009,6 +9091,10 @@ function renderPortfolio() {
 
     ${emptyStateHtml}
 
+    ${m.anomalyCount > 0 ? `<div class="price-anomaly-banner">
+      ⚠ Price feed anomaly on ${m.anomalyCount} holding${m.anomalyCount === 1 ? '' : 's'} — today's portfolio change excludes them. Look for the ⚠ PRICE flag on affected rows. Verify those prices on your broker.
+    </div>` : ""}
+
     ${renderDrawdownGauge()}
 
     ${renderVerdictZones()}
@@ -9317,9 +9403,15 @@ function renderVerdictRow(r) {
     if (!label) return "";
     return `<span class="vrow-fresh-badge vrow-fresh-${escAttr(f)}" title="Analysis freshness: ${escAttr(f)}">${escAttr(label)}</span>`;
   })();
-  const dayChange = (r.day_change_pct != null && !r.is_cash)
-    ? `<span class="vrow-day ${r.day_change_pct >= 0 ? 'pos' : 'neg'}">${fmtPct(r.day_change_pct)}</span>`
-    : "";
+  // Phase O — if the row's symbol has a broken price feed, replace the
+  // day-change pill with a visible PRICE ANOMALY badge so the user knows
+  // not to trust the number.
+  const anomaly = !r.is_cash ? priceAnomaly(r.symbol, r.asset_class) : { anomaly: false };
+  const dayChange = anomaly.anomaly
+    ? `<span class="vrow-day-anomaly" title="${escAttr(anomaly.reason)}">⚠ PRICE</span>`
+    : (r.day_change_pct != null && !r.is_cash)
+      ? `<span class="vrow-day ${r.day_change_pct >= 0 ? 'pos' : 'neg'}">${fmtPct(r.day_change_pct)}</span>`
+      : "";
   const value = r.value != null
     ? `<span class="vrow-value">$${fmtUSD(r.value, 0)}</span>`
     : "";
@@ -9503,6 +9595,10 @@ function renderWatchlist() {
     const dayClass = (snap?.day_change_pct || 0) >= 0 ? "pos" : "neg";
     const rsiClass = snap?.rsi14 < 35 ? "warn" : snap?.rsi14 > 70 ? "over" : "";
     const trendClass = snap?.trend === "above_200ma" ? "above" : "below";
+    // Phase O — price anomaly check for watchlist rows. Same logic as holdings;
+    // shown as a small badge replacing the day-change number when the feed is
+    // obviously broken.
+    const wAnomaly = priceAnomaly(w.symbol, w.asset_class);
 
     // Suggested entry strip — only when a condition has actually fired
     // AND the symbol isn't already being handled by Today's Verdict / Today's
@@ -9561,7 +9657,9 @@ function renderWatchlist() {
         </div>
         <div>
           <div class="watch-price">${snap?.current_price != null ? '$' + fmtUSD(snap.current_price) : '—'}</div>
-          <div class="watch-day ${dayClass}">${snap?.day_change_pct != null ? fmtPct(snap.day_change_pct) : '—'}</div>
+          ${wAnomaly.anomaly
+            ? `<div class="watch-day-anomaly" title="${escAttr(wAnomaly.reason)}">⚠ PRICE</div>`
+            : `<div class="watch-day ${dayClass}">${snap?.day_change_pct != null ? fmtPct(snap.day_change_pct) : '—'}</div>`}
         </div>
         <div class="watch-stats">
           <span class="watch-stat-rsi ${rsiClass}">RSI ${snap?.rsi14 != null ? snap.rsi14 : '—'}</span>
