@@ -9495,6 +9495,98 @@ function clearDiscoverFilters() {
 // We deliberately show drawdown next to return so risk is visible, and we
 // keep the disclaimer prominent.
 // ============================================================================
+// Restored after the Phase I cleanup: ETF_UNIVERSE feeds both the leaderboard
+// renderer and the Pre-Surge scanner. It used to live inside the Bot subsystem
+// (which we cut) but the leaderboard + scanner are still alive in Discover and
+// in Today's Opportunities scoring.
+const ETF_UNIVERSE = [
+  // US broad market
+  { symbol: "VTI",   name: "Vanguard Total Stock Market",       category: "US Broad" },
+  { symbol: "VOO",   name: "Vanguard S&P 500",                  category: "US Broad" },
+  { symbol: "SPY",   name: "SPDR S&P 500",                      category: "US Broad" },
+  { symbol: "QQQ",   name: "Invesco QQQ (Nasdaq 100)",          category: "US Broad" },
+  { symbol: "IWM",   name: "iShares Russell 2000 (Small Cap)",  category: "US Broad" },
+  { symbol: "DIA",   name: "SPDR Dow Jones",                    category: "US Broad" },
+  // US factor / smart beta
+  { symbol: "MTUM",  name: "iShares MSCI USA Momentum",         category: "Factor" },
+  { symbol: "QUAL",  name: "iShares MSCI USA Quality",          category: "Factor" },
+  { symbol: "VLUE",  name: "iShares MSCI USA Value",            category: "Factor" },
+  { symbol: "SPMO",  name: "Invesco S&P 500 Momentum",          category: "Factor" },
+  { symbol: "SCHD",  name: "Schwab US Dividend Equity",         category: "Dividend" },
+  { symbol: "VYM",   name: "Vanguard High Dividend",            category: "Dividend" },
+  { symbol: "VIG",   name: "Vanguard Dividend Appreciation",    category: "Dividend" },
+  // US sectors
+  { symbol: "XLK",   name: "Technology Select Sector",          category: "US Sector" },
+  { symbol: "XLF",   name: "Financial Select Sector",           category: "US Sector" },
+  { symbol: "XLE",   name: "Energy Select Sector",              category: "US Sector" },
+  { symbol: "XLV",   name: "Health Care Select Sector",         category: "US Sector" },
+  { symbol: "XLY",   name: "Consumer Discretionary",            category: "US Sector" },
+  { symbol: "XLI",   name: "Industrials Select Sector",         category: "US Sector" },
+  { symbol: "XLU",   name: "Utilities Select Sector",           category: "US Sector" },
+  { symbol: "XLP",   name: "Consumer Staples",                  category: "US Sector" },
+  { symbol: "XLB",   name: "Materials Select Sector",           category: "US Sector" },
+  { symbol: "XLRE",  name: "Real Estate Select Sector",         category: "US Sector" },
+  { symbol: "XLC",   name: "Communication Services",            category: "US Sector" },
+  // Thematic
+  { symbol: "SMH",   name: "VanEck Semiconductors",             category: "Thematic" },
+  { symbol: "SOXX",  name: "iShares Semiconductor",             category: "Thematic" },
+  { symbol: "BOTZ",  name: "Global X Robotics & AI",            category: "Thematic" },
+  { symbol: "AIQ",   name: "Global X AI & Tech",                category: "Thematic" },
+  { symbol: "CIBR",  name: "First Trust Cybersecurity",         category: "Thematic" },
+  { symbol: "URA",   name: "Global X Uranium",                  category: "Thematic" },
+  { symbol: "ICLN",  name: "iShares Global Clean Energy",       category: "Thematic" },
+  { symbol: "TAN",   name: "Invesco Solar",                     category: "Thematic" },
+  { symbol: "ITA",   name: "iShares US Aerospace & Defense",    category: "Thematic" },
+  { symbol: "JETS",  name: "US Global Jets (Airlines)",         category: "Thematic" },
+  { symbol: "ARKK",  name: "ARK Innovation",                    category: "Thematic" },
+  // International
+  { symbol: "VEA",   name: "Vanguard FTSE Developed Markets",   category: "International" },
+  { symbol: "EFA",   name: "iShares MSCI EAFE",                 category: "International" },
+  { symbol: "VXUS",  name: "Vanguard Total Intl Stock",         category: "International" },
+  { symbol: "IEFA",  name: "iShares Core MSCI EAFE",            category: "International" },
+  { symbol: "EWJ",   name: "iShares MSCI Japan",                category: "International" },
+  { symbol: "EWG",   name: "iShares MSCI Germany",              category: "International" },
+  { symbol: "EWU",   name: "iShares MSCI United Kingdom",       category: "International" },
+  { symbol: "INDA",  name: "iShares MSCI India",                category: "International" },
+  { symbol: "MCHI",  name: "iShares MSCI China",                category: "International" },
+  // Europe (US-listed broad/sector)
+  { symbol: "VGK",   name: "Vanguard FTSE Europe",              category: "Europe" },
+  { symbol: "IEUR",  name: "iShares Core MSCI Europe",          category: "Europe" },
+  { symbol: "EZU",   name: "iShares MSCI Eurozone",             category: "Europe" },
+  { symbol: "FEZ",   name: "SPDR Euro Stoxx 50",                category: "Europe" },
+  { symbol: "HEDJ",  name: "WisdomTree Europe Hedged Equity",   category: "Europe" },
+  { symbol: "FEU",   name: "SPDR Stoxx Europe 50",              category: "Europe" },
+  { symbol: "EWP",   name: "iShares MSCI Spain",                category: "Europe" },
+  { symbol: "EWQ",   name: "iShares MSCI France",               category: "Europe" },
+  { symbol: "EWI",   name: "iShares MSCI Italy",                category: "Europe" },
+  { symbol: "EWL",   name: "iShares MSCI Switzerland",          category: "Europe" },
+  { symbol: "EWN",   name: "iShares MSCI Netherlands",          category: "Europe" },
+  { symbol: "EWD",   name: "iShares MSCI Sweden",               category: "Europe" },
+  { symbol: "DAX",   name: "Global X DAX Germany",              category: "Europe" },
+  { symbol: "EUFN",  name: "iShares MSCI Europe Financials",    category: "Europe" },
+  // Emerging markets
+  { symbol: "VWO",   name: "Vanguard FTSE Emerging Markets",    category: "EM" },
+  { symbol: "EEM",   name: "iShares MSCI Emerging Markets",     category: "EM" },
+  { symbol: "ARGT",  name: "Global X Argentina",                category: "EM" },
+  { symbol: "EWZ",   name: "iShares MSCI Brazil",               category: "EM" },
+  // Bonds
+  { symbol: "AGG",   name: "iShares Core US Aggregate Bond",    category: "Bond" },
+  { symbol: "BND",   name: "Vanguard Total Bond Market",        category: "Bond" },
+  { symbol: "TLT",   name: "iShares 20+ Year Treasury",         category: "Bond" },
+  { symbol: "IEF",   name: "iShares 7-10 Year Treasury",        category: "Bond" },
+  { symbol: "HYG",   name: "iShares iBoxx High Yield",          category: "Bond" },
+  { symbol: "TIP",   name: "iShares TIPS",                      category: "Bond" },
+  // Commodities / precious metals
+  { symbol: "GLD",   name: "SPDR Gold Trust",                   category: "Commodities" },
+  { symbol: "SLV",   name: "iShares Silver Trust",              category: "Commodities" },
+  { symbol: "GDX",   name: "VanEck Gold Miners",                category: "Commodities" },
+  { symbol: "USO",   name: "United States Oil Fund",            category: "Commodities" },
+  { symbol: "DBC",   name: "Invesco DB Commodity Index",        category: "Commodities" },
+  // Crypto-linked (proxy via ETFs)
+  { symbol: "IBIT",  name: "iShares Bitcoin Trust",             category: "Crypto-linked" },
+  { symbol: "BITO",  name: "ProShares Bitcoin Strategy",        category: "Crypto-linked" },
+];
+
 const LEADERBOARD_CACHE_MS = 1000 * 60 * 30; // 30-minute soft refresh
 
 async function fetchEtfLeaderboard(forceRefresh) {
