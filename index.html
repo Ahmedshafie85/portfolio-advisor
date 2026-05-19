@@ -699,6 +699,40 @@ body {
   cursor: help;
 }
 
+/* ============================================================
+   Phase P — Holdings management list in Settings
+   ============================================================ */
+.holdings-list-settings {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.holding-row-settings {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule-soft);
+  border-radius: 8px;
+}
+.holding-row-main { flex: 1; min-width: 0; }
+.holding-row-head {
+  display: flex; align-items: baseline; gap: 10px;
+}
+.holding-row-sym {
+  font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--ink);
+}
+.holding-row-cls {
+  font-family: var(--sans); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted);
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--bg-elev);
+}
+.holding-row-meta {
+  font-family: var(--sans); font-size: 11.5px; color: var(--ink-soft);
+  margin-top: 3px; line-height: 1.4;
+}
+.holding-row-actions {
+  display: flex; gap: 4px; flex-shrink: 0;
+}
+
 
 /* Verb-change badge — surfaces "row used to be HOLD, now is ACT". Auto-clears
    30 seconds after the verdict call returns. Subtle row pulse animates once. */
@@ -12671,6 +12705,38 @@ function renderSettings() {
     </div>
     ${renderInvestorProfileSection()}
     ${renderRiskSettings()}
+    <div class="settings-group">
+      <div class="section-head" style="padding: 0 4px 8px; display:flex; justify-content:space-between; align-items:baseline;">
+        <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Holdings</h3>
+        <button class="btn-ghost-sm" data-act="add-holding">+ Add</button>
+      </div>
+      <div class="holdings-list-settings">
+        ${state.holdings.length === 0
+          ? `<div class="setting-row" style="color:var(--ink-muted);font-size:12px;">No holdings yet. Tap "+ Add" to enter your first position.</div>`
+          : state.holdings.map(h => {
+              const m = holdingMetrics(h);
+              const isCash = h.asset_class === "cash";
+              const valStr = m.value != null ? `$${fmtUSD(m.value, 0)}` : "—";
+              const qtyStr = isCash
+                ? `$${fmtUSD(h.quantity, 2)} cash`
+                : `${fmtNum(h.quantity, 4)} @ ${m.current_price != null ? '$' + fmtUSD(m.current_price, 2) : "—"}`;
+              return `
+                <div class="holding-row-settings">
+                  <div class="holding-row-main">
+                    <div class="holding-row-head">
+                      <span class="holding-row-sym">${escAttr(h.symbol)}</span>
+                      <span class="holding-row-cls">${escAttr(ALLOC_LABELS[h.asset_class] || h.asset_class)}</span>
+                    </div>
+                    <div class="holding-row-meta">${escAttr(qtyStr)} · ${escAttr(valStr)}</div>
+                  </div>
+                  <div class="holding-row-actions">
+                    <button class="btn-ghost-sm" data-act="edit-holding" data-symbol="${escAttr(h.symbol)}">Edit</button>
+                    <button class="btn-ghost-sm" data-act="delete-holding" data-symbol="${escAttr(h.symbol)}" style="color:var(--red);">×</button>
+                  </div>
+                </div>`;
+            }).join("")}
+      </div>
+    </div>
     <div class="settings-group" id="tradeLogSection">
       <div class="section-head" style="padding: 0 4px 8px; display:flex; justify-content:space-between; align-items:baseline;">
         <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Trade Log</h3>
