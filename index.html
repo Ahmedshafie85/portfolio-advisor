@@ -9499,6 +9499,74 @@ function clearDiscoverFilters() {
 // renderer and the Pre-Surge scanner. It used to live inside the Bot subsystem
 // (which we cut) but the leaderboard + scanner are still alive in Discover and
 // in Today's Opportunities scoring.
+// Restored after Phase I cleanup: CURATED_PICKS feeds the Discover Ideas
+// surface inside the Watchlist tab. Same data as before the cleanup.
+const CURATED_PICKS = [
+  // === HIGH-CONVICTION INDIVIDUAL STOCKS ===
+  { symbol: "BN",    name: "Brookfield Corp",         theme: "AI Infrastructure",                source: "Motley Fool",     date: "Jan 2026", thesis: "AI infrastructure fund (up to $100B AUM target), wealth solutions growth, real estate recovery. 25% est. annual earnings growth over 5 years." },
+  { symbol: "META",  name: "Meta Platforms",          theme: "AI Applications",                  source: "Motley Fool",     date: "Jan 2026", thesis: "Personal AI superintelligence vision, billions of daily AI chatbot users, growing AI glasses demand. Reinvesting heavily in moat." },
+  { symbol: "NEE",   name: "NextEra Energy",          theme: "AI Power Demand",                  source: "Motley Fool",     date: "Jan 2026", thesis: "Partner of choice for AI data center power deals (Meta, Google). Clean energy + grid build-out beneficiary." },
+  { symbol: "KMI",   name: "Kinder Morgan",           theme: "Natural Gas for AI",               source: "Motley Fool",     date: "Jan 2026", thesis: "$20B+ in gas infra capex, 28 bcf/day gas demand growth by 2030 (~25%). 4%+ dividend with growth runway." },
+  { symbol: "AMZN",  name: "Amazon",                  theme: "AI Cloud + AWS",                   source: "RBC Capital",     date: "Jan 2026", thesis: "Best-in-class AWS AI ROIC, compelling product/capacity acceleration cycle. AWS growth expected to accelerate." },
+  { symbol: "MSFT",  name: "Microsoft",               theme: "Large-cap Software/AI",            source: "Morgan Stanley",  date: "Jan 2026", thesis: "Robust mid-teens top-line growth, room for margin expansion. $650 PT. Top pick in large-cap software." },
+  { symbol: "MU",    name: "Micron",                  theme: "Semiconductors",                   source: "TipRanks/RBC",    date: "Jan 2026", thesis: "DRAM + NAND bit shipments +20% in 2026 from AI demand. Stock trades at <6x next-12mo EPS." },
+  { symbol: "MRK",   name: "Merck",                   theme: "Healthcare Value",                 source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Attractive valuation + clinical catalysts. Safe haven from expensive tech multiples." },
+  { symbol: "VRTX",  name: "Vertex Pharma",           theme: "Healthcare Value",                 source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Attractive valuation, clinical catalysts. Defensive healthcare with growth visibility." },
+  { symbol: "CEG",   name: "Constellation Energy",    theme: "Nuclear Power for AI",             source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Pure-play nuclear utility, AI data-center power contracts. Multi-decade visibility from hyperscaler deals." },
+  { symbol: "BA",    name: "Boeing",                  theme: "Industrial Recovery",              source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Production stability catalyst, recovery from 2024-25 issues. Balanced barbell to high-growth tech." },
+  { symbol: "SPOT",  name: "Spotify",                 theme: "Quality Growth",                   source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Audio platform monetization curve, pricing power, healthy free cash flow trajectory." },
+  { symbol: "DG",    name: "Dollar General",          theme: "K-shaped Consumer",                source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Higher-than-expected tax refund cycle as tailwind for lower-income shoppers." },
+  { symbol: "NKE",   name: "Nike",                    theme: "Recovery Story",                   source: "BTIG",            date: "Jan 2026", thesis: "$100 PT (~57% upside from Dec 2025). Product pipeline, 2026 World Cup catalyst, insider buying." },
+  { symbol: "XYZ",   name: "Block (Square)",          theme: "Fintech Growth",                   source: "BTIG",            date: "Jan 2026", thesis: "$90 PT (~38% upside). Most compelling large-cap fintech, profitable mid-teens growth Cash App + Square." },
+  { symbol: "LVMUY", name: "LVMH (ADR)",              theme: "International / Europe",           source: "Kiplinger",       date: "Dec 2025", thesis: "French luxury conglomerate, 75 elite brands (Dior, Tiffany, Dom Perignon). International rotation play." },
+  { symbol: "ROP",   name: "Roper Technologies",      theme: "Niche Software",                   source: "Truist/Kiplinger",date: "Dec 2025", thesis: "Diversified niche software (education, transport, healthcare). Off March highs — re-entry zone." },
+
+  // === ETFs: AI / TECH / SEMIS ===
+  { symbol: "SMH",   name: "VanEck Semiconductors",       theme: "Semiconductors",               source: "WalletInvestor",  date: "Feb 2026", thesis: "Premier semi vehicle. TSMC + chip designers as 'picks and shovels' of AI revolution." },
+  { symbol: "BAI",   name: "BlackRock AI ETF",            theme: "AI Infrastructure",            source: "etf.com",         date: "Feb 2026", thesis: "Largest thematic ETF ($13.7B AUM), 38% 3-month return. Actively managed AI infra exposure." },
+  { symbol: "CHAT",  name: "Roundhill Generative AI",     theme: "AI Applications",              source: "Roundhill",       date: "Feb 2026", thesis: "Actively managed, proprietary AI exposure scoring. 0.75% ER. Targeted gen-AI play." },
+  { symbol: "BOTZ",  name: "Global X Robotics & AI",      theme: "AI Applications",              source: "Investing.com",   date: "Feb 2026", thesis: "40+ robotics/AI innovators (NVDA, ABB, Intuitive Surgical). $2.5B+ AUM, broad robotics exposure." },
+  { symbol: "AIQ",   name: "Global X AI & Tech",          theme: "AI Applications",              source: "etf.com",         date: "Feb 2026", thesis: "Developed-markets AI exposure across applications, hardware, services. 20.5% 3-mo return." },
+  { symbol: "IGM",   name: "iShares Expanded Tech",       theme: "Broad Tech",                   source: "etf.com",         date: "Feb 2026", thesis: "Cost-effective ($9.71B AUM, 0.39% ER) diversified NA tech beyond S&P 500 tech." },
+  { symbol: "CIBR",  name: "First Trust Cybersec",        theme: "Cybersecurity",                source: "etf.com",         date: "Feb 2026", thesis: "$11B+ AUM cyber leader. CrowdStrike, Broadcom holdings. Beneficiary of AI-driven threat landscape." },
+
+  // === ETFs: ENERGY / NUCLEAR / GRID ===
+  { symbol: "URA",   name: "Global X Uranium",            theme: "Nuclear Power for AI",         source: "Global X",        date: "Feb 2026", thesis: "Dominant nuclear ETF as corporates pivot to clean firm power. 6+ GW corporate clean firm announcements in 2025." },
+  { symbol: "SMRF",  name: "VettaFi Small Modular Reactor", theme: "Nuclear Power for AI",       source: "ALPS",            date: "Feb 2026", thesis: "Pure-play on SMR + uranium cycle. Top holdings: Oklo, Energy Fuels, NexGen. Heavy nuclear-cycle weight." },
+  { symbol: "XLU",   name: "Utilities Sector SPDR",       theme: "AI Power Demand",              source: "WalletInvestor",  date: "Feb 2026", thesis: "Defensive growth + AI power play. Multi-year up-cycle from data center electricity demand." },
+  { symbol: "GRID",  name: "First Trust Grid Infra",      theme: "Electrification",              source: "etf.com",         date: "Feb 2026", thesis: "16.8% quarterly return. Grid modernization for AI data centers + electrification transition." },
+  { symbol: "ELFY",  name: "ALPS Electrification Infra",  theme: "Electrification",              source: "ALPS",            date: "Feb 2026", thesis: "27.3% YTD return. 18 electrification sub-industries building/upgrading power grid across sectors." },
+  { symbol: "ACES",  name: "ALPS Clean Energy",           theme: "Clean Energy",                 source: "ALPS",            date: "Feb 2026", thesis: "12.3% YTD return. Pure-play renewables for AI + electrification. Plug Power, First Solar holdings." },
+  { symbol: "XLE",   name: "Energy Sector SPDR",          theme: "Energy",                       source: "Bankrate",        date: "Feb 2026", thesis: "Outperformed early 2026 due to geopolitical tensions. Broad energy sector hedge against tech concentration." },
+
+  // === ETFs: PRECIOUS METALS / COMMODITIES (NEW — addresses silver miss) ===
+  { symbol: "GLD",   name: "SPDR Gold Trust",             theme: "Precious Metals",              source: "Motley Fool",     date: "May 2026", thesis: "Largest gold ETF ($154B AUM). Most liquid gold proxy. Central bank demand strong; de-dollarization tailwind." },
+  { symbol: "SLV",   name: "iShares Silver Trust",        theme: "Precious Metals",              source: "USNews",          date: "Feb 2026", thesis: "Physical silver. Industrial demand from solar/electrification (~55% of consumption) + safe-haven flows. Highly volatile." },
+  { symbol: "SIL",   name: "Global X Silver Miners",      theme: "Precious Metals",              source: "USNews",          date: "Apr 2026", thesis: "Leveraged play on silver: miners benefit from fixed costs when prices rise. $5.7B AUM, 38 holdings, materials sector." },
+  { symbol: "SLVR",  name: "Sprott Silver Miners + PSLV", theme: "Precious Metals",              source: "USNews",          date: "Apr 2026", thesis: "Silver miners + direct physical silver allocation via PSLV in one ETF. Sprott commodities expertise." },
+  { symbol: "GDX",   name: "VanEck Gold Miners",          theme: "Precious Metals",              source: "Motley Fool",     date: "May 2026", thesis: "Gold miners outperformed bullion in 2026 (15% vs 6% bullion YTD). Operational leverage to rising gold prices." },
+  { symbol: "GDXJ",  name: "VanEck Junior Gold Miners",   theme: "Precious Metals",              source: "Motley Fool",     date: "May 2026", thesis: "$8.5B AUM, 120 smaller miners. Higher beta to gold price than majors. Reasonable 0.52% ER." },
+  { symbol: "PPLT",  name: "abrdn Physical Platinum",     theme: "Precious Metals",              source: "Motley Fool",     date: "May 2026", thesis: "Direct platinum exposure. Lower correlation with gold/silver — diversifies precious metals basket." },
+  { symbol: "GUNR",  name: "FlexShares Global Resources", theme: "Commodities",                  source: "etf.com",         date: "Feb 2026", thesis: "Diversified natural resources (energy, metals, ag, timber). Inflation hedge + infrastructure demand." },
+
+  // === ETFs: DIVIDEND / DEFENSIVE (NEW) ===
+  { symbol: "SCHD",  name: "Schwab US Dividend Equity",   theme: "Dividend / Defensive",         source: "Morningstar",     date: "May 2026", thesis: "Top-rated dividend ETF. Quality dividend payers with low fees. Defensive in tech selloffs, steady income." },
+  { symbol: "VYM",   name: "Vanguard High Dividend",      theme: "Dividend / Defensive",         source: "WalletInvestor",  date: "Feb 2026", thesis: "Cushion in current expensive S&P. Lower relative valuations + 3%+ yield. Value rotation beneficiary." },
+  { symbol: "TDVG",  name: "T. Rowe Price Dividend Growth", theme: "Dividend / Defensive",       source: "Morningstar",     date: "Mar 2026", thesis: "Top-rated dividend-growth ETF. Financially healthy companies that consistently raise dividends." },
+  { symbol: "VIG",   name: "Vanguard Dividend Appreciation", theme: "Dividend / Defensive",      source: "Bankrate",        date: "Nov 2025", thesis: "Dividend growth focus — companies with 10+ years of consecutive increases. Low ER, large-cap quality bias." },
+
+  // === ETFs: DEFENSE (NEW) ===
+  { symbol: "ITA",   name: "iShares US Aerospace & Defense", theme: "Defense",                   source: "USNews",          date: "Feb 2026", thesis: "Geopolitical conflict tailwind. Defense ETF exposure to reliable + emerging leaders in conflict-driven spend." },
+  { symbol: "SHLD",  name: "Global X Defense Tech",       theme: "Defense",                      source: "Global X",        date: "Jan 2026", thesis: "Modern defense tech exposure — drones, cyber, autonomous systems. Different angle vs traditional ITA primes." },
+
+  // === ETFs: INTERNATIONAL ROTATION (NEW) ===
+  { symbol: "ARGT",  name: "Global X Argentina",          theme: "Emerging Markets",             source: "Kiplinger",       date: "Dec 2025", thesis: "Diversified play on Milei's reforms post-midterm victory. Riskier but contrarian EM exposure." },
+  { symbol: "VEA",   name: "Vanguard FTSE Developed Markets", theme: "International / Europe",  source: "WalletInvestor",  date: "Feb 2026", thesis: "Japan/Eurozone earnings gap with US has narrowed — rotation candidate. Cheap valuations + currency diversification." },
+  { symbol: "EFA",   name: "iShares MSCI EAFE",           theme: "International / Europe",       source: "WalletInvestor",  date: "Feb 2026", thesis: "Broad developed ex-US. Trades at large valuation discount to S&P 500. Stimulus + reform stories." },
+  { symbol: "EWJ",   name: "iShares MSCI Japan",          theme: "International / Europe",       source: "WalletInvestor",  date: "Feb 2026", thesis: "Japan corporate reform, yen weakness benefiting exporters. Cheap relative to historical multiples." },
+  { symbol: "EEM",   name: "iShares MSCI Emerging Markets", theme: "Emerging Markets",           source: "USNews",          date: "Feb 2026", thesis: "Stretched US valuations driving capital into EM ETFs. Broad EM exposure (India, Brazil, EM-Asia)." },
+];
+
 const ETF_UNIVERSE = [
   // US broad market
   { symbol: "VTI",   name: "Vanguard Total Stock Market",       category: "US Broad" },
