@@ -6741,21 +6741,27 @@ function priceAnomaly(symbol, assetClass) {
     return { anomaly: true, reason: "Invalid price ratio" };
   }
   const movePct = (ratio - 1) * 100;
-  // Per-asset-class thresholds. ETFs should never move >15% in a day under
-  // any normal circumstance. Single stocks can occasionally on earnings/news.
-  // Crypto is bonkers and trades 24/7 — only flag clearly broken feeds.
+  // Thresholds raised (Phase Q follow-up): the earlier tighter bands were
+  // catching false positives where prev_close was merely stale by a session
+  // or two — producing a phantom 15-25% "move" even though the current price
+  // was perfectly fine. That eroded trust in the flag.
+  //
+  // These thresholds now only catch CATASTROPHIC feed errors: the URNU.L
+  // cross-currency artifact (GBp vs GBP, ~100x) and PPLT-style 10x shifts.
+  // A merely-large daily move passes through — better to occasionally trust
+  // a real big move than to constantly false-flag a stale prev_close.
   let threshold;
   switch (assetClass) {
-    case "etf":    threshold = 15; break;
-    case "metal":  threshold = 10; break;
-    case "us_stock": threshold = 30; break;
-    case "crypto": threshold = 40; break;
-    default:       threshold = 25; break;
+    case "etf":      threshold = 40; break;
+    case "metal":    threshold = 35; break;
+    case "us_stock": threshold = 50; break;
+    case "crypto":   threshold = 60; break;
+    default:         threshold = 50; break;
   }
   if (Math.abs(movePct) > threshold) {
     return {
       anomaly: true,
-      reason: `Day change ${movePct >= 0 ? "+" : ""}${movePct.toFixed(1)}% exceeds ${threshold}% ${assetClass || "asset"} threshold — likely stale prev_close`,
+      reason: `Day change ${movePct >= 0 ? "+" : ""}${movePct.toFixed(1)}% exceeds ${threshold}% ${assetClass || "asset"} threshold — likely a broken price feed`,
     };
   }
   return { anomaly: false, reason: null };
@@ -12164,7 +12170,27 @@ const TRADE_DIRECTIONS = [
 
 // Infer the most likely direction from a verdict's action_line.
 // Best-effort — user can always change in the modal.
+// Infer the most likely trade direction from a verdict.
+//
+// Priority order:
+//   1. The fired trigger's direction. A fired BULL trigger means the verdict
+//      is telling you to add/buy; a fired BEAR trigger means trim/exit. This
+//      is the structured signal and it's authoritative — it should never be
+//      overridden by fuzzy text matching.
+//   2. Explicit verbs in the action_line text (exit/trim/sell/add/buy/open).
+//   3. A NEUTRAL fallback. Critically: an ambiguous verdict on a held
+//      position must NOT default to "trim" — defaulting an unclear signal to
+//      a sell is the most dangerous wrong guess. For held positions with no
+//      directional signal we default to "add" (the verdict surfaced as ACT
+//      for a reason, and add is the non-destructive choice); for non-held we
+//      default to "buy". The user can always change it in the modal.
 function inferDirectionFromVerdict(verdict, isHeld) {
+  // 1. Structured signal — fired trigger direction wins outright.
+  const firedDir = verdict?.fired_trigger?.direction;
+  if (firedDir === "bull") return isHeld ? "add" : "buy";
+  if (firedDir === "bear") return isHeld ? "trim" : "sell";
+
+  // 2. Explicit verbs in the action line.
   const text = String(verdict?.action_line || "").toLowerCase();
   if (text.includes("exit"))    return "exit";
   if (text.includes("trim"))    return "trim";
@@ -12172,7 +12198,15 @@ function inferDirectionFromVerdict(verdict, isHeld) {
   if (text.includes("add"))     return isHeld ? "add" : "buy";
   if (text.includes("open"))    return "buy";
   if (text.includes("buy"))     return "buy";
-  return isHeld ? "trim" : "buy"; // weak default
+
+  // 3. Also scan for bull/bear language as a weaker text signal — covers
+  // action lines like "Bull trigger fired ... Alert set" that carry no
+  // explicit add/buy verb.
+  if (text.includes("bull trigger")) return isHeld ? "add" : "buy";
+  if (text.includes("bear trigger")) return isHeld ? "trim" : "sell";
+
+  // 4. Neutral fallback — never sell-bias an ambiguous held verdict.
+  return isHeld ? "add" : "buy";
 }
 
 // Build a trade ID — date-prefixed so trade lists sort chronologically by id
