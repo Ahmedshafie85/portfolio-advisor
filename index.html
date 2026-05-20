@@ -596,6 +596,71 @@ body {
   font-family: var(--sans); font-size: 11.5px; color: var(--ink); line-height: 1.5;
 }
 
+/* ============================================================
+   Phase R — Paper Performance panel
+   ============================================================ */
+.pp-headline {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 10px;
+}
+.pp-headline-main { display: flex; flex-direction: column; gap: 2px; }
+.pp-exp {
+  font-family: var(--display); font-size: 34px; font-weight: 600;
+  letter-spacing: -0.02em; line-height: 1;
+}
+.pp-exp.pp-pos { color: var(--green); }
+.pp-exp.pp-neg { color: var(--red); }
+.pp-exp-label {
+  font-family: var(--sans); font-size: 10.5px; color: var(--ink-muted);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.pp-headline-side { display: flex; gap: 16px; }
+.pp-stat { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.pp-stat-v { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--ink); }
+.pp-stat-l { font-family: var(--sans); font-size: 9.5px; color: var(--ink-muted); letter-spacing: 0.03em; text-transform: uppercase; }
+.pp-breakdown {
+  background: var(--bg-card);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.pp-bd-row {
+  display: grid; grid-template-columns: auto 1fr auto 1fr;
+  align-items: baseline; gap: 8px;
+  margin-bottom: 10px;
+}
+.pp-bd-label {
+  font-family: var(--sans); font-size: 10.5px; color: var(--ink-muted);
+  letter-spacing: 0.03em; text-transform: uppercase;
+}
+.pp-bd-val { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+.pp-bd-val.pp-pos { color: var(--green); }
+.pp-bd-val.pp-neg { color: var(--red); }
+.pp-bd-exits { display: flex; flex-wrap: wrap; gap: 6px; }
+.pp-exit-chip {
+  font-family: var(--sans); font-size: 10.5px; font-weight: 500;
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--bg-elev); color: var(--ink-soft);
+}
+.pp-exit-chip.pp-exit-target { background: rgba(22,163,74,0.12); color: var(--green); }
+.pp-exit-chip.pp-exit-stop   { background: rgba(220,38,38,0.12); color: var(--red); }
+.pp-exit-chip.pp-exit-timeout{ background: rgba(202,138,4,0.12); color: var(--gold); }
+.pp-exit-chip.pp-exit-open   { background: var(--bg-elev); color: var(--ink-muted); }
+.pp-block { margin-top: 14px; }
+.pp-block-label {
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-muted);
+  margin-bottom: 6px; padding-left: 2px;
+}
+.pp-pos { color: var(--green); }
+.pp-neg { color: var(--red); }
+
 /* Track Record split: paper vs real side-by-side rows */
 .tr-overall-split {
   background: var(--bg-card);
@@ -4818,16 +4883,16 @@ async function loadInitialData() {
   setTimeout(() => runTriggersCheck(false).catch(() => {}), 3500);
   // Phase C — unified verdict on first load. Debounced to 4h.
   setTimeout(() => runVerdict(false).catch(() => {}), 4500);
-  // Phase H3 — trade-outcome evaluator on first load. Cooldown 6h via
-  // localStorage so it doesn't re-run on every refresh. Walks all trades
-  // older than 7 days and writes one evaluation row per due trade.
+  // Phase R — paper-trade exit simulation on first load. Cooldown 6h via
+  // localStorage. Replays every open paper trade against its symbol's daily
+  // OHLC history and closes any that hit target/stop/timeout.
   setTimeout(() => {
-    runEvaluator().then(r => {
-      if (r.evaluated > 0) {
-        toast(`Evaluated ${r.evaluated} trade${r.evaluated === 1 ? "" : "s"}${r.finalized ? `, ${r.finalized} finalized` : ""}`);
+    runPaperSimulation().then(r => {
+      if (r.closed > 0) {
+        toast(`${r.closed} paper trade${r.closed === 1 ? "" : "s"} closed by simulation`);
         if (state.currentView === "settings") {
           populateTradeLogList();
-          populateTrackRecord();
+          populatePaperPerformance();
         }
       }
     }).catch(() => {});
@@ -12319,6 +12384,67 @@ const EVAL_LAST_RUN_KEY = "evaluatorLastRun";
 // boot fires repeatedly. Manual button in Settings always bypasses cooldown.
 const EVAL_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
+// ============================================================================
+// PHASE R — PAPER TRADE EXIT SIMULATION
+// ============================================================================
+//
+// Replaces the flawed H3 weekly-grading evaluator. The old evaluator graded
+// open positions weekly and never closed them, so "success" was undefined and
+// outcomes drifted with price. It did not actually test the app's verdict
+// logic.
+//
+// This engine treats each paper trade as a real trade with a mechanical exit
+// plan derived from the three numbers the verdict produced:
+//   - entry  = trade.price (price when logged)
+//   - target = analysis_snapshot.action_price_zone (take-profit)
+//   - stop   = analysis_snapshot.action_invalidation (stop-loss)
+//   - deadline = analysis_snapshot.action_timeframe (timeframe expiry)
+//
+// The simulation replays the price path day-by-day since entry. Whichever
+// level is touched FIRST closes the trade at that level. If neither is hit by
+// the timeframe deadline, the trade closes at market on the deadline date.
+// Result: a real round trip with entry, exit, P&L%, hold days, exit reason.
+//
+// Lifecycle:  open  ->  closed_target | closed_stop | closed_timeout
+//
+// Accuracy: we replay daily OHLC (high/low) so first-touch is determined
+// correctly even when target and stop are both crossed in the same week.
+// ============================================================================
+
+const PAPER_SIM_LAST_RUN_KEY = "paperSimLastRun";
+const PAPER_SIM_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+// Fallback deadline if the verdict's timeframe can't be parsed. The app's
+// verdicts typically say "review in 2-3 weeks" — 30 days is a safe cap.
+const PAPER_SIM_DEFAULT_DEADLINE_DAYS = 30;
+
+// Parse a timeframe string into a number of days. The verdict writes these as
+// free text: "Review in 3 weeks", "Monitor daily for next 10-14 days",
+// "Reassess within 2 weeks". We extract the LARGEST day-count mentioned (the
+// outer bound of the window) so we don't close a trade prematurely.
+function parseTimeframeDays(tfStr) {
+  if (!tfStr) return PAPER_SIM_DEFAULT_DEADLINE_DAYS;
+  const s = String(tfStr).toLowerCase();
+  let maxDays = 0;
+  // "N-M weeks" or "N weeks"
+  const weekMatches = s.matchAll(/(\d+)(?:\s*[-–]\s*(\d+))?\s*week/g);
+  for (const m of weekMatches) {
+    const hi = m[2] ? parseInt(m[2]) : parseInt(m[1]);
+    maxDays = Math.max(maxDays, hi * 7);
+  }
+  // "N-M days" or "N days"
+  const dayMatches = s.matchAll(/(\d+)(?:\s*[-–]\s*(\d+))?\s*day/g);
+  for (const m of dayMatches) {
+    const hi = m[2] ? parseInt(m[2]) : parseInt(m[1]);
+    maxDays = Math.max(maxDays, hi);
+  }
+  // "N month(s)"
+  const monthMatches = s.matchAll(/(\d+)\s*month/g);
+  for (const m of monthMatches) {
+    maxDays = Math.max(maxDays, parseInt(m[1]) * 30);
+  }
+  return maxDays > 0 ? maxDays : PAPER_SIM_DEFAULT_DEADLINE_DAYS;
+}
+
 // Parse a price zone string into {lo, hi} bounds. Same loose grammar as the
 // existing priceInZone — but returns the numeric bounds so we can compute
 // "target progress" not just in/out.
@@ -12352,178 +12478,152 @@ function parsePriceZone(zoneStr) {
 
 // Parse an invalidation string into a directional level + comparator.
 // Returns {level: number, breach_if: "below"|"above"} or null.
-// Examples: "Below £87.40" → {level: 87.40, breach_if: "below"}
-// Examples: "Close below 200MA" → null (we can't evaluate non-price levels)
 function parseInvalidation(invStr) {
   if (!invStr) return null;
   const s = String(invStr).replace(/[$£€,]/g, "").toLowerCase();
-  // "below X" or "<X"
   const below = s.match(/(?:below|under|<)\s*(\d+(?:\.\d+)?)/);
   if (below) return { level: parseFloat(below[1]), breach_if: "below" };
-  // "above X" or ">X"
   const above = s.match(/(?:above|over|>)\s*(\d+(?:\.\d+)?)/);
   if (above) return { level: parseFloat(above[1]), breach_if: "above" };
   return null;
 }
 
-// The classification engine. Pure function. Given a trade + current price,
-// produces one evaluation row. Doesn't mutate state, doesn't write to Firestore.
-function evaluateTrade(trade, currentPrice) {
-  const decisionPrice = trade.price;
+// Resolve a single take-profit level from the snapshotted price zone, given
+// trade direction. For a bullish trade the target is the *low edge* of the
+// zone (first touch into the zone = target reached). For a bearish trade
+// (trim/exit), the "target" is the zone too but interpreted as price falling
+// to it — we use the *high edge* as first-touch.
+function resolveTargetLevel(zone, isBullish) {
+  if (!zone) return null;
+  if (isBullish) {
+    // Bullish: target reached when price rises to the lower bound.
+    return isFinite(zone.lo) && zone.lo > 0 ? zone.lo : (isFinite(zone.hi) ? zone.hi : null);
+  } else {
+    // Bearish: vindicated when price falls to the upper bound of the zone.
+    return isFinite(zone.hi) ? zone.hi : (isFinite(zone.lo) ? zone.lo : null);
+  }
+}
+
+// ============================================================================
+// THE SIMULATION ENGINE
+// ============================================================================
+// simulateTradeExit replays a trade against a daily price series and returns
+// the exit event. priceSeries is an array of { date: "YYYY-MM-DD", high, low,
+// close } sorted ascending, starting at or after the trade date.
+//
+// Returns:
+//   { status: "open" }                                  — still running
+//   { status: "closed_target", exit_price, exit_date, hold_days, pnl_pct, exit_reason }
+//   { status: "closed_stop",   ... }
+//   { status: "closed_timeout",... }
+function simulateTradeExit(trade, priceSeries) {
+  const entry = Number(trade.price);
   const direction = String(trade.direction || "").toLowerCase();
-  const isBullish = ["buy", "add"].includes(direction);  // entered/added — thesis was up
-  const isBearish = ["sell", "trim", "exit"].includes(direction); // sold — thesis was down (or de-risk)
-  const tradeDate = new Date(trade.trade_date || trade.created_at || Date.now());
-  const daysSince = Math.floor((Date.now() - tradeDate.getTime()) / 86400000);
-
-  const evalRow = {
-    evaluated_at: new Date().toISOString(),
-    days_since_trade: daysSince,
-    price_at_eval: currentPrice,
-    outcome: "ambiguous",
-    target_progress_pct: null,
-    invalidation_breached: false,
-    target_hit: false,
-    reasoning: "",
-  };
-
-  if (currentPrice == null || decisionPrice == null) {
-    evalRow.outcome = "ambiguous";
-    evalRow.reasoning = "Price data missing — cannot evaluate.";
-    return evalRow;
+  const isBullish = ["buy", "add"].includes(direction);
+  const isBearish = ["sell", "trim", "exit"].includes(direction);
+  if (!entry || (!isBullish && !isBearish)) {
+    return { status: "open", reason: "indeterminate direction or entry" };
   }
 
-  // Price move since the trade, signed in the direction of the thesis.
-  // For bullish trades (buy/add), positive = thesis vindicated.
-  // For bearish trades (sell/trim/exit), positive = trim was right (price fell).
-  const rawMovePct = ((currentPrice - decisionPrice) / decisionPrice) * 100;
-  const thesisMovePct = isBullish ? rawMovePct : -rawMovePct;
-  evalRow.move_pct = Number(rawMovePct.toFixed(2));
-  evalRow.thesis_move_pct = Number(thesisMovePct.toFixed(2));
-
-  // Parse the snapshotted target zone + invalidation.
   const snap = trade.analysis_snapshot || {};
   const zone = parsePriceZone(snap.action_price_zone);
-  const invalidation = parseInvalidation(snap.action_invalidation);
+  const inv = parseInvalidation(snap.action_invalidation);
+  const targetLevel = resolveTargetLevel(zone, isBullish);
+  const stopLevel = inv ? inv.level : null;
+  const deadlineDays = parseTimeframeDays(snap.action_timeframe);
 
-  // ---- Invalidation check ----
-  // For BULLISH trades: invalidation usually means "price below stop". Breach
-  // = current price hit the stop. That's "failed."
-  // For BEARISH trades: a trim's "invalidation" is unusual — typically you'd
-  // re-buy if price rebounds past entry. We treat any move >5% AGAINST the
-  // direction (i.e. price went UP after a trim) as a failure signal.
-  let invalidationBreached = false;
-  if (invalidation && isBullish) {
-    if (invalidation.breach_if === "below" && currentPrice <= invalidation.level) {
-      invalidationBreached = true;
-    } else if (invalidation.breach_if === "above" && currentPrice >= invalidation.level) {
-      invalidationBreached = true;
+  const tradeDate = new Date(trade.trade_date || trade.created_at || Date.now());
+  const deadlineDate = new Date(tradeDate.getTime() + deadlineDays * 86400000);
+
+  // Walk the price series day by day. First level touched wins.
+  for (const bar of priceSeries) {
+    const barDate = new Date(bar.date);
+    if (barDate < tradeDate) continue; // skip pre-entry bars
+    const hold = Math.max(0, Math.round((barDate.getTime() - tradeDate.getTime()) / 86400000));
+
+    const hi = bar.high != null ? bar.high : bar.close;
+    const lo = bar.low  != null ? bar.low  : bar.close;
+
+    if (isBullish) {
+      // Bullish: target is an UP level, stop is a DOWN level.
+      const targetTouched = targetLevel != null && hi >= targetLevel;
+      const stopTouched   = stopLevel  != null && lo <= stopLevel;
+      // If both touched same day, we cannot know order intraday — resolve
+      // conservatively as the STOP (worst case). This is the honest choice:
+      // assuming the win when we can't prove it would inflate the record.
+      if (stopTouched) {
+        return closeEvent("closed_stop", stopLevel, bar.date, hold, entry, isBullish,
+          `Stop ${fmtUSD(stopLevel)} hit`);
+      }
+      if (targetTouched) {
+        return closeEvent("closed_target", targetLevel, bar.date, hold, entry, isBullish,
+          `Target ${fmtUSD(targetLevel)} reached`);
+      }
+    } else {
+      // Bearish (trim/exit): "target" = price fell to level, "stop" = price
+      // rose past the invalidation (trim was wrong).
+      const targetTouched = targetLevel != null && lo <= targetLevel;
+      const stopTouched   = stopLevel  != null && hi >= stopLevel;
+      if (stopTouched) {
+        return closeEvent("closed_stop", stopLevel, bar.date, hold, entry, isBullish,
+          `Invalidation ${fmtUSD(stopLevel)} breached`);
+      }
+      if (targetTouched) {
+        return closeEvent("closed_target", targetLevel, bar.date, hold, entry, isBullish,
+          `Target ${fmtUSD(targetLevel)} reached`);
+      }
     }
-  } else if (isBearish && thesisMovePct < -5) {
-    // No formal invalidation but trim went badly wrong
-    invalidationBreached = true;
-  }
-  evalRow.invalidation_breached = invalidationBreached;
 
-  // ---- Target check ----
-  // For BULLISH trades: target hit = price reached/exceeded the zone.
-  // For BEARISH trades: target hit = price moved >5% in the thesis direction
-  //   (price went down) — "trim was vindicated" by subsequent drop.
-  let targetHit = false;
-  let targetProgressPct = null;
-  if (zone && isBullish) {
-    if (currentPrice >= zone.lo) targetHit = true;
-    // Progress: 0% = at decision price, 100% = at lower bound of zone.
-    if (zone.lo > decisionPrice) {
-      targetProgressPct = Math.max(0, Math.min(100,
-        ((currentPrice - decisionPrice) / (zone.lo - decisionPrice)) * 100
-      ));
+    // Deadline check — if this bar is at/past the deadline and nothing has
+    // been hit, close at this bar's close.
+    if (barDate >= deadlineDate) {
+      return closeEvent("closed_timeout", bar.close, bar.date, hold, entry, isBullish,
+        `Timeframe expired (${deadlineDays}d) — closed at market`);
     }
-  } else if (isBearish) {
-    if (thesisMovePct >= 5) targetHit = true;
-    // Progress: linear scale, 0 at no-move, 100 at -5% (vindication).
-    targetProgressPct = Math.max(0, Math.min(100, (thesisMovePct / 5) * 100));
-  }
-  evalRow.target_hit = targetHit;
-  if (targetProgressPct != null) evalRow.target_progress_pct = Number(targetProgressPct.toFixed(1));
-
-  // ---- Classification ----
-  if (targetHit) {
-    evalRow.outcome = "successful";
-    evalRow.reasoning = isBullish
-      ? `Price reached target zone (${snap.action_price_zone || "n/a"}). +${rawMovePct.toFixed(1)}% from entry.`
-      : `Trim vindicated — price fell ${Math.abs(rawMovePct).toFixed(1)}% since exit.`;
-  } else if (invalidationBreached) {
-    evalRow.outcome = "failed";
-    evalRow.reasoning = isBullish
-      ? `Invalidation breached (${snap.action_invalidation || "n/a"}). ${rawMovePct.toFixed(1)}% from entry.`
-      : `Trim wrong — price rose ${Math.abs(rawMovePct).toFixed(1)}% since exit.`;
-  } else if (Math.abs(thesisMovePct) < 2) {
-    evalRow.outcome = "ambiguous";
-    evalRow.reasoning = `Price hasn't moved meaningfully (${rawMovePct.toFixed(1)}%). Thesis still playing out.`;
-  } else if (thesisMovePct > 0) {
-    evalRow.outcome = "partial_success";
-    evalRow.reasoning = `Moving in thesis direction (${rawMovePct.toFixed(1)}%), but target not yet reached.`;
-  } else {
-    evalRow.outcome = "ambiguous";
-    evalRow.reasoning = `Drifted against thesis (${rawMovePct.toFixed(1)}%) but no invalidation yet.`;
   }
 
-  return evalRow;
+  // Series exhausted, no level hit, deadline not yet reached → still open.
+  return { status: "open", target_level: targetLevel, stop_level: stopLevel, deadline_days: deadlineDays };
 }
 
-// Decide if a trade has reached a terminal state based on its trajectory.
-// Returns {final: bool, reason: string}.
-function checkFinalization(trade, newEvalRow) {
-  const outcomes = [...(trade.outcomes || []), newEvalRow];
-  const daysSince = newEvalRow.days_since_trade;
-  // Hard age cap — past this we stop re-evaluating regardless.
-  if (daysSince >= EVAL_MAX_AGE_DAYS) {
-    return { final: true, reason: `Reached ${EVAL_MAX_AGE_DAYS}-day age cap` };
-  }
-  // Look at the last two evaluations.
-  if (outcomes.length >= 2) {
-    const lastTwo = outcomes.slice(-2);
-    const allSuccess = lastTwo.every(o => o.outcome === "successful" && o.target_hit);
-    if (allSuccess) {
-      return { final: true, reason: "Target hit on two consecutive evaluations" };
-    }
-    const allFailed = lastTwo.every(o => o.outcome === "failed" && o.invalidation_breached);
-    if (allFailed) {
-      return { final: true, reason: "Invalidation breached on two consecutive evaluations" };
-    }
-  }
-  return { final: false, reason: null };
+// Build a close event with P&L computed in the thesis direction.
+function closeEvent(status, exitPrice, exitDate, holdDays, entry, isBullish, reason) {
+  const rawPct = ((exitPrice - entry) / entry) * 100;
+  // P&L in thesis terms: bullish trade profits when price rises; bearish
+  // (trim/exit) "profits" — i.e. was correct — when price falls.
+  const pnlPct = isBullish ? rawPct : -rawPct;
+  return {
+    status,
+    exit_price: Number(exitPrice.toFixed(4)),
+    exit_date: exitDate,
+    hold_days: holdDays,
+    raw_move_pct: Number(rawPct.toFixed(2)),
+    pnl_pct: Number(pnlPct.toFixed(2)),
+    exit_reason: reason,
+    is_win: pnlPct > 0,
+  };
 }
 
-// Find trades that are due for evaluation. A trade is due if:
-//   - it's at least 7 days old AND has no outcomes yet, OR
-//   - its most recent evaluation was >= 7 days ago
-// AND it's not already "final" status.
-function findDueTrades(trades) {
-  const now = Date.now();
-  return trades.filter(t => {
-    if (t.outcome_status === "final") return false;
-    const tradeDate = new Date(t.trade_date || t.created_at || now).getTime();
-    const ageDays = (now - tradeDate) / 86400000;
-    if (ageDays < EVAL_INTERVAL_DAYS) return false; // too young for first eval
-    const outcomes = t.outcomes || [];
-    if (outcomes.length === 0) return true;
-    const lastEvalAt = new Date(outcomes[outcomes.length - 1].evaluated_at).getTime();
-    const daysSinceLastEval = (now - lastEvalAt) / 86400000;
-    return daysSinceLastEval >= EVAL_INTERVAL_DAYS;
-  });
-}
 
-// The orchestrator. Loads trades, finds due ones, fetches current prices,
-// evaluates, persists updates back to Firestore. Returns a summary count.
-async function runEvaluator({ force = false } = {}) {
+
+// ============================================================================
+// ORCHESTRATOR — runs the simulation across all open paper trades.
+// ============================================================================
+// For each open paper trade: fetch the symbol's daily OHLC history (the
+// /price endpoint already returns a year of ohlcv), slice to bars since the
+// trade date, run simulateTradeExit. If it returns a close event, write the
+// closed trade back to Firestore.
+//
+// Real (non-paper) trades are NOT simulated — they reflect actual broker
+// activity and the user manages their real exits. Simulation is the paper
+// hypothesis test only.
+
+async function runPaperSimulation({ force = false } = {}) {
   if (!state.uid) return { ran: false, reason: "not_signed_in" };
-  // Cooldown check (unless force)
   if (!force) {
     try {
-      const last = localStorage.getItem(EVAL_LAST_RUN_KEY);
-      if (last && Date.now() - new Date(last).getTime() < EVAL_COOLDOWN_MS) {
+      const last = localStorage.getItem(PAPER_SIM_LAST_RUN_KEY);
+      if (last && Date.now() - new Date(last).getTime() < PAPER_SIM_COOLDOWN_MS) {
         return { ran: false, reason: "cooldown" };
       }
     } catch (e) { /* ignore */ }
@@ -12536,53 +12636,81 @@ async function runEvaluator({ force = false } = {}) {
     return { ran: false, reason: "load_failed", error: e.message };
   }
 
-  const due = findDueTrades(trades);
-  if (due.length === 0) {
-    localStorage.setItem(EVAL_LAST_RUN_KEY, new Date().toISOString());
-    return { ran: true, evaluated: 0, finalized: 0 };
+  // Open paper trades only. A trade is "open" if it has no lifecycle_status
+  // or its status is "open". Closed trades (closed_target/stop/timeout) skip.
+  const openPaper = trades.filter(t =>
+    t.is_paper === true &&
+    (!t.lifecycle_status || t.lifecycle_status === "open")
+  );
+  if (openPaper.length === 0) {
+    localStorage.setItem(PAPER_SIM_LAST_RUN_KEY, new Date().toISOString());
+    return { ran: true, simulated: 0, closed: 0 };
   }
 
-  let evaluated = 0, finalized = 0;
-  for (const trade of due) {
-    // Fetch current price. Prefer state cache; fall back to a fresh fetch
-    // so the evaluator works even if app state is stale.
-    let currentPrice = state.prices?.[trade.symbol]?.current_price ?? null;
-    if (currentPrice == null) {
-      try {
-        const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(trade.symbol)}`);
-        if (r.ok) {
-          const j = await r.json();
-          currentPrice = j.current_price ?? null;
-        }
-      } catch (e) { /* leave null */ }
-    }
+  // Group by symbol so we fetch each symbol's history once.
+  const bySymbol = {};
+  for (const t of openPaper) {
+    (bySymbol[t.symbol] = bySymbol[t.symbol] || []).push(t);
+  }
 
-    const evalRow = evaluateTrade(trade, currentPrice);
-    const newOutcomes = [...(trade.outcomes || []), evalRow];
-    const finalCheck = checkFinalization(trade, evalRow);
-
-    const update = {
-      outcomes: newOutcomes,
-      outcome: evalRow.outcome,
-      outcome_status: finalCheck.final ? "final" : "active",
-      final_reason: finalCheck.final ? finalCheck.reason : null,
-      evaluated_at: evalRow.evaluated_at,
-      price_at_evaluation: currentPrice,
-      target_hit: evalRow.target_hit,
-      stop_hit: evalRow.invalidation_breached,
-      updated_at: new Date().toISOString(),
-    };
+  let simulated = 0, closed = 0;
+  for (const [symbol, symTrades] of Object.entries(bySymbol)) {
+    // Fetch daily OHLC history for this symbol.
+    let series = [];
     try {
-      await db.collection("users").doc(state.uid).collection("trades").doc(trade.id).update(update);
-      evaluated++;
-      if (finalCheck.final) finalized++;
+      const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(symbol)}`);
+      if (r.ok) {
+        const j = await r.json();
+        // ohlcv is [{t, o, h, l, c, v}] — t is a unix-seconds timestamp.
+        series = (j.ohlcv || []).map(bar => ({
+          date: new Date(bar.t * 1000).toISOString().slice(0, 10),
+          high: bar.h, low: bar.l, close: bar.c,
+        })).filter(b => b.high != null && b.low != null);
+      }
     } catch (e) {
-      console.warn("eval write failed for", trade.id, e);
+      console.warn("paper-sim price fetch failed for", symbol, e);
+      continue; // skip this symbol's trades this run
+    }
+    if (series.length === 0) continue;
+
+    for (const trade of symTrades) {
+      simulated++;
+      const result = simulateTradeExit(trade, series);
+      if (result.status === "open") {
+        // Still open — record the latest open snapshot (levels + deadline)
+        // so the panel can show distance-to-target without re-deriving.
+        try {
+          await db.collection("users").doc(state.uid).collection("trades").doc(trade.id).update({
+            lifecycle_status: "open",
+            sim_target_level: result.target_level ?? null,
+            sim_stop_level: result.stop_level ?? null,
+            sim_deadline_days: result.deadline_days ?? null,
+            sim_checked_at: new Date().toISOString(),
+          });
+        } catch (e) { console.warn("paper-sim open-update failed", trade.id, e); }
+        continue;
+      }
+      // Trade closed — write the round trip.
+      try {
+        await db.collection("users").doc(state.uid).collection("trades").doc(trade.id).update({
+          lifecycle_status: result.status,
+          exit_price: result.exit_price,
+          exit_date: result.exit_date,
+          hold_days: result.hold_days,
+          pnl_pct: result.pnl_pct,
+          raw_move_pct: result.raw_move_pct,
+          exit_reason: result.exit_reason,
+          is_win: result.is_win,
+          sim_checked_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+        closed++;
+      } catch (e) { console.warn("paper-sim close-write failed", trade.id, e); }
     }
   }
 
-  localStorage.setItem(EVAL_LAST_RUN_KEY, new Date().toISOString());
-  return { ran: true, evaluated, finalized };
+  localStorage.setItem(PAPER_SIM_LAST_RUN_KEY, new Date().toISOString());
+  return { ran: true, simulated, closed };
 }
 
 // ============================================================================
@@ -12779,16 +12907,15 @@ function renderSettings() {
     <div class="settings-group" id="tradeLogSection">
       <div class="section-head" style="padding: 0 4px 8px; display:flex; justify-content:space-between; align-items:baseline;">
         <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Trade Log</h3>
-        <button class="btn-ghost-sm" data-act="run-evaluator">Evaluate now</button>
       </div>
       <div id="tradeLogList" class="trade-log-list">
         <div class="setting-row" style="color:var(--ink-muted);font-size:12px;">Loading trades…</div>
       </div>
     </div>
-    <div id="trackRecordSlot">
+    <div id="paperPerfSlot">
       <div class="settings-group">
         <div class="section-head" style="padding: 0 4px 8px;">
-          <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Track Record</h3>
+          <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Paper Performance</h3>
         </div>
         <div class="setting-row" style="color:var(--ink-muted);font-size:12px;">Loading…</div>
       </div>
@@ -12803,8 +12930,8 @@ function renderSettings() {
   // Async-load trades and re-render the list slot. Async because trades live
   // in Firestore and we don't want to block the Settings render on the network.
   populateTradeLogList().catch(e => console.warn("trade log load:", e));
-  // H4 — same pattern for the track record dashboard.
-  populateTrackRecord().catch(e => console.warn("track record load:", e));
+  // Phase R — same pattern for the paper performance panel.
+  populatePaperPerformance().catch(e => console.warn("paper perf load:", e));
 }
 
 // Render the trade log list inside its slot. Called by renderSettings after
@@ -12888,273 +13015,212 @@ async function confirmDeleteTrade(tradeId) {
     toast("Trade deleted");
     if (state.currentView === "settings") {
       populateTradeLogList();
-      populateTrackRecord();
+      populatePaperPerformance();
     }
   } catch (e) {
     toast(`Delete failed: ${e.message || e}`, 3000, "error");
   }
 }
 
-// Manual evaluator trigger from Settings. Bypasses the 6h cooldown.
-async function runEvaluatorManual() {
-  toast("Running evaluator…");
+// Manual paper-simulation trigger from Settings. Bypasses the 6h cooldown.
+async function runPaperSimulationManual() {
+  toast("Running paper-trade simulation…");
   try {
-    const r = await runEvaluator({ force: true });
+    const r = await runPaperSimulation({ force: true });
     if (!r.ran) {
-      toast(`No evaluation: ${r.reason || "unknown"}`, 2400);
+      toast(`Simulation skipped: ${r.reason || "unknown"}`, 2400);
       return;
     }
-    if (r.evaluated === 0) {
-      toast("Nothing due — all trades are either too young or final");
+    if (r.simulated === 0) {
+      toast("No open paper trades to simulate");
+    } else if (r.closed === 0) {
+      toast(`Checked ${r.simulated} open paper trade${r.simulated === 1 ? "" : "s"} — none closed yet`);
     } else {
-      toast(`Evaluated ${r.evaluated} trade${r.evaluated === 1 ? "" : "s"}${r.finalized ? `, ${r.finalized} finalized` : ""}`);
+      toast(`${r.closed} of ${r.simulated} paper trade${r.simulated === 1 ? "" : "s"} closed`);
     }
     if (state.currentView === "settings") {
       populateTradeLogList();
-      populateTrackRecord();
+      populatePaperPerformance();
     }
   } catch (e) {
-    toast(`Evaluator failed: ${e.message || e}`, 3000, "error");
+    errorToast("Paper simulation", e);
   }
 }
 
 // ============================================================================
-// PHASE H4 — Track Record.
-//
-// Pure aggregator over the trades collection. Reads outcomes/stance/conviction
-// from each trade and produces three summary blocks: overall success rate,
-// by stance, by conviction.
-//
-// Denominator policy (option B): active trades are counted using their
-// latest evaluation. Success rates can drift week-to-week as active trades
-// re-classify. The UI marks how many of the denominator are still active.
-//
-// What counts as "success" in the rate:
-//   successful + partial_success → numerator
-//   failed                       → denominator only
-//   ambiguous, no outcome yet    → excluded (would inflate denominator with noise)
+// PHASE R — PAPER PERFORMANCE PANEL
 // ============================================================================
+// Replaces the H4 Track Record. Where Track Record reported "the entry signal
+// trended favorably", this reports the real verdict-logic test: round-trip
+// P&L on paper trades that have been closed by the simulation engine.
+//
+// Metrics — the things that actually answer "is the app's logic valid":
+//   - Win rate: closed_target count / all closed
+//   - Average win %, average loss %
+//   - Expectancy: avg P&L per trade (the single number that matters)
+//   - Average hold days
+//   - Exit-reason breakdown: how many hit target vs stop vs timed out
+// All split by stance and by conviction so you can see which verdict types
+// the app gets right.
 
-function computeTrackRecord(trades) {
-  // Trades that have at least one evaluation row OR a denormalized outcome.
-  const evaluated = trades.filter(t => {
-    const hasOutcome = t.outcome && t.outcome !== "pending";
-    const hasTrajectory = Array.isArray(t.outcomes) && t.outcomes.length > 0;
-    return hasOutcome || hasTrajectory;
-  });
+function computePaperPerformance(trades) {
+  const paper = trades.filter(t => t.is_paper === true);
+  const closed = paper.filter(t =>
+    t.lifecycle_status && t.lifecycle_status.startsWith("closed")
+  );
+  const open = paper.filter(t => !t.lifecycle_status || t.lifecycle_status === "open");
 
-  const isWin     = t => t.outcome === "successful" || t.outcome === "partial_success";
-  const isLoss    = t => t.outcome === "failed";
-  const isCounted = t => isWin(t) || isLoss(t);
-  const isActive  = t => t.outcome_status !== "final";
-
-  // Compute headline stats over a given subset (used for paper vs real splits)
-  function blockFor(subset) {
-    const subsetEvaluated = subset.filter(t => {
-      const hasOutcome = t.outcome && t.outcome !== "pending";
-      const hasTrajectory = Array.isArray(t.outcomes) && t.outcomes.length > 0;
-      return hasOutcome || hasTrajectory;
-    });
-    const counted = subsetEvaluated.filter(isCounted);
-    const wins = counted.filter(isWin).length;
+  function statBlock(subset) {
+    if (subset.length === 0) {
+      return { n: 0, wins: 0, losses: 0, win_rate: null, avg_win: null,
+               avg_loss: null, expectancy: null, avg_hold: null,
+               n_target: 0, n_stop: 0, n_timeout: 0 };
+    }
+    const wins   = subset.filter(t => t.is_win === true);
+    const losses = subset.filter(t => t.is_win !== true);
+    const pnls   = subset.map(t => Number(t.pnl_pct) || 0);
+    const winPnls  = wins.map(t => Number(t.pnl_pct) || 0);
+    const lossPnls = losses.map(t => Number(t.pnl_pct) || 0);
+    const holds  = subset.map(t => Number(t.hold_days)).filter(d => !isNaN(d));
+    const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
     return {
-      total_logged: subset.length,
-      total_evaluated: subsetEvaluated.length,
-      counted_total: counted.length,
-      counted_active: counted.filter(isActive).length,
-      wins,
-      losses: counted.length - wins,
-      success_rate_pct: counted.length > 0 ? Number((wins / counted.length * 100).toFixed(1)) : null,
-      ambiguous: subsetEvaluated.filter(t => t.outcome === "ambiguous").length,
-      pending: subset.length - subsetEvaluated.length,
+      n: subset.length,
+      wins: wins.length,
+      losses: losses.length,
+      win_rate: Number((wins.length / subset.length * 100).toFixed(1)),
+      avg_win:  winPnls.length  ? Number(avg(winPnls).toFixed(2))  : null,
+      avg_loss: lossPnls.length ? Number(avg(lossPnls).toFixed(2)) : null,
+      expectancy: Number(avg(pnls).toFixed(2)),
+      avg_hold: holds.length ? Number(avg(holds).toFixed(0)) : null,
+      n_target:  subset.filter(t => t.lifecycle_status === "closed_target").length,
+      n_stop:    subset.filter(t => t.lifecycle_status === "closed_stop").length,
+      n_timeout: subset.filter(t => t.lifecycle_status === "closed_timeout").length,
     };
   }
 
-  // Paper trades are marked is_paper === true. Anything else (false, undefined,
-  // legacy trades from before the field existed) is treated as real.
-  const paperTrades = trades.filter(t => t.is_paper === true);
-  const realTrades  = trades.filter(t => t.is_paper !== true);
-
-  const overall = blockFor(trades);
-  const paper   = blockFor(paperTrades);
-  const real    = blockFor(realTrades);
-
-  // Helper: group + roll up (unchanged from before — operates over all evaluated)
-  function groupRollup(picker) {
+  function groupBy(picker) {
     const groups = {};
-    for (const t of evaluated) {
+    for (const t of closed) {
       const key = picker(t) || "—";
       (groups[key] = groups[key] || []).push(t);
     }
-    return Object.entries(groups).map(([key, ts]) => {
-      const c = ts.filter(isCounted);
-      const w = c.filter(isWin).length;
-      const active = c.filter(isActive).length;
-      const finalTs = ts.filter(t => t.outcome_status === "final");
-      const ages = finalTs.map(t => {
-        const start = new Date(t.trade_date || t.created_at || 0).getTime();
-        const last = (t.outcomes && t.outcomes.length > 0)
-          ? new Date(t.outcomes[t.outcomes.length - 1].evaluated_at).getTime()
-          : null;
-        if (!start || !last) return null;
-        return (last - start) / 86400000;
-      }).filter(d => d != null);
-      const avgDays = ages.length > 0 ? ages.reduce((a, b) => a + b, 0) / ages.length : null;
-      return {
-        key,
-        count: ts.length,
-        counted: c.length,
-        active,
-        wins: w,
-        losses: c.length - w,
-        success_rate_pct: c.length > 0 ? Number((w / c.length * 100).toFixed(1)) : null,
-        avg_days_to_resolution: avgDays != null ? Number(avgDays.toFixed(1)) : null,
-      };
-    }).sort((a, b) => b.count - a.count);
+    return Object.entries(groups)
+      .map(([key, ts]) => ({ key, ...statBlock(ts) }))
+      .sort((a, b) => b.n - a.n);
   }
 
-  const by_stance = groupRollup(t => {
-    const s = t.analysis_snapshot?.stance;
-    return s ? String(s).toUpperCase() : "—";
-  });
-
-  const by_conviction = groupRollup(t => {
-    const c = t.analysis_snapshot?.conviction;
-    return c ? String(c).toLowerCase() : "—";
-  });
-
-  return { overall, paper, real, by_stance, by_conviction };
+  return {
+    overall: statBlock(closed),
+    open_count: open.length,
+    total_paper: paper.length,
+    by_stance: groupBy(t => {
+      const s = t.analysis_snapshot?.stance;
+      return s ? String(s).toUpperCase() : "—";
+    }),
+    by_conviction: groupBy(t => {
+      const c = t.analysis_snapshot?.conviction;
+      return c ? String(c).toLowerCase() : "—";
+    }),
+  };
 }
 
-// Render the Track Record section. Three blocks. Empty-state strings make
-// the surface usable even before any trades have outcomes.
-function renderTrackRecord(stats) {
+function renderPaperPerformance(stats) {
   const o = stats.overall;
-  if (o.total_logged === 0) {
-    return `<div class="settings-group">
-      <div class="section-head" style="padding: 0 4px 8px;">
-        <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Track Record</h3>
-      </div>
+  const header = `<div class="section-head" style="padding: 0 4px 8px;">
+    <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Paper Performance</h3>
+    <button class="btn-ghost-sm" data-act="run-paper-sim">Run sim</button>
+  </div>`;
+
+  if (stats.total_paper === 0) {
+    return `<div class="settings-group" id="paperPerfInner">
+      ${header}
       <div class="setting-row" style="color:var(--ink-muted);font-size:12px;line-height:1.5;">
-        No trades logged yet. The track record dashboard activates once you've logged trades and the weekly evaluator has classified some outcomes.
+        No paper trades yet. Log an ACT verdict as a paper trade — the simulation will replay it against its target, stop, and timeframe, then report the round-trip result here.
       </div>
     </div>`;
   }
 
-  // Helper: format a success rate line with active-count annotation.
-  function rateLine(r) {
-    if (r.success_rate_pct == null) {
-      return `<span class="tr-rate-empty">${r.counted === 0 ? "no graded trades yet" : ""}</span>`;
-    }
-    const activeNote = r.active > 0 ? ` <span class="tr-active">(${r.active} active)</span>` : "";
-    return `<span class="tr-rate">${r.success_rate_pct}%</span> <span class="tr-rate-detail">${r.wins} of ${r.counted}${activeNote}</span>`;
-  }
-
-  // Helper: compact overall stat row (used for paper+real split)
-  function overallStatRow(label, b) {
-    if (b.total_logged === 0) {
-      return `<div class="tr-split-row">
-        <div class="tr-split-label">${escAttr(label)}</div>
-        <div class="tr-split-rate"><span class="tr-rate-empty">no trades</span></div>
-      </div>`;
-    }
-    const rateText = b.success_rate_pct != null
-      ? `<span class="tr-split-pct">${b.success_rate_pct}%</span>`
-      : `<span class="tr-rate-empty">no grades yet</span>`;
-    const meta = `${b.wins}W ${b.losses}L${b.counted_active > 0 ? ` · ${b.counted_active} active` : ""}${b.pending > 0 ? ` · ${b.pending} pending` : ""}`;
-    return `<div class="tr-split-row">
-      <div class="tr-split-label">${escAttr(label)}</div>
-      <div class="tr-split-rate">${rateText}</div>
-      <div class="tr-split-meta">${meta}</div>
+  if (o.n === 0) {
+    return `<div class="settings-group" id="paperPerfInner">
+      ${header}
+      <div class="setting-row" style="color:var(--ink-muted);font-size:12px;line-height:1.5;">
+        ${stats.open_count} open paper trade${stats.open_count === 1 ? "" : "s"}, none closed yet. The simulation closes a trade when price touches its target or stop, or when the verdict's timeframe expires. Results appear here once trades resolve.
+      </div>
     </div>`;
   }
 
-  // Block 1 — Overall, with paper/real breakdown if both exist
-  const hasPaper = stats.paper.total_logged > 0;
-  const hasReal  = stats.real.total_logged > 0;
-  const showSplit = hasPaper && hasReal;
-
-  const overallBlock = showSplit
-    ? `<div class="tr-overall-split">
-         ${overallStatRow("Paper", stats.paper)}
-         ${overallStatRow("Real", stats.real)}
-         ${overallStatRow("Combined", o)}
-       </div>`
-    : `<div class="tr-overall">
-         <div class="tr-overall-top">
-           <div class="tr-overall-label">${hasPaper ? "Paper trades" : (hasReal ? "Real trades" : "Overall")}</div>
-           <div class="tr-overall-rate">
-             ${o.success_rate_pct != null ? `<span class="tr-rate-big">${o.success_rate_pct}%</span>` : `<span class="tr-rate-empty">—</span>`}
-           </div>
-         </div>
-         <div class="tr-overall-meta">
-           ${o.wins} successful, ${o.losses} failed${o.counted_active > 0 ? ` · ${o.counted_active} still active` : ""}
-           ${o.ambiguous > 0 ? ` · ${o.ambiguous} ambiguous (excluded)` : ""}
-           ${o.pending > 0 ? ` · ${o.pending} pending eval` : ""}
-         </div>
-       </div>`;
-
-  // Block 2
-  const stanceBlock = stats.by_stance.length > 0
-    ? `<div class="tr-block">
-         <div class="tr-block-label">By stance</div>
-         <table class="tr-table">
-           <thead><tr><th>Stance</th><th>n</th><th>Success</th><th>Avg days</th></tr></thead>
-           <tbody>
-             ${stats.by_stance.map(r => `
-               <tr>
-                 <td class="tr-key">${escAttr(r.key)}</td>
-                 <td class="tr-count">${r.count}</td>
-                 <td class="tr-rate-cell">${rateLine(r)}</td>
-                 <td class="tr-days">${r.avg_days_to_resolution != null ? `${r.avg_days_to_resolution}d` : "—"}</td>
-               </tr>`).join("")}
-           </tbody>
-         </table>
-       </div>`
-    : "";
-
-  // Block 3
-  const convictionBlock = stats.by_conviction.length > 0
-    ? `<div class="tr-block">
-         <div class="tr-block-label">By conviction</div>
-         <table class="tr-table">
-           <thead><tr><th>Conviction</th><th>n</th><th>Success</th><th>Avg days</th></tr></thead>
-           <tbody>
-             ${stats.by_conviction.map(r => `
-               <tr>
-                 <td class="tr-key">${escAttr(r.key)}</td>
-                 <td class="tr-count">${r.count}</td>
-                 <td class="tr-rate-cell">${rateLine(r)}</td>
-                 <td class="tr-days">${r.avg_days_to_resolution != null ? `${r.avg_days_to_resolution}d` : "—"}</td>
-               </tr>`).join("")}
-           </tbody>
-         </table>
-       </div>`
-    : "";
-
-  return `<div class="settings-group">
-    <div class="section-head" style="padding: 0 4px 8px;">
-      <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Track Record</h3>
+  // Headline — expectancy is the single most important number.
+  const expClass = o.expectancy > 0 ? "pp-pos" : o.expectancy < 0 ? "pp-neg" : "";
+  const headline = `<div class="pp-headline">
+    <div class="pp-headline-main">
+      <div class="pp-exp ${expClass}">${o.expectancy >= 0 ? "+" : ""}${o.expectancy}%</div>
+      <div class="pp-exp-label">expectancy / trade</div>
     </div>
-    ${overallBlock}
-    ${stanceBlock}
-    ${convictionBlock}
-    <div class="tr-disclaimer">Success = price reached the target zone (or trim was vindicated). Ambiguous trades excluded from rate. Active trades counted using latest weekly evaluation.</div>
+    <div class="pp-headline-side">
+      <div class="pp-stat"><span class="pp-stat-v">${o.win_rate}%</span><span class="pp-stat-l">win rate</span></div>
+      <div class="pp-stat"><span class="pp-stat-v">${o.n}</span><span class="pp-stat-l">closed</span></div>
+      <div class="pp-stat"><span class="pp-stat-v">${o.avg_hold != null ? o.avg_hold + "d" : "—"}</span><span class="pp-stat-l">avg hold</span></div>
+    </div>
+  </div>`;
+
+  // Win/loss + exit-reason breakdown.
+  const breakdown = `<div class="pp-breakdown">
+    <div class="pp-bd-row">
+      <span class="pp-bd-label">Avg win</span>
+      <span class="pp-bd-val pp-pos">${o.avg_win != null ? "+" + o.avg_win + "%" : "—"}</span>
+      <span class="pp-bd-label">Avg loss</span>
+      <span class="pp-bd-val pp-neg">${o.avg_loss != null ? o.avg_loss + "%" : "—"}</span>
+    </div>
+    <div class="pp-bd-exits">
+      <span class="pp-exit-chip pp-exit-target">${o.n_target} hit target</span>
+      <span class="pp-exit-chip pp-exit-stop">${o.n_stop} hit stop</span>
+      <span class="pp-exit-chip pp-exit-timeout">${o.n_timeout} timed out</span>
+      ${stats.open_count > 0 ? `<span class="pp-exit-chip pp-exit-open">${stats.open_count} still open</span>` : ""}
+    </div>
+  </div>`;
+
+  // Group tables.
+  function groupTable(label, rows) {
+    if (rows.length === 0) return "";
+    return `<div class="pp-block">
+      <div class="pp-block-label">${escAttr(label)}</div>
+      <table class="tr-table">
+        <thead><tr><th>${escAttr(label.replace("By ", ""))}</th><th>n</th><th>Win%</th><th>Expect.</th><th>Hold</th></tr></thead>
+        <tbody>
+          ${rows.map(r => {
+            const e = r.expectancy > 0 ? "pp-pos" : r.expectancy < 0 ? "pp-neg" : "";
+            return `<tr>
+              <td class="tr-key">${escAttr(r.key)}</td>
+              <td class="tr-count">${r.n}</td>
+              <td class="tr-rate-cell">${r.win_rate}%</td>
+              <td class="tr-rate-cell ${e}">${r.expectancy >= 0 ? "+" : ""}${r.expectancy}%</td>
+              <td class="tr-days">${r.avg_hold != null ? r.avg_hold + "d" : "—"}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>`;
+  }
+
+  return `<div class="settings-group" id="paperPerfInner">
+    ${header}
+    ${headline}
+    ${breakdown}
+    ${groupTable("By stance", stats.by_stance)}
+    ${groupTable("By conviction", stats.by_conviction)}
+    <div class="tr-disclaimer">Each paper trade is replayed against its snapshotted target, stop, and timeframe using daily OHLC. First level touched closes the trade; if both touch the same day, the stop is assumed (conservative). Expectancy = average round-trip P&amp;L per closed trade — the core test of whether the verdict logic is valid.</div>
   </div>`;
 }
 
-// Async loader for the Track Record slot in Settings. Mirrors the pattern
-// used by populateTradeLogList: render placeholder synchronously, fetch in
-// the background, swap when ready.
-async function populateTrackRecord() {
-  const slot = document.getElementById("trackRecordSlot");
+async function populatePaperPerformance() {
+  const slot = document.getElementById("paperPerfSlot");
   if (!slot) return;
   try {
     const trades = await loadTrades(500);
-    const stats = computeTrackRecord(trades);
-    slot.innerHTML = renderTrackRecord(stats);
+    const stats = computePaperPerformance(trades);
+    slot.innerHTML = renderPaperPerformance(stats);
   } catch (e) {
-    slot.innerHTML = `<div class="settings-group"><div class="setting-row" style="color:var(--red);font-size:12px;">Failed to load track record: ${escAttr(e.message || e)}</div></div>`;
+    slot.innerHTML = `<div class="settings-group"><div class="setting-row" style="color:var(--red);font-size:12px;">Failed to load paper performance: ${escAttr(e.message || e)}</div></div>`;
   }
 }
 
@@ -13748,7 +13814,7 @@ function openLogTrade(symbol, prefillDirection) {
         <input id="lt_paper" type="checkbox" checked />
         <span>Paper trade</span>
       </label>
-      <span class="lt-paper-hint">Test the verdict without placing a real order. Paper trades are tracked separately in Track Record.</span>
+      <span class="lt-paper-hint">Test the verdict without placing a real order. Paper trades are replayed against their target/stop in Paper Performance.</span>
     </div>
 
     <div class="field">
@@ -14207,7 +14273,7 @@ document.addEventListener("click", (e) => {
       case "copy-error":             copyToClipboard(target.dataset.errorText || ""); break;
       case "close-modal":            closeModal(); break;
       case "delete-trade":           confirmDeleteTrade(target.dataset.tradeId); break;
-      case "run-evaluator":          runEvaluatorManual(); break;
+      case "run-paper-sim":          runPaperSimulationManual(); break;
       case "toggle-trade-traj":
         state.expandedTrades = state.expandedTrades || {};
         const tid = target.dataset.tradeId;
