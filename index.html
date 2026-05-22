@@ -4092,6 +4092,12 @@ body {
         <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
       </svg>Discover
     </button>
+    <button class="tab" data-view="journal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 4h13a2 2 0 0 1 2 2v14a1 1 0 0 1-1.4.9L12 18l-5.6 2.9A1 1 0 0 1 5 20V6"/>
+        <path d="M9 7h6M9 11h6"/>
+      </svg>Journal
+    </button>
     <button class="tab" data-view="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
@@ -4890,7 +4896,7 @@ async function loadInitialData() {
     runPaperSimulation().then(r => {
       if (r.closed > 0) {
         toast(`${r.closed} paper trade${r.closed === 1 ? "" : "s"} closed by simulation`);
-        if (state.currentView === "settings") {
+        if (state.currentView === "journal") {
           populateTradeLogList();
           populatePaperPerformance();
         }
@@ -7075,12 +7081,12 @@ function renderCurrentView() {
   const v = state.currentView;
   if (v === "portfolio") return renderPortfolio();
   if (v === "discover")  return renderDiscover();
+  if (v === "journal")   return renderJournal();
   if (v === "settings")  return renderSettings();
   // Legacy fallthrough — old view names get re-routed to current homes so
-  // stale localStorage state doesn't break the app on first load after the
-  // 3-tab cleanup.
+  // stale localStorage state doesn't break the app on first load.
   if (v === "markets" || v === "watchlist") { state.currentView = "discover"; return renderDiscover(); }
-  if (v === "signals" || v === "journal" || v === "news" || v === "bot" || v === "scans") {
+  if (v === "signals" || v === "news" || v === "bot" || v === "scans") {
     state.currentView = "portfolio";
     return renderPortfolio();
   }
@@ -7094,7 +7100,6 @@ function setView(v) {
   const LEGACY_TO_NEW = {
     markets:   { view: "discover", sub: "watchlist" },
     watchlist: { view: "discover", sub: "watchlist" },
-    journal:   { view: "portfolio" },
     news:      { view: "portfolio" },
     bot:       { view: "portfolio" },
     signals:   { view: "portfolio" },
@@ -12943,6 +12948,19 @@ function renderSettings() {
             }).join("")}
       </div>
     </div>
+  `;
+}
+
+// ============================================================================
+// JOURNAL — dedicated tab (Phase R+). Holds the Trade Log and the Paper
+// Performance panel. These previously lived inside Settings; promoted to
+// their own tab so the audit surface is a first-class destination.
+// ============================================================================
+function renderJournal() {
+  const view = $("#view");
+  if (!view) return;
+  view.innerHTML = `
+    <div class="section-head" style="padding: 20px 20px 0;"><h2>Journal</h2></div>
     <div class="settings-group" id="tradeLogSection">
       <div class="section-head" style="padding: 0 4px 8px; display:flex; justify-content:space-between; align-items:baseline;">
         <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Trade Log</h3>
@@ -12962,14 +12980,11 @@ function renderSettings() {
     <div class="empty-state" style="padding: 30px 20px;">
       <p style="font-size:11px;color:var(--ink-muted);line-height:1.6;">
         This app is a tool, not an advisor. All signals are inputs, not recommendations.<br>
-        Decisions are yours. Trade log exists so you can audit yourself.
+        Decisions are yours. The journal exists so you can audit yourself.
       </p>
     </div>
   `;
-  // Async-load trades and re-render the list slot. Async because trades live
-  // in Firestore and we don't want to block the Settings render on the network.
   populateTradeLogList().catch(e => console.warn("trade log load:", e));
-  // Phase R — same pattern for the paper performance panel.
   populatePaperPerformance().catch(e => console.warn("paper perf load:", e));
 }
 
@@ -13052,7 +13067,7 @@ async function confirmDeleteTrade(tradeId) {
   try {
     await deleteTrade(tradeId);
     toast("Trade deleted");
-    if (state.currentView === "settings") {
+    if (state.currentView === "journal") {
       populateTradeLogList();
       populatePaperPerformance();
     }
@@ -13077,7 +13092,7 @@ async function runPaperSimulationManual() {
     } else {
       toast(`${r.closed} of ${r.simulated} paper trade${r.simulated === 1 ? "" : "s"} closed`);
     }
-    if (state.currentView === "settings") {
+    if (state.currentView === "journal") {
       populateTradeLogList();
       populatePaperPerformance();
     }
@@ -13916,7 +13931,7 @@ async function submitLogTrade(symbol) {
     });
     toast(isPaper ? "Paper trade logged" : "Trade logged");
     closeModal();
-    if (state.currentView === "settings") renderSettings();
+    if (state.currentView === "journal") renderJournal();
   } catch (e) {
     toast(`Failed to log: ${e.message || e}`, 3000, "error");
   }
