@@ -4092,13 +4092,6 @@ body {
         <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
       </svg>Discover
     </button>
-    <button class="tab" data-view="journal">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V4z"/>
-        <path d="M4 17a3 3 0 0 1 3-3h13"/>
-        <path d="M9 8h6M9 12h4"/>
-      </svg>Journal
-    </button>
     <button class="tab" data-view="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
@@ -4897,7 +4890,7 @@ async function loadInitialData() {
     runPaperSimulation().then(r => {
       if (r.closed > 0) {
         toast(`${r.closed} paper trade${r.closed === 1 ? "" : "s"} closed by simulation`);
-        if (state.currentView === "journal" || state.currentView === "settings") {
+        if (state.currentView === "settings") {
           populateTradeLogList();
           populatePaperPerformance();
         }
@@ -7082,13 +7075,12 @@ function renderCurrentView() {
   const v = state.currentView;
   if (v === "portfolio") return renderPortfolio();
   if (v === "discover")  return renderDiscover();
-  if (v === "journal")   return renderJournal();
   if (v === "settings")  return renderSettings();
   // Legacy fallthrough — old view names get re-routed to current homes so
   // stale localStorage state doesn't break the app on first load after the
   // 3-tab cleanup.
   if (v === "markets" || v === "watchlist") { state.currentView = "discover"; return renderDiscover(); }
-  if (v === "signals" || v === "news" || v === "bot" || v === "scans") {
+  if (v === "signals" || v === "journal" || v === "news" || v === "bot" || v === "scans") {
     state.currentView = "portfolio";
     return renderPortfolio();
   }
@@ -7098,12 +7090,11 @@ function renderCurrentView() {
 function setView(v) {
   // Remap legacy view names to the new 3-tab structure (Portfolio, Discover,
   // Settings). Anything that used to live under Signals now redirects to
-  // Portfolio — the verdict layer covers the same ground. NOTE: 'journal' is
-  // now a real top-level view (Trade Log + Paper Performance), so it is no
-  // longer in this legacy-remap table.
+  // Portfolio — the verdict layer covers the same ground.
   const LEGACY_TO_NEW = {
     markets:   { view: "discover", sub: "watchlist" },
     watchlist: { view: "discover", sub: "watchlist" },
+    journal:   { view: "portfolio" },
     news:      { view: "portfolio" },
     bot:       { view: "portfolio" },
     signals:   { view: "portfolio" },
@@ -12525,6 +12516,35 @@ function resolveTargetLevel(zone, isBullish) {
 //   { status: "closed_target", exit_price, exit_date, hold_days, pnl_pct, exit_reason }
 //   { status: "closed_stop",   ... }
 //   { status: "closed_timeout",... }
+// Resolve a trade's entry date from whatever shape it was stored in.
+// Returns a valid Date, or null if nothing usable is found. Critically, this
+// rejects epoch-zero / pre-2000 dates — a paper trade can't predate the app,
+// and treating a 1970 date as real produced the 20-million-day hold bug.
+function resolveTradeDate(trade) {
+  const candidates = [trade.trade_date, trade.created_at, trade.logged_at];
+  for (const c of candidates) {
+    if (c == null || c === "" || c === 0) continue;
+    let d = null;
+    if (typeof c === "object" && c.seconds != null) {
+      // Firestore Timestamp shape
+      d = new Date(c.seconds * 1000);
+    } else if (typeof c === "number") {
+      // Unix ms or s — if it's suspiciously small treat as seconds
+      d = new Date(c < 1e12 ? c * 1000 : c);
+    } else {
+      d = new Date(c);
+    }
+    if (d && !isNaN(d.getTime())) {
+      // Sanity floor: anything before 2020 is not a real trade date for this
+      // app. Reject so it can't poison hold-day math.
+      if (d.getFullYear() >= 2020 && d.getTime() <= Date.now() + 86400000) {
+        return d;
+      }
+    }
+  }
+  return null;
+}
+
 function simulateTradeExit(trade, priceSeries) {
   const entry = Number(trade.price);
   const direction = String(trade.direction || "").toLowerCase();
@@ -12541,12 +12561,22 @@ function simulateTradeExit(trade, priceSeries) {
   const stopLevel = inv ? inv.level : null;
   const deadlineDays = parseTimeframeDays(snap.action_timeframe);
 
-  const tradeDate = new Date(trade.trade_date || trade.created_at || Date.now());
+  // Robust trade-date resolution. trade_date may be a "YYYY-MM-DD" string, an
+  // ISO string, a Firestore timestamp object {seconds,...}, a number, null,
+  // or garbage. A bad parse here produced the "20,207,687 day" hold bug —
+  // epoch-zero subtracted from a real date. Guard every case.
+  const tradeDate = resolveTradeDate(trade);
+  if (!tradeDate) {
+    // No usable date — cannot simulate. Leave open; the trade-log row still
+    // shows, but it won't pollute Paper Performance with junk numbers.
+    return { status: "open", reason: "unparseable trade date" };
+  }
   const deadlineDate = new Date(tradeDate.getTime() + deadlineDays * 86400000);
 
   // Walk the price series day by day. First level touched wins.
   for (const bar of priceSeries) {
     const barDate = new Date(bar.date);
+    if (isNaN(barDate.getTime())) continue;
     if (barDate < tradeDate) continue; // skip pre-entry bars
     const hold = Math.max(0, Math.round((barDate.getTime() - tradeDate.getTime()) / 86400000));
 
@@ -12913,26 +12943,6 @@ function renderSettings() {
             }).join("")}
       </div>
     </div>
-    <div class="empty-state" style="padding: 30px 20px;">
-      <p style="font-size:11px;color:var(--ink-muted);line-height:1.6;">
-        This app is a tool, not an advisor. All signals are inputs, not recommendations.<br>
-        Decisions are yours. Trade log exists so you can audit yourself.
-      </p>
-    </div>
-  `;
-}
-
-// ============================================================================
-// JOURNAL — Trade Log + Paper Performance, relocated out of Settings into its
-// own top-level tab. Keeps the audit/replay surface separate from
-// configuration, since it's a distinct activity (review past trades & verify
-// the verdict logic rather than tweak settings).
-// ============================================================================
-function renderJournal() {
-  $("#topbarTitle").textContent = "Journal";
-  const view = $("#view");
-  view.innerHTML = `
-    <div class="section-head" style="padding: 20px 20px 0;"><h2>Journal</h2></div>
     <div class="settings-group" id="tradeLogSection">
       <div class="section-head" style="padding: 0 4px 8px; display:flex; justify-content:space-between; align-items:baseline;">
         <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Trade Log</h3>
@@ -12951,17 +12961,19 @@ function renderJournal() {
     </div>
     <div class="empty-state" style="padding: 30px 20px;">
       <p style="font-size:11px;color:var(--ink-muted);line-height:1.6;">
-        Every logged trade is replayed weekly against its snapshotted target and stop.<br>
-        This is where you audit yourself — the verdict logic is only as good as the closed-trade record.
+        This app is a tool, not an advisor. All signals are inputs, not recommendations.<br>
+        Decisions are yours. Trade log exists so you can audit yourself.
       </p>
     </div>
   `;
-  // Same async-load pattern as the old Settings location.
+  // Async-load trades and re-render the list slot. Async because trades live
+  // in Firestore and we don't want to block the Settings render on the network.
   populateTradeLogList().catch(e => console.warn("trade log load:", e));
+  // Phase R — same pattern for the paper performance panel.
   populatePaperPerformance().catch(e => console.warn("paper perf load:", e));
 }
 
-// Render the trade log list inside its slot. Called by renderJournal after
+// Render the trade log list inside its slot. Called by renderSettings after
 // fetching from Firestore. Each row is tappable for delete (no edit yet —
 // the snapshot is the snapshot; if you mis-typed quantity, delete + re-log).
 async function populateTradeLogList() {
@@ -13040,7 +13052,7 @@ async function confirmDeleteTrade(tradeId) {
   try {
     await deleteTrade(tradeId);
     toast("Trade deleted");
-    if (state.currentView === "journal" || state.currentView === "settings") {
+    if (state.currentView === "settings") {
       populateTradeLogList();
       populatePaperPerformance();
     }
@@ -13065,7 +13077,7 @@ async function runPaperSimulationManual() {
     } else {
       toast(`${r.closed} of ${r.simulated} paper trade${r.simulated === 1 ? "" : "s"} closed`);
     }
-    if (state.currentView === "journal" || state.currentView === "settings") {
+    if (state.currentView === "settings") {
       populateTradeLogList();
       populatePaperPerformance();
     }
@@ -13108,7 +13120,11 @@ function computePaperPerformance(trades) {
     const pnls   = subset.map(t => Number(t.pnl_pct) || 0);
     const winPnls  = wins.map(t => Number(t.pnl_pct) || 0);
     const lossPnls = losses.map(t => Number(t.pnl_pct) || 0);
-    const holds  = subset.map(t => Number(t.hold_days)).filter(d => !isNaN(d));
+    // Filter hold_days to sane values only. A closed trade in this app can't
+    // have been held more than ~1 year; anything larger is a legacy bad-date
+    // artifact and must not be averaged in.
+    const holds  = subset.map(t => Number(t.hold_days))
+                         .filter(d => !isNaN(d) && d >= 0 && d <= 400);
     const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
     return {
       n: subset.length,
@@ -13900,8 +13916,7 @@ async function submitLogTrade(symbol) {
     });
     toast(isPaper ? "Paper trade logged" : "Trade logged");
     closeModal();
-    if (state.currentView === "journal") renderJournal();
-    else if (state.currentView === "settings") renderSettings();
+    if (state.currentView === "settings") renderSettings();
   } catch (e) {
     toast(`Failed to log: ${e.message || e}`, 3000, "error");
   }
