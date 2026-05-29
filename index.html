@@ -2837,29 +2837,36 @@ body {
 .presurge-card.empty,
 .presurge-card.loading { padding-bottom: 12px; }
 .rotation-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1px; background: var(--rule-soft); padding: 1px;
 }
-.rot-cat { background: var(--bg-card); padding: 10px 12px; }
+.rot-cat { background: var(--bg-card); padding: 9px 10px; }
 .rot-cat-head {
   font-family: var(--sans); font-size: 9.5px; font-weight: 700;
-  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted);
-  margin-bottom: 7px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted);
+  margin-bottom: 6px; display: flex; align-items: center; gap: 5px;
 }
+.rot-cat-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+.rot-cat-dot.hot  { background: var(--green); }
+.rot-cat-dot.warm { background: var(--gold); }
+.rot-cat-dot.cold { background: var(--red); opacity: 0.6; }
 .rot-row {
-  display: flex; align-items: baseline; gap: 7px; padding: 3px 0; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+  cursor: pointer; border-radius: 5px; margin-bottom: 2px;
 }
-.rot-row:hover { opacity: 0.75; }
-.rot-sym { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; }
-.rot-star { color: var(--gold); font-size: 10px; }
-.rot-rs { font-family: var(--mono); font-size: 12px; font-weight: 600; }
-.rot-rs.rs-strong { color: var(--green); }
-.rot-rs.rs-pos    { color: var(--green); opacity: 0.7; }
-.rot-rs.rs-soft   { color: var(--ink-muted); }
-.rot-rs.rs-neg    { color: var(--red); opacity: 0.8; }
-.rot-trend { font-family: var(--mono); font-size: 9.5px; }
-.rot-trend.up   { color: var(--green); opacity: 0.6; }
-.rot-trend.down { color: var(--red); opacity: 0.6; }
+.rot-row:hover { outline: 1px solid var(--rule); }
+.rot-sym { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; display: flex; align-items: center; gap: 3px; }
+.rot-star { color: var(--gold); font-size: 9px; }
+.rot-rs { font-family: var(--mono); font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.rot-pct { font-size: 9px; opacity: 0.6; margin-left: 1px; }
+.rot-trend { font-family: var(--mono); font-size: 11px; width: 10px; text-align: center; }
+.rot-trend.up   { color: var(--green); }
+.rot-trend.down { color: var(--red); }
+.rot-read {
+  font-family: var(--sans); font-size: 12.5px; color: var(--ink-soft);
+  padding: 10px 14px; line-height: 1.5; border-bottom: 1px solid var(--rule-soft);
+}
+.rot-read b { color: var(--ink); font-weight: 600; }
 .presurge-card::before {
   content: ""; position: absolute; left: 0; top: 0; bottom: 0;
   width: 3px; background: linear-gradient(180deg, var(--gold), var(--green));
@@ -9180,11 +9187,13 @@ function computeEtfRotation() {
     const rsBlend = (rs21 != null && rs63 != null) ? (rs21 * 0.5 + rs63 * 0.5)
                    : (rs21 != null ? rs21 : rs63);
     const sma200 = closes.length >= 200 ? computeSMA(closes, 200) : null;
+    // Tri-state: true above, false below, null when we lack 200 bars to judge.
+    // Avoids showing a confident ↑200 / ↓200 when the data can't support it.
     const aboveTrend = sma200 != null ? cur > sma200 : null;
     const durable = rs252 != null && rs252 > 0; // yearly RS positive = durable leadership
     rows.push({
       symbol: e.symbol, name: e.name, category: e.category,
-      rs21, rs63, rsBlend, aboveTrend, durable, current_price: cur,
+      rs21, rs63, rs252, rsBlend, aboveTrend, durable, current_price: cur,
     });
   }
   rows.sort((a, b) => b.rsBlend - a.rsBlend);
@@ -9194,40 +9203,65 @@ function computeEtfRotation() {
 function renderEtfRotationStrip() {
   const rows = computeEtfRotation();
   if (!rows.length) return ""; // no SPY benchmark or no ETF data yet
-  // Group by category, each category's members ranked by RS within it.
-  const CATEGORY_ORDER = ["US Sector", "Factor", "US Broad", "International", "Dividend", "Thematic"];
+  // Group by category.
   const byCat = {};
   for (const r of rows) (byCat[r.category] = byCat[r.category] || []).push(r);
-  const cats = CATEGORY_ORDER.filter(c => byCat[c]).concat(Object.keys(byCat).filter(c => !CATEGORY_ORDER.includes(c)));
 
-  const fmtRs = (v) => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
-  const rsClass = (v) => v == null ? "" : v > 3 ? "rs-strong" : v > 0 ? "rs-pos" : v > -3 ? "rs-soft" : "rs-neg";
+  // Sort categories by their STRONGEST member's RS, so the hottest sectors sit
+  // first (read left-to-right / top-to-bottom = strongest to weakest rotation).
+  const catBest = {};
+  for (const c of Object.keys(byCat)) catBest[c] = Math.max(...byCat[c].map(r => r.rsBlend));
+  const cats = Object.keys(byCat).sort((a, b) => catBest[b] - catBest[a]);
+
+  // Heatmap cell: background intensity scales with RS magnitude. Strong green
+  // for leaders, strong red for laggards, faint for the middle.
+  const heatStyle = (v) => {
+    if (v == null) return "";
+    const mag = Math.min(1, Math.abs(v) / 20); // saturate at ±20% RS
+    const alpha = (0.10 + mag * 0.45).toFixed(2);
+    if (v >= 0) return `background: rgba(74, 122, 74, ${alpha});`;       // green
+    return `background: rgba(176, 61, 45, ${alpha});`;                    // red
+  };
+  const fmtRs = (v) => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}`;
+  const trendMark = (t) => t === true ? `<span class="rot-trend up" title="Above 200-day average">↑</span>`
+                        : t === false ? `<span class="rot-trend down" title="Below 200-day average">↓</span>`
+                        : ``; // unknown — show nothing rather than a misleading arrow
 
   const catBlocks = cats.map(cat => {
-    const members = byCat[cat].slice(0, 6); // top 6 per category
+    const members = byCat[cat].slice(0, 6);
+    const best = catBest[cat];
+    const catHeat = best >= 8 ? "hot" : best >= 0 ? "warm" : "cold";
     const rowsHtml = members.map(r => `
-      <div class="rot-row" data-act="open-asset" data-symbol="${escAttr(r.symbol)}">
-        <span class="rot-sym">${escAttr(r.symbol)}${r.durable ? ` <span class="rot-star" title="Backed by positive 1-year relative strength">★</span>` : ""}</span>
-        <span class="rot-rs ${rsClass(r.rsBlend)}">${fmtRs(r.rsBlend)}</span>
-        <span class="rot-trend ${r.aboveTrend ? "up" : "down"}">${r.aboveTrend ? "↑200" : "↓200"}</span>
+      <div class="rot-row" data-act="open-asset" data-symbol="${escAttr(r.symbol)}" style="${heatStyle(r.rsBlend)}">
+        <span class="rot-sym">${escAttr(r.symbol)}${r.durable ? `<span class="rot-star" title="Durable — positive 1-year relative strength">★</span>` : ""}</span>
+        <span class="rot-rs">${fmtRs(r.rsBlend)}<span class="rot-pct">%</span></span>
+        ${trendMark(r.aboveTrend)}
       </div>`).join("");
     return `<div class="rot-cat">
-      <div class="rot-cat-head">${escAttr(cat)}</div>
+      <div class="rot-cat-head"><span class="rot-cat-dot ${catHeat}"></span>${escAttr(cat)}</div>
       ${rowsHtml}
     </div>`;
   }).join("");
+
+  // A one-line plain-English read of the rotation, derived from the data.
+  const topCat = cats[0], botCat = cats[cats.length - 1];
+  const leadName = byCat[topCat]?.[0]?.symbol;
+  const readLine = (catBest[topCat] > 3)
+    ? `Money is rotating into <b>${escAttr(topCat)}</b> (${escAttr(leadName)} leads) and out of <b>${escAttr(botCat)}</b>.`
+    : `No strong rotation — leadership is flat across categories right now.`;
 
   return `
     <div class="presurge-card rotation-card">
       <div class="presurge-head">
         <div>
           <h3>ETF Rotation</h3>
-          <div class="presurge-sub">Relative strength vs SPY · 1mo + 3mo blend · ★ = durable (1yr)</div>
+          <div class="presurge-sub">Strength vs SPY · 1mo+3mo · ★ durable · greener = leading</div>
         </div>
         <button class="btn btn-sm" data-act="run-presurge">Rescan</button>
       </div>
+      <div class="rot-read">${readLine}</div>
       <div class="rotation-grid">${catBlocks}</div>
-      <div class="presurge-foot">Leaders top each column. Tap any ETF to open it. Timing setups (oversold/breakout) still appear in the Screener list above.</div>
+      <div class="presurge-foot">Hottest categories first; leaders top each column. Tap any ETF to open it. Timing setups (oversold/breakout) appear in the Screener above.</div>
     </div>`;
 }
 
