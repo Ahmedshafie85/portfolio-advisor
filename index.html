@@ -8963,108 +8963,16 @@ const SCREENER_MIN_SCORE = 55; // only surface setups that clear this bar
 
 function computeScreenerSetups() {
   const out = [];
-  const universe = getPreSurgeUniverse(); // reuse the same fetched universe
-  const benchCloses = state.prices["SPY"]?.ohlcv?.map(d => d.c) || null;
-
+  const universe = getPreSurgeUniverse();
   for (const sym of universe) {
     if (sym === "SPY") continue;
-    const data = state.prices[sym];
-    if (!data || !data.ohlcv || data.ohlcv.length < 60) continue;
-    const ohlcv = data.ohlcv;
-    const closes = ohlcv.map(d => d.c).filter(x => x != null);
-    const vols   = ohlcv.map(d => d.v != null ? d.v : 0);
-    const cur = data.current_price ?? closes[closes.length - 1];
-    if (cur == null || closes.length < 60) continue;
-
-    const rsi   = computeRSI(closes, 14);
-    const sma50  = computeSMA(closes, 50);
-    const sma200 = closes.length >= 200 ? computeSMA(closes, 200) : null;
-    const swingLow = recentSwingLow(ohlcv, 20);
-    const ret90 = closes.length >= 90 ? ((cur - closes[closes.length - 90]) / closes[closes.length - 90]) * 100 : null;
-    const avgVol20 = vols.length >= 21 ? vols.slice(-21, -1).reduce((a, b) => a + b, 0) / 20 : null;
-    const todayVol = vols[vols.length - 1];
-    const volRatio = (avgVol20 && avgVol20 > 0) ? todayVol / avgVol20 : null;
-    const high60 = Math.max(...closes.slice(-60));
-    const peak90 = closes.length >= 90 ? Math.max(...closes.slice(-90)) : Math.max(...closes);
-    const ddFromPeak = peak90 > 0 ? ((cur - peak90) / peak90) * 100 : 0;
-
-    const candidates = [];
-
-    // ---- OVERSOLD BOUNCE ----
-    if (rsi != null && rsi <= 32 && sma200 != null) {
-      let score = 0;
-      score += rsi <= 22 ? 35 : rsi <= 28 ? 28 : 20;          // depth of oversold
-      if (cur > sma200) score += 25;                           // quality: above 200MA
-      else score -= 10;                                        // below 200MA = riskier
-      if (swingLow != null && cur <= swingLow * 1.04) score += 20; // near support
-      if (ddFromPeak > -35) score += 10;                       // not in free-fall
-      if (volRatio != null && volRatio > 1.3) score += 10;     // capitulation volume
-      score = Math.max(0, Math.min(100, score));
-      candidates.push({ setup: "Oversold bounce", score,
-        detail: `RSI ${rsi.toFixed(0)}${cur > sma200 ? " · above 200MA" : " · below 200MA"}${swingLow != null && cur <= swingLow * 1.04 ? " · at support" : ""}` });
-    }
-
-    // ---- BREAKOUT ----
-    if (cur >= high60 * 0.995) {
-      let score = 0;
-      score += cur >= high60 ? 35 : 25;                        // at vs near the high
-      if (volRatio != null && volRatio > 1.5) score += 30;     // volume confirms
-      else if (volRatio != null && volRatio > 1.2) score += 18;
-      else score -= 5;                                          // breakout w/o volume = suspect
-      if (sma50 != null && cur > sma50) score += 15;           // trend intact
-      if (ret90 != null && ret90 > 0) score += 10;             // positive base
-      score = Math.max(0, Math.min(100, score));
-      candidates.push({ setup: "Breakout", score,
-        detail: `${cur >= high60 ? "new" : "near"} 60d high${volRatio != null ? ` · vol ${volRatio.toFixed(1)}×` : ""}` });
-    }
-
-    // ---- MOMENTUM PULLBACK ----
-    if (ret90 != null && ret90 > 12 && sma50 != null && rsi != null && rsi >= 38 && rsi <= 52) {
-      let score = 0;
-      score += ret90 > 30 ? 30 : 22;                           // trend strength
-      if (cur > sma50) score += 22;                            // holding the 50MA
-      else if (cur > sma50 * 0.97) score += 12;                // testing it
-      if (rsi >= 40 && rsi <= 48) score += 20;                 // ideal cooled-off zone
-      if (sma200 != null && cur > sma200) score += 18;         // primary uptrend intact
-      score = Math.max(0, Math.min(100, score));
-      candidates.push({ setup: "Momentum pullback", score,
-        detail: `90d +${ret90.toFixed(0)}% · RSI ${rsi.toFixed(0)} · ${cur > sma50 ? "above" : "testing"} 50MA` });
-    }
-
-    // keep the single strongest setup per symbol (don't double-list a name)
-    if (candidates.length) {
-      candidates.sort((a, b) => b.score - a.score);
-      const best = candidates[0];
-      if (best.score >= SCREENER_MIN_SCORE) {
-        out.push({ symbol: sym, current_price: cur, ...best });
-      }
+    const r = scoreSymbolSetups(sym);
+    // Surface only named setups that clear the floor. Sub-floor / no-setup names
+    // still get a score for their watchlist row, but don't clutter the curated list.
+    if (r && r.setup && r.score >= SCREENER_MIN_SCORE) {
+      out.push(r);
     }
   }
-
-  // ---- ETF ROTATION (from the leaderboard, separate data source) ----
-  if (Array.isArray(state.etfLeaderboard)) {
-    for (const e of state.etfLeaderboard) {
-      if (!e || e.error || e.return_pct == null) continue;
-      const aboveTrend = e.trend_200ma === "above_200ma" || e.trend_200ma === true;
-      if (!aboveTrend) continue;
-      let score = 0;
-      score += e.return_pct >= 30 ? 35 : e.return_pct >= 18 ? 28 : e.return_pct >= 10 ? 18 : 8;
-      score += 25; // above 200MA confirmed
-      if (e.max_drawdown_pct != null && e.max_drawdown_pct > -15) score += 15; // smooth ride
-      else if (e.max_drawdown_pct != null && e.max_drawdown_pct > -25) score += 8;
-      score = Math.max(0, Math.min(100, score));
-      if (score >= SCREENER_MIN_SCORE) {
-        // ETF leader replaces any weaker non-ETF entry for the same symbol
-        const existing = out.find(o => o.symbol === e.symbol);
-        const row = { symbol: e.symbol, current_price: e.current_price ?? null,
-          setup: "ETF rotation", score,
-          detail: `+${e.return_pct.toFixed(0)}% · above 200MA${e.max_drawdown_pct != null ? ` · max DD ${e.max_drawdown_pct.toFixed(0)}%` : ""}` };
-        if (existing) { if (row.score > existing.score) Object.assign(existing, row); }
-        else out.push(row);
-      }
-    }
-  }
-
   out.sort((a, b) => b.score - a.score);
   return out;
 }
@@ -9141,6 +9049,29 @@ function scoreSymbolSetups(sym) {
     score = Math.max(0, Math.min(100, score));
     candidates.push({ setup: "Momentum pullback", score,
       detail: `90d +${ret90.toFixed(0)}% · RSI ${rsi.toFixed(0)} · ${cur > sma50 ? "above" : "testing"} 50MA` });
+  }
+
+  // ---- ETF ROTATION (price-based, so ETFs score WITHOUT the leaderboard) ----
+  // An ETF leading = strong trailing return + above its 200MA + not too choppy.
+  // The leaderboard, when present, enriches the detail line but isn't required.
+  const isEtf = (typeof ETF_UNIVERSE !== "undefined") && ETF_UNIVERSE.some(e => e.symbol === sym);
+  if (isEtf && sma200 != null) {
+    const ret126 = closes.length >= 126 ? ((cur - closes[closes.length - 126]) / closes[closes.length - 126]) * 100 : ret90;
+    const aboveTrend = cur > sma200;
+    let score = 0;
+    if (ret126 != null) score += ret126 >= 30 ? 35 : ret126 >= 18 ? 28 : ret126 >= 10 ? 18 : ret126 >= 3 ? 10 : 0;
+    if (aboveTrend) score += 25; else score -= 5;
+    if (sma50 != null && cur > sma50) score += 12;        // shorter trend also up
+    if (ddFromPeak > -12) score += 10;                     // smooth, shallow pullbacks
+    else if (ddFromPeak > -20) score += 5;
+    score = Math.max(0, Math.min(100, score));
+    // Enrich detail from the leaderboard if we have it.
+    let detail = `${ret126 != null ? (ret126 >= 0 ? "+" : "") + ret126.toFixed(0) + "% 6mo" : "trend"}${aboveTrend ? " · above 200MA" : " · below 200MA"}`;
+    if (Array.isArray(state.etfLeaderboard)) {
+      const e = state.etfLeaderboard.find(x => x.symbol === sym);
+      if (e && e.return_pct != null) detail = `+${e.return_pct.toFixed(0)}% · ${aboveTrend ? "above" : "below"} 200MA${e.max_drawdown_pct != null ? ` · max DD ${e.max_drawdown_pct.toFixed(0)}%` : ""}`;
+    }
+    candidates.push({ setup: "ETF rotation", score, detail });
   }
 
   if (!candidates.length) {
@@ -10420,13 +10351,22 @@ function renderWatchlist() {
     return;
   }
 
+  // Precompute the screener score once per symbol (the comparator runs many
+  // times; scoring each name once keeps it cheap).
+  const _wlScore = {};
+  for (const w of state.watchlist) _wlScore[w.symbol] = screenerScoreFor(w.symbol)?.score ?? -1;
   const sorted = state.watchlist.slice().sort((a, b) => {
+    // Urgency first: a fired alert outranks a high score (a tripped stop matters
+    // more than a pretty setup). Within each band, rank by the live screener
+    // score, high to low — the same score shown on each row.
     const sa = state.watchlistSnapshot[a.symbol];
     const sb = state.watchlistSnapshot[b.symbol];
     const ta = sa?.triggers?.length || 0;
     const tb = sb?.triggers?.length || 0;
-    if (ta !== tb) return tb - ta;
-    return (sb?.setup_score || 0) - (sa?.setup_score || 0);
+    if ((ta > 0) !== (tb > 0)) return tb > 0 ? 1 : -1;  // fired-trigger band on top
+    const scoreA = _wlScore[a.symbol], scoreB = _wlScore[b.symbol];
+    if (scoreA !== scoreB) return scoreB - scoreA;       // high score → low
+    return a.symbol.localeCompare(b.symbol);             // stable alpha tiebreak
   });
 
   const rows = sorted.map(w => {
