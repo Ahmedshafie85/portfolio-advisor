@@ -3024,6 +3024,12 @@ body {
   font-family: var(--mono); font-size: 18px; font-weight: 600;
   min-width: 30px; text-align: center;
 }
+.unified-action { display: flex; align-items: flex-start; gap: 12px; margin-top: 8px; }
+.unified-score {
+  font-family: var(--mono); font-size: 18px; font-weight: 600;
+  min-width: 30px; text-align: center; flex: 0 0 auto; line-height: 1.3;
+}
+.unified-action-body { flex: 1; min-width: 0; }
 .screener-mid { flex: 1; min-width: 0; }
 .screener-sym-row { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
 .screener-sym { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--ink); }
@@ -10247,27 +10253,43 @@ function screenerSetupFor(symbol) {
   return _screenerSetupCache.map[symbol] || null;
 }
 
+// Shared score badge — the SAME number shown on the Screener card, so every
+// surface (Screener, Watchlist, Opportunities) leads with one consistent score.
+function renderScoreBadge(score, color) {
+  if (score == null) return "";
+  return `<span class="unified-score" style="color:${color || "var(--ink-soft)"};">${Math.round(score)}</span>`;
+}
+
 function renderUnifiedAction(symbol, currentPrice, isHeld) {
+  const s = screenerSetupFor(symbol);
+  const color = (s && typeof SCREENER_SETUP_COLORS !== "undefined" && SCREENER_SETUP_COLORS[s.setup]) || "var(--ink-soft)";
+  const scoreBadge = s ? renderScoreBadge(s.score, color) : "";
+
   const analysis = state.analyses?.[symbol] || null;
   if (analysis) {
-    // Analyzed → real directive. Build the row-shaped object computeLocalVerdict
-    // expects, run it, then render the same directive line used on Portfolio.
+    // Analyzed → real directive, but KEEP the score badge so the row still
+    // shows its number. Same directive line used on Portfolio, prefixed with
+    // the score for visual consistency with the Screener.
     const holding = state.holdings.find(h => h.symbol === symbol && h.asset_class !== "cash") || null;
     const v = computeLocalVerdict(analysis, holding, { currentPrice, isHeld });
     const d = deriveDirective({ ...v, symbol });
-    return renderDirectiveLine(d);
+    return `<div class="unified-action">${scoreBadge}<div class="unified-action-body">${renderDirectiveLine(d)}</div></div>`;
   }
-  // Not analyzed → show the free Screener setup as the pre-read.
-  const s = screenerSetupFor(symbol);
+
+  // Not analyzed → score + setup tag + detail (identical content to a Screener row).
   if (s) {
-    const color = (typeof SCREENER_SETUP_COLORS !== "undefined" && SCREENER_SETUP_COLORS[s.setup]) || "var(--ink-soft)";
     return `
-      <div class="vrow-directive" style="margin-top:8px;">
-        <span class="dir-verb" style="background:transparent;border:1px solid ${color};color:${color};font-weight:600;">${escAttr(s.setup)}</span>
-        <span class="dir-dot">·</span>
-        <span class="dir-piece">${escAttr(s.detail)}</span>
-        <span class="dir-dot">·</span>
-        <span class="dir-piece dir-conf-low">analyze for action</span>
+      <div class="unified-action">
+        ${scoreBadge}
+        <div class="unified-action-body">
+          <div class="vrow-directive" style="margin-top:0;">
+            <span class="dir-verb" style="background:transparent;border:1px solid ${color};color:${color};font-weight:600;">${escAttr(s.setup)}</span>
+            <span class="dir-dot">·</span>
+            <span class="dir-piece">${escAttr(s.detail)}</span>
+            <span class="dir-dot">·</span>
+            <span class="dir-piece dir-conf-low">analyze for action</span>
+          </div>
+        </div>
       </div>`;
   }
   // No setup, no analysis → tracking only.
