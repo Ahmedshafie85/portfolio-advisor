@@ -9479,6 +9479,12 @@ async function runPreSurge() {
   state.preSurgeProgress = { fetched: 0, total: 0 };
   renderCurrentView();
   try {
+    // UNIFIED SCAN: one operation behind every scan button. First refresh the
+    // watchlist snapshot (row prices/RSI/triggers), then run the universe scan
+    // that powers the Screener + Pre-Surge. Previously "Rescan" on the Screener
+    // skipped the snapshot while "Scan now" did it — same button, different
+    // result. Now they're identical no matter where pressed.
+    try { if (state.watchlist?.length) await runScan(); } catch (e) { /* snapshot best-effort */ }
     await ensurePreSurgeData((fetched, total) => {
       state.preSurgeProgress = { fetched, total };
       // Only re-render every ~5 items to avoid flicker on slow networks
@@ -9489,9 +9495,12 @@ async function runPreSurge() {
     state.preSurgeWatching = watching;
     state.preSurgeAllScored = allScored;
     state.preSurgeRanAt = new Date().toISOString();
+    state.lastScanAt = new Date().toISOString();
     const added = recordPreSurgeFlags(flagged);
     state.preSurgeLoading = false;
     state.preSurgeProgress = null;
+    // Invalidate the screener cache so the next render recomputes on fresh data.
+    _screenerSetupCache = { at: 0, map: null };
     renderCurrentView();
     toast(`${flagged.length} confirmed setup${flagged.length === 1 ? "" : "s"}${added > 0 ? ` · ${added} new today` : ""} · ${watching.length} watching · ${allScored.length} scored`);
     // Kick off DTC fetch in background to enrich rows with short-interest badges
@@ -11260,17 +11269,13 @@ function backToWatchlist() {
 }
 
 async function rescan() {
-  toast("Scanning…");
+  // Both "Scan now" and the Screener's "Rescan" now run the SAME unified scan
+  // (runPreSurge does snapshot + universe). This wrapper just exists for the
+  // top-bar button's own spinner/label.
   const btn = $('[data-act="rescan"]');
   if (btn) { btn.innerHTML = '<span class="spinner"></span> Scanning…'; btn.disabled = true; }
   try {
-    // ONE scan button does both jobs: the watchlist snapshot (prices, RSI,
-    // triggers for the rows) AND the ranked universe scan that powers the
-    // Screener setups + Pre-Surge. The user shouldn't have to press two.
-    await runScan();
-    try { await runPreSurge(); } catch (e) { /* universe scan is best-effort */ }
-    toast(state.triggers.length > 0 ? `Scan complete · ${state.triggers.length} triggers` : "Scan complete");
-    renderCurrentView();
+    await runPreSurge();
   } catch (e) {
     toast("Scan failed: " + (e.message || "").slice(0, 80), 3000, "error");
     if (btn) { btn.innerHTML = "Try Again"; btn.disabled = false; }
