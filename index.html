@@ -2086,6 +2086,32 @@ body {
 .setting-row .lbl { font-size: 14px; }
 .setting-row .sub { font-size: 11px; color: var(--ink-muted); margin-top: 2px; }
 
+.howto-card { background: var(--bg-card); }
+.howto-toggle {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 15px 18px; background: none; border: none; cursor: pointer;
+  font-family: var(--sans); font-size: 14px; color: var(--ink); text-align: left;
+}
+.howto-chevron { color: var(--ink-muted); font-size: 13px; }
+.howto-body { padding: 4px 18px 18px; border-top: 1px solid var(--rule-soft); }
+.howto-step {
+  display: flex; gap: 12px; align-items: flex-start; padding: 9px 0;
+  font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--ink-soft);
+}
+.howto-step b { color: var(--ink); }
+.howto-num {
+  flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--bg-elev); color: var(--ink-muted);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; margin-top: 1px;
+}
+.howto-note {
+  margin-top: 12px; padding: 12px 14px; border-radius: 8px;
+  background: var(--bg-elev); font-family: var(--sans); font-size: 12.5px;
+  line-height: 1.55; color: var(--ink-soft);
+}
+.howto-note b { color: var(--ink); }
+
 .toggle {
   position: relative; width: 44px; height: 26px;
   background: var(--rule); border-radius: 13px;
@@ -4480,6 +4506,7 @@ const state = {
   // Phase Q — Telegram notifications profile. Hydrated from Firestore on
   // boot via loadNotifications(). { enabled: bool, telegram_chat_id: string }
   notifications: null,
+  howtoOpen: true,   // How-to-use card on Settings — open by default first time
   breakoutPromptDismissed: localStorage.getItem("breakoutPromptDismissed") === "1",
   // News (big-opportunity filter) — hydrate from localStorage so opportunities
   // survive iOS tab unloading and page reloads (within TTL window)
@@ -10977,22 +11004,19 @@ document.addEventListener("input", e => {
 
 async function addCuratedToWatchlist(symbol, name) {
   if (!symbol) return;
-  // Default condition for curated ideas: drop-from-peak 10% (entry on weakness)
-  const conditions = [
-    { id: cryptoRandomId(), type: "drop_from_peak", threshold_pct: 10 },
-  ];
+  const cls = guessAssetClass(symbol);
+  // Same auto-armed defaults as manual add — oversold, pullback, breakout.
+  const conditions = defaultConditionsFor(symbol, cls);
   try {
     await db.collection("users").doc(state.uid).collection("watchlist").doc(symbol).set({
       symbol,
       name: name || symbol,
       conditions,
-      asset_class: guessAssetClass(symbol),
+      asset_class: cls,
       added_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     await loadWatchlist();
-    toast(`${symbol} added to watchlist`);
-    // Re-render whichever view we're on so the button state updates immediately
-    // (was renderWatchlist() — broke when called from Today's Opportunities on Portfolio tab)
+    toast(`${symbol} added · alerts armed`);
     renderCurrentView();
   } catch (e) {
     toast(`Failed to add: ${e.message || e}`, 3000, "error");
@@ -11236,12 +11260,16 @@ function backToWatchlist() {
 }
 
 async function rescan() {
-  toast("Scanning watchlist…");
+  toast("Scanning…");
   const btn = $('[data-act="rescan"]');
   if (btn) { btn.innerHTML = '<span class="spinner"></span> Scanning…'; btn.disabled = true; }
   try {
+    // ONE scan button does both jobs: the watchlist snapshot (prices, RSI,
+    // triggers for the rows) AND the ranked universe scan that powers the
+    // Screener setups + Pre-Surge. The user shouldn't have to press two.
     await runScan();
-    toast(state.triggers.length > 0 ? `Scan complete · ${state.triggers.length} triggers` : "Scan complete · no triggers");
+    try { await runPreSurge(); } catch (e) { /* universe scan is best-effort */ }
+    toast(state.triggers.length > 0 ? `Scan complete · ${state.triggers.length} triggers` : "Scan complete");
     renderCurrentView();
   } catch (e) {
     toast("Scan failed: " + (e.message || "").slice(0, 80), 3000, "error");
@@ -13463,6 +13491,23 @@ function renderSettings() {
   const email = user?.email || "Anonymous (this device only)";
   view.innerHTML = `
     <div class="section-head" style="padding: 20px 20px 0;"><h2>Settings</h2></div>
+    <div class="settings-group howto-card">
+      <button class="howto-toggle" data-act="toggle-howto">
+        <span><b>How to use this app</b> — the weekly routine</span>
+        <span class="howto-chevron">${state.howtoOpen ? "▾" : "▸"}</span>
+      </button>
+      ${state.howtoOpen ? `
+      <div class="howto-body">
+        <div class="howto-step"><span class="howto-num">1</span><div><b>Scan (free).</b> Open Watchlist or Discover and tap <b>Scan now</b>. No AI cost — it scores your whole universe for setups.</div></div>
+        <div class="howto-step"><span class="howto-num">2</span><div><b>Read the shortlist.</b> In Discover, the Screener ranks names by setup quality. You're just reading the free pre-reads, not analyzing yet.</div></div>
+        <div class="howto-step"><span class="howto-num">3</span><div><b>Analyze 3–5 only.</b> Tap Analyze on the best few. This is the one place you spend money — on a handful, not the whole list.</div></div>
+        <div class="howto-step"><span class="howto-num">4</span><div><b>Read the directive.</b> Each shows <i>BUY at $X · buy $Y · confidence Z</i>. HIGH + a setup you like = act. LOW/MED = wait.</div></div>
+        <div class="howto-step"><span class="howto-num">5</span><div><b>Check holdings.</b> On Portfolio, most say HOLD — ignore those. Act only on <b>SELL</b>, <b>ADD</b>, or the red pulsing <b>EXIT</b>.</div></div>
+        <div class="howto-step"><span class="howto-num">6</span><div><b>Log what you do.</b> Tap Log Trade. Over time the Journal shows which setups actually pay off for you.</div></div>
+        <div class="howto-step"><span class="howto-num">7</span><div><b>Let Telegram watch.</b> You don't check daily. Add names to the watchlist (alerts auto-arm) and the cron pings you when something fires.</div></div>
+        <div class="howto-note">One line: <b>Scan → read shortlist → analyze the best few → act on loud directives → log it → let Telegram watch the rest.</b> This is decision support, not a signal to follow blindly — the confidence label tells you when the app itself isn't sure.</div>
+      </div>` : ""}
+    </div>
     <div class="settings-group">
       <div class="setting-row">
         <div>
@@ -14684,6 +14729,21 @@ const debouncedSearchWatch = debounce(async () => {
   } catch (e) { results.classList.add("hidden"); }
 }, 300);
 
+// Default conditions auto-armed when a name is added to the watchlist, so the
+// cron has something to alert on without the user hand-entering anything. Tuned
+// to the moderate tier: oversold (RSI<30), a meaningful pullback, and a 50-day
+// breakout. Types match what the Worker's evalStructuredCondition supports.
+// Editable per-name afterward.
+function defaultConditionsFor(symbol, assetClass) {
+  const s = String(symbol || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const isCrypto = assetClass === "crypto";
+  return [
+    { id: `${s}_rsi`,    type: "rsi_below",      threshold: 30 },
+    { id: `${s}_dip`,    type: "drop_from_peak", threshold_pct: isCrypto ? 18 : 12 },
+    { id: `${s}_break`,  type: "breakout_high",  period: 50 },
+  ];
+}
+
 async function submitAddWatch() {
   const symbol = $("#aw_symbol").value.trim().toUpperCase();
   const cls = $("#aw_class").value;
@@ -14691,10 +14751,10 @@ async function submitAddWatch() {
   if (!symbol) { toast("Enter a symbol", 2400, "error"); return; }
   await db.collection("users").doc(state.uid).collection("watchlist").doc(symbol).set({
     symbol, asset_class: cls, name,
-    conditions: [],
+    conditions: defaultConditionsFor(symbol, cls),
     added_at: firebase.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
-  toast(`${symbol} added to watchlist`);
+  toast(`${symbol} added · alerts armed`);
   closeModal();
   await loadWatchlist();
   renderWatchlist();
@@ -14975,6 +15035,7 @@ document.addEventListener("click", (e) => {
       case "delete-holding":         confirmDeleteHolding(symbol); break;
       case "save-notifications":     saveNotifications(); break;
       case "test-notification":      sendTestNotification(); break;
+      case "toggle-howto":           state.howtoOpen = !state.howtoOpen; renderSettings(); break;
       case "notif-toggle": {
         // Live-update the label text on the toggle without re-rendering.
         const span = target.parentElement?.querySelector("span");
