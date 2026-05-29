@@ -8236,18 +8236,15 @@ function renderTodaysOpportunitiesCard() {
 function renderOpportunityItem(o) {
   const actionClass = o.action.toLowerCase();
   const recKey = recKeyFor(o.symbol, "opportunity", "opps");
-  let actionLine = "";
-  if (o.action === "STARTER" && o.dollars > 0) {
-    actionLine = `Starter ~$${fmtUSD(o.dollars, 0)} (~1.5% of portfolio)`;
-  } else if (o.action === "CONSIDER" && o.dollars > 0) {
-    actionLine = `Nibble ~$${fmtUSD(o.dollars, 0)} (~0.5%)`;
-  } else if (o.action === "WATCH") {
-    actionLine = "Add to watchlist · re-evaluate when signal strengthens";
-  }
 
   // Show current price + macro tag
   const price = state.prices[o.symbol]?.current_price;
   const priceStr = price ? `$${fmtUSD(price)}` : "";
+
+  // ONE action vocabulary — same directive line as holdings and watchlist.
+  // After analysis: full BUY/ADD/WAIT directive. Before: the Screener setup
+  // pre-read (these are NEW entries, so it's never "held").
+  const unifiedAction = renderUnifiedAction(o.symbol, price, false);
 
   const buyVotes = o.votes.filter(x => x.dir === "buy");
   const tiltVotes = o.votes.filter(x => x.dir === "tilt");
@@ -8277,17 +8274,8 @@ function renderOpportunityItem(o) {
 
   const onWatchlist = state.watchlist.some(w => w.symbol === o.symbol);
 
-  // Phase M — inline verdict block for opportunity rows. Uses the analysis
-  // if one exists; falls back to a "no analysis yet" hint that nudges the
-  // user to tap the existing ⚡ Analyze button.
-  const isVerdictExpanded = !!state.expandedVerdicts?.[o.symbol];
-  const oppAnalysis = state.analyses?.[o.symbol];
-  const oppVerdictBlock = isVerdictExpanded
-    ? renderInlineVerdictBlock(o.symbol, oppAnalysis, null, state.prices[o.symbol]?.current_price)
-    : "";
-
-  // Build opportunity entry plan (Round 3) — only for CONSIDER/STARTER, not WATCH.
-  // Collapsed by default — tap to expand. Same UX pattern as held verdicts.
+  // Trade plan (entry/stop) stays — collapsed by default. It's the detail
+  // behind the directive, same as the plan block on Portfolio ACT rows.
   const oppPlan = buildOpportunityPlan(o);
   const oppPlanToggleKey = `tp:opp:${o.symbol}:${o.action}`;
   const oppPlanExpanded = !!state.tradePlanExpanded?.[oppPlanToggleKey];
@@ -8324,13 +8312,11 @@ function renderOpportunityItem(o) {
     <div class="opp-item ${actionClass}" data-act="open-asset" data-symbol="${escAttr(o.symbol)}">
       <div class="opp-item-head">
         <div class="oih-left">
-          <span class="opp-action-badge ${actionClass}">${escAttr(o.action)}</span>
           <span class="opp-sym">${escAttr(o.symbol)}</span>
           ${priceStr ? `<span class="opp-price">${priceStr}</span>` : ""}
           ${onWatchlist ? `<span class="opp-tag onlist">on watchlist</span>` : ""}
         </div>
         <div class="oih-right">
-          <span class="opp-net">net +${o.net.toFixed(1)}</span>
           <button class="vrow-analyze ${state.analyzingSymbols?.[o.symbol] ? 'analyzing' : ''}"
                   data-act="vrow-analyze" data-symbol="${escAttr(o.symbol)}"
                   title="Analyze ${escAttr(o.symbol)}"
@@ -8342,14 +8328,10 @@ function renderOpportunityItem(o) {
           <button class="opp-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" title="Hide">×</button>
         </div>
       </div>
-      ${actionLine ? `<div class="opp-action-line">${escAttr(actionLine)}</div>` : ""}
+      ${unifiedAction}
       <div class="opp-votes">${voteChips}</div>
       ${oppPlanHtml}
-      <div class="opp-actions-row">
-        <button class="inline-action-btn" data-act="toggle-inline-verdict" data-symbol="${escAttr(o.symbol)}">${isVerdictExpanded ? "▴ Verdict" : "▾ Verdict"}</button>
-        ${!onWatchlist && o.action !== "STARTER" ? `<button class="inline-action-btn" data-act="add-curated" data-symbol="${escAttr(o.symbol)}" data-name="${escAttr(o.symbol)}">+ Watch</button>` : ""}
-      </div>
-      ${oppVerdictBlock}
+      ${!onWatchlist ? `<div class="opp-actions-row"><button class="inline-action-btn" data-act="add-curated" data-symbol="${escAttr(o.symbol)}" data-name="${escAttr(o.symbol)}">+ Watch</button></div>` : ""}
     </div>
   `;
 }
@@ -10208,6 +10190,54 @@ function m_safe() {
 
 
 // ----- Watchlist
+// Unified action for a Watchlist / Opportunity row. ONE vocabulary everywhere:
+//   - If the name has been analyzed → the full directive line (BUY/ADD/SELL/
+//     WAIT + level + size + confidence), identical to holdings and Portfolio.
+//   - If NOT yet analyzed → the top Screener setup it scored (the free pre-read),
+//     with a prompt to spend an Analyze for the full directive.
+// This replaces the old raw condition-pills + "go look on another tab" pointer.
+let _screenerSetupCache = { at: 0, map: null };
+function screenerSetupFor(symbol) {
+  // Cache the screener pass for ~1s so a full watchlist render doesn't recompute
+  // the whole universe per row.
+  if (!_screenerSetupCache.map || Date.now() - _screenerSetupCache.at > 1000) {
+    try {
+      const setups = (typeof computeScreenerSetups === "function") ? computeScreenerSetups() : [];
+      const m = {};
+      for (const s of setups) if (!m[s.symbol]) m[s.symbol] = s;
+      _screenerSetupCache = { at: Date.now(), map: m };
+    } catch (e) { _screenerSetupCache = { at: Date.now(), map: {} }; }
+  }
+  return _screenerSetupCache.map[symbol] || null;
+}
+
+function renderUnifiedAction(symbol, currentPrice, isHeld) {
+  const analysis = state.analyses?.[symbol] || null;
+  if (analysis) {
+    // Analyzed → real directive. Build the row-shaped object computeLocalVerdict
+    // expects, run it, then render the same directive line used on Portfolio.
+    const holding = state.holdings.find(h => h.symbol === symbol && h.asset_class !== "cash") || null;
+    const v = computeLocalVerdict(analysis, holding, { currentPrice, isHeld });
+    const d = deriveDirective({ ...v, symbol });
+    return renderDirectiveLine(d);
+  }
+  // Not analyzed → show the free Screener setup as the pre-read.
+  const s = screenerSetupFor(symbol);
+  if (s) {
+    const color = (typeof SCREENER_SETUP_COLORS !== "undefined" && SCREENER_SETUP_COLORS[s.setup]) || "var(--ink-soft)";
+    return `
+      <div class="vrow-directive" style="margin-top:8px;">
+        <span class="dir-verb" style="background:transparent;border:1px solid ${color};color:${color};font-weight:600;">${escAttr(s.setup)}</span>
+        <span class="dir-dot">·</span>
+        <span class="dir-piece">${escAttr(s.detail)}</span>
+        <span class="dir-dot">·</span>
+        <span class="dir-piece dir-conf-low">analyze for action</span>
+      </div>`;
+  }
+  // No setup, no analysis → tracking only.
+  return `<div class="vrow-directive-note" style="margin-top:8px;">Tracking — no setup yet. Analyze for a full read.</div>`;
+}
+
 function renderWatchlist() {
   if (state.selectedSymbol) {
     renderWatchDetail(state.selectedSymbol);
@@ -10243,66 +10273,16 @@ function renderWatchlist() {
   const rows = sorted.map(w => {
     const snap = state.watchlistSnapshot[w.symbol];
     const hasTrigger = snap?.triggers?.length > 0;
-    const condPills = (w.conditions || []).map(c => {
-      const fired = snap?.triggers?.some(t => t.condition_id === c.id);
-      return `<span class="watch-cond-pill ${fired ? 'fired' : ''}">${escAttr(describeCondition(c))}</span>`;
-    }).join("");
 
     const dayClass = (snap?.day_change_pct || 0) >= 0 ? "pos" : "neg";
     const rsiClass = snap?.rsi14 < 35 ? "warn" : snap?.rsi14 > 70 ? "over" : "";
     const trendClass = snap?.trend === "above_200ma" ? "above" : "below";
-    // Phase O — price anomaly check for watchlist rows. Same logic as holdings;
-    // shown as a small badge replacing the day-change number when the feed is
-    // obviously broken.
     const wAnomaly = priceAnomaly(w.symbol, w.asset_class);
-
-    // Suggested entry strip — only when a condition has actually fired
-    // AND the symbol isn't already being handled by Today's Verdict / Today's
-    // Opportunities on the Portfolio tab. We don't want THREE places telling
-    // the user to buy the same name.
-    let suggestStrip = "";
     const heldHere = state.holdings.some(h => h.symbol === w.symbol && h.asset_class !== "cash");
-    // If held: decision is on the Portfolio tab via Today's Verdict — suppress.
-    // If not held but has firing condition: decision is via Today's Opportunities — suppress.
-    // We keep the strip ONLY when the symbol has NO trigger firing (just a tracking row).
-    if (hasTrigger && snap?.current_price && !heldHere) {
-      // Symbol has firing condition AND isn't held → handled by Today's Opportunities.
-      // Show a soft pointer instead of duplicating the action.
-      suggestStrip = `
-        <div class="watch-suggest-strip pointer">
-          <span class="wss-action">↑ Action on Portfolio → Today's Opportunities</span>
-        </div>
-      `;
-    } else if (hasTrigger && snap?.current_price && heldHere) {
-      // Held + firing condition → handled by Today's Verdict
-      suggestStrip = `
-        <div class="watch-suggest-strip pointer">
-          <span class="wss-action">↑ Action on Portfolio → Today's Verdict</span>
-        </div>
-      `;
-    }
-    // Legacy: keep the "contradicts" override for the rare case where scan says trim
-    // on the same symbol — preserves the safety check
-    if (hasTrigger && snap?.current_price) {
-      const scanContradicts = (computeDailyScan() || []).some(a => a.symbol === w.symbol && a.kind === "trim");
-      if (scanContradicts) {
-        suggestStrip = `
-          <div class="watch-suggest-strip contradicts">
-            <span class="wss-action">⚠ Daily scan suggests TRIM — review before buying</span>
-          </div>
-        `;
-      }
-    }
 
-    // Inline Verdict expander state (Phase M). Tap "Verdict" → row expands
-    // showing the per-symbol local verdict (target, action, reasoning). Tap
-    // again to collapse. Uses computeLocalVerdict — consistent with what the
-    // asset detail page shows. Falls back gracefully when no analysis exists.
-    const isVerdictExpanded = !!state.expandedVerdicts?.[w.symbol];
-    const analysis = state.analyses?.[w.symbol];
-    const verdictBlock = isVerdictExpanded
-      ? renderInlineVerdictBlock(w.symbol, analysis, null, snap?.current_price)
-      : "";
+    // ONE action vocabulary: directive line after analysis, Screener setup
+    // before. No more raw condition pills, no more "go look on another tab".
+    const actionLine = renderUnifiedAction(w.symbol, snap?.current_price, heldHere);
 
     return `
       <div class="watch-row ${hasTrigger ? 'has-trigger' : ''}" data-act="open-watch" data-symbol="${escAttr(w.symbol)}">
@@ -10322,13 +10302,10 @@ function renderWatchlist() {
           <span class="watch-trend ${trendClass}">${snap?.trend === 'above_200ma' ? '↑ 200MA' : '↓ 200MA'}</span>
           <span>${snap?.pct_from_52w_high != null ? snap.pct_from_52w_high.toFixed(1) + '% from 52w high' : ''}</span>
         </div>
-        ${condPills ? `<div class="watch-cond-pills">${condPills}</div>` : ""}
-        ${suggestStrip}
+        ${actionLine}
         <div class="watch-actions">
           <button class="inline-action-btn" data-act="run-analysis-inline" data-symbol="${escAttr(w.symbol)}">⚡ Analyze</button>
-          <button class="inline-action-btn" data-act="toggle-inline-verdict" data-symbol="${escAttr(w.symbol)}">${isVerdictExpanded ? "▴ Verdict" : "▾ Verdict"}</button>
         </div>
-        ${verdictBlock}
       </div>
     `;
   }).join("");
