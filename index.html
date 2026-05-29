@@ -9051,26 +9051,56 @@ function scoreSymbolSetups(sym) {
       detail: `90d +${ret90.toFixed(0)}% · RSI ${rsi.toFixed(0)} · ${cur > sma50 ? "above" : "testing"} 50MA` });
   }
 
-  // ---- ETF ROTATION (price-based, so ETFs score WITHOUT the leaderboard) ----
-  // An ETF leading = strong trailing return + above its 200MA + not too choppy.
-  // The leaderboard, when present, enriches the detail line but isn't required.
+  // ---- ETF OPPORTUNITY (relative strength + absolute setup, blended) --------
+  // For an ETF, the opportunity isn't its raw return — it's whether it's LEADING
+  // (beating SPY and trending up) or a buyable LAGGARD (pulled back but still in
+  // a primary uptrend), timed by an absolute setup. We blend:
+  //   • Relative strength vs SPY over ~3mo and ~6mo (rotation signal)
+  //   • Trend (above 200MA) + smoothness (shallow drawdown)
+  //   • An absolute timing kicker (oversold dip OR fresh breakout)
+  // and tag WHY: "leading sector", "oversold laggard", or "breakout".
   const isEtf = (typeof ETF_UNIVERSE !== "undefined") && ETF_UNIVERSE.some(e => e.symbol === sym);
   if (isEtf && sma200 != null) {
-    const ret126 = closes.length >= 126 ? ((cur - closes[closes.length - 126]) / closes[closes.length - 126]) * 100 : ret90;
+    const bench = state.prices["SPY"]?.ohlcv?.map(d => d.c).filter(x => x != null);
     const aboveTrend = cur > sma200;
-    let score = 0;
-    if (ret126 != null) score += ret126 >= 30 ? 35 : ret126 >= 18 ? 28 : ret126 >= 10 ? 18 : ret126 >= 3 ? 10 : 0;
-    if (aboveTrend) score += 25; else score -= 5;
-    if (sma50 != null && cur > sma50) score += 12;        // shorter trend also up
-    if (ddFromPeak > -12) score += 10;                     // smooth, shallow pullbacks
-    else if (ddFromPeak > -20) score += 5;
-    score = Math.max(0, Math.min(100, score));
-    // Enrich detail from the leaderboard if we have it.
-    let detail = `${ret126 != null ? (ret126 >= 0 ? "+" : "") + ret126.toFixed(0) + "% 6mo" : "trend"}${aboveTrend ? " · above 200MA" : " · below 200MA"}`;
-    if (Array.isArray(state.etfLeaderboard)) {
-      const e = state.etfLeaderboard.find(x => x.symbol === sym);
-      if (e && e.return_pct != null) detail = `+${e.return_pct.toFixed(0)}% · ${aboveTrend ? "above" : "below"} 200MA${e.max_drawdown_pct != null ? ` · max DD ${e.max_drawdown_pct.toFixed(0)}%` : ""}`;
+    const ret63  = closes.length >= 63  ? ((cur - closes[closes.length - 63])  / closes[closes.length - 63])  * 100 : null;
+    const ret126 = closes.length >= 126 ? ((cur - closes[closes.length - 126]) / closes[closes.length - 126]) * 100 : ret90;
+
+    // Relative strength vs SPY over the same windows (positive = outperforming).
+    let rs63 = null, rs126 = null;
+    if (bench && bench.length >= 126) {
+      const bcur = bench[bench.length - 1];
+      const b63  = ((bcur - bench[bench.length - 63])  / bench[bench.length - 63])  * 100;
+      const b126 = ((bcur - bench[bench.length - 126]) / bench[bench.length - 126]) * 100;
+      if (ret63  != null) rs63  = ret63  - b63;
+      if (ret126 != null) rs126 = ret126 - b126;
     }
+    const leadingNow  = rs63  != null && rs63  > 0;
+    const leadingMed  = rs126 != null && rs126 > 0;
+
+    let score = 0;
+    // Relative strength is the core rotation signal.
+    if (rs126 != null) score += rs126 >= 12 ? 28 : rs126 >= 5 ? 20 : rs126 >= 0 ? 12 : 0;
+    if (rs63  != null) score += rs63  >= 8  ? 16 : rs63  >= 0 ? 8  : -6;   // recent leadership / fading
+    // Trend & quality.
+    if (aboveTrend) score += 20; else score -= 8;
+    if (ddFromPeak > -10) score += 8; else if (ddFromPeak > -18) score += 4;
+
+    // Absolute timing kicker + the "why" tag.
+    let why = leadingMed ? "leading" : "lagging";
+    if (rsi != null && rsi <= 35 && aboveTrend) {
+      // Oversold but still in a primary uptrend = buyable laggard / pullback.
+      score += 14; why = "oversold laggard";
+    } else if (cur >= Math.max(...closes.slice(-60)) * 0.997) {
+      score += 12; why = "breakout";
+    } else if (leadingNow && leadingMed) {
+      score += 8;  why = "leading sector";
+    }
+    score = Math.max(0, Math.min(100, score));
+
+    // Detail line tells the rotation story in plain terms.
+    const rsTxt = rs126 != null ? `${rs126 >= 0 ? "+" : ""}${rs126.toFixed(0)}% vs SPY` : (ret126 != null ? `${ret126 >= 0 ? "+" : ""}${ret126.toFixed(0)}% 6mo` : "trend");
+    const detail = `${why} · ${rsTxt} · ${aboveTrend ? "above" : "below"} 200MA`;
     candidates.push({ setup: "ETF rotation", score, detail });
   }
 
