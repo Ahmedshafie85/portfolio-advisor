@@ -2862,6 +2862,14 @@ body {
 .rot-trend { font-family: var(--mono); font-size: 11px; width: 10px; text-align: center; }
 .rot-trend.up   { color: var(--green); }
 .rot-trend.down { color: var(--red); }
+.rot-watch {
+  flex: 0 0 auto; width: 16px; height: 16px; padding: 0; border-radius: 4px;
+  border: 1px solid var(--rule); background: var(--bg-card); color: var(--ink-soft);
+  font-size: 12px; line-height: 1; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+}
+.rot-watch:hover { border-color: var(--green); color: var(--green); }
+.rot-watch.on { border: none; background: none; color: var(--green); cursor: default; }
 .rot-read {
   font-family: var(--sans); font-size: 12.5px; color: var(--ink-soft);
   padding: 10px 14px; line-height: 1.5; border-bottom: 1px solid var(--rule-soft);
@@ -9231,12 +9239,18 @@ function renderEtfRotationStrip() {
     const members = byCat[cat].slice(0, 6);
     const best = catBest[cat];
     const catHeat = best >= 8 ? "hot" : best >= 0 ? "warm" : "cold";
-    const rowsHtml = members.map(r => `
+    const rowsHtml = members.map(r => {
+      const onList = state.watchlist.some(w => w.symbol === r.symbol);
+      return `
       <div class="rot-row" data-act="open-asset" data-symbol="${escAttr(r.symbol)}" style="${heatStyle(r.rsBlend)}">
         <span class="rot-sym">${escAttr(r.symbol)}${r.durable ? `<span class="rot-star" title="Durable — positive 1-year relative strength">★</span>` : ""}</span>
         <span class="rot-rs">${fmtRs(r.rsBlend)}<span class="rot-pct">%</span></span>
         ${trendMark(r.aboveTrend)}
-      </div>`).join("");
+        ${onList
+          ? `<span class="rot-watch on" title="On watchlist">✓</span>`
+          : `<button class="rot-watch" data-act="add-curated" data-symbol="${escAttr(r.symbol)}" data-name="${escAttr(r.name)}" title="Add ${escAttr(r.symbol)} to watchlist" onclick="event.stopPropagation()">+</button>`}
+      </div>`;
+    }).join("");
     return `<div class="rot-cat">
       <div class="rot-cat-head"><span class="rot-cat-dot ${catHeat}"></span>${escAttr(cat)}</div>
       ${rowsHtml}
@@ -9323,6 +9337,7 @@ function renderScreenerCard() {
                     onclick="event.stopPropagation()">
               ${isAnalyzing ? `<span class="spinner"></span>` : "Analyze"}
             </button>
+            ${(!watched && !held) ? `<button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(s.symbol)}" data-name="${escAttr(s.symbol)}" title="Add ${escAttr(s.symbol)} to watchlist" onclick="event.stopPropagation()">+ Watch</button>` : ""}
             <button class="presurge-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" title="Hide" onclick="event.stopPropagation()">×</button>
           </div>
         </div>`;
