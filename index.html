@@ -3053,6 +3053,33 @@ body {
   border: 1px dashed var(--rule); font-style: italic;
 }
 .screener-list { display: flex; flex-direction: column; }
+.screener-group-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-soft); padding: 14px 18px 6px;
+}
+.screener-top {
+  margin: 4px 14px 10px; padding: 12px 16px;
+  border: 1px solid var(--accent, #b08d3c);
+  border-radius: 10px; cursor: pointer;
+  background: color-mix(in srgb, var(--accent, #b08d3c) 6%, transparent);
+}
+.screener-top-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent, #b08d3c); margin-bottom: 6px;
+}
+.screener-top-row { display: flex; align-items: center; gap: 10px; }
+.screener-top-score {
+  font-family: "Fraunces", serif; font-size: 28px; font-weight: 600; line-height: 1;
+}
+.screener-top-sym {
+  font-family: "Fraunces", serif; font-size: 20px; font-weight: 600;
+  color: var(--ink);
+}
+.screener-top-detail {
+  font-size: 12px; color: var(--ink-soft); margin-top: 5px;
+}
 .screener-row {
   display: flex; align-items: center; gap: 12px;
   padding: 11px 18px; border-bottom: 1px solid var(--rule-soft);
@@ -9447,12 +9474,12 @@ function renderScreenerCard() {
         <div class="presurge-head">
           <div>
             <h3>Screener</h3>
-            <div class="presurge-sub">Oversold · Breakout · Pullback · ETF rotation</div>
+            <div class="presurge-sub">Setup score 0–100 · Oversold · Breakout · Pullback · Rotation</div>
           </div>
           <button class="btn btn-sm" data-act="run-presurge">Run scan</button>
         </div>
         <div class="presurge-empty-body">
-          Ranks the whole universe for four tradeable setups — oversold bounces, breakouts, momentum pullbacks, and ETF rotation leaders — using data already on hand. <b>No AI calls.</b> Run the scan once (it also powers Pre-Surge), then spend an Analyze only on the names at the top worth your time.
+          Ranks your universe for four tradeable setups — oversold bounces, breakouts, momentum pullbacks, and ETF rotation leaders — using data already on hand. <b>No AI calls.</b> The <b>Setup score (0–100)</b> rates how ready each name is to trade right now. Run the scan once, then spend an Analyze only on the names at the top worth your time.
         </div>
       </div>`;
   }
@@ -9467,14 +9494,15 @@ function renderScreenerCard() {
   if (visible.length === 0) {
     body = `<div class="presurge-empty-body">No setups clear the bar right now. That's normal in a quiet or strongly-trending tape — the screener stays silent rather than padding the list. Re-run after a session with more movement.</div>`;
   } else {
-    body = `<div class="screener-list">
-      ${visible.map(s => {
-        const recKey = recKeyFor(s.symbol, "screener", s.setup);
-        const held = state.holdings.some(h => h.symbol === s.symbol && h.asset_class !== "cash");
-        const watched = state.watchlist.some(w => w.symbol === s.symbol);
-        const color = SCREENER_SETUP_COLORS[s.setup] || "var(--ink-soft)";
-        const isAnalyzing = !!(state.analyzingSymbols && state.analyzingSymbols[s.symbol]);
-        return `
+    // Render one screener row. Shared by the Top-setup callout and both groups
+    // so the markup stays identical everywhere.
+    const renderRow = (s) => {
+      const recKey = recKeyFor(s.symbol, "screener", s.setup);
+      const held = state.holdings.some(h => h.symbol === s.symbol && h.asset_class !== "cash");
+      const watched = state.watchlist.some(w => w.symbol === s.symbol);
+      const color = SCREENER_SETUP_COLORS[s.setup] || "var(--ink-soft)";
+      const isAnalyzing = !!(state.analyzingSymbols && state.analyzingSymbols[s.symbol]);
+      return `
         <div class="screener-row" data-act="open-asset" data-symbol="${escAttr(s.symbol)}">
           <div class="screener-score" style="color:${color};">${s.score}</div>
           <div class="screener-mid">
@@ -9499,8 +9527,41 @@ function renderScreenerCard() {
             <button class="presurge-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" title="Hide" onclick="event.stopPropagation()">×</button>
           </div>
         </div>`;
-      }).join("")}
-    </div>`;
+    };
+
+    // Split the ranked list into the two questions the user actually has:
+    //   MINE  — names you hold or watch → "what do I do with this position?"
+    //   NEW   — everything else → "is this worth a new position?"
+    // Already sorted by score (computeScreenerSetups), so each group stays ranked.
+    const isMine = (s) =>
+      state.holdings.some(h => h.symbol === s.symbol && h.asset_class !== "cash") ||
+      state.watchlist.some(w => w.symbol === s.symbol);
+    const mine = visible.filter(isMine);
+    const fresh = visible.filter(s => !isMine(s));
+
+    // The single highest-scoring setup overall — the one place to look first.
+    const top = visible[0];
+    const topColor = SCREENER_SETUP_COLORS[top.setup] || "var(--ink-soft)";
+    const topMine = isMine(top);
+    const topCallout = `
+      <div class="screener-top" data-act="open-asset" data-symbol="${escAttr(top.symbol)}">
+        <div class="screener-top-label">Top setup${topMine ? " · in your book" : " · new idea"}</div>
+        <div class="screener-top-row">
+          <span class="screener-top-score" style="color:${topColor};">${top.score}</span>
+          <span class="screener-top-sym">${escAttr(top.symbol)}</span>
+          <span class="screener-setup" style="color:${topColor};border-color:${topColor};">${escAttr(top.setup)}</span>
+        </div>
+        <div class="screener-top-detail">${escAttr(top.detail)}</div>
+      </div>`;
+
+    const groupHtml = (label, arr) => arr.length ? `
+      <div class="screener-group-label">${label} · ${arr.length}</div>
+      <div class="screener-list">${arr.map(renderRow).join("")}</div>` : "";
+
+    body = `
+      ${topCallout}
+      ${groupHtml("Your positions &amp; watchlist", mine)}
+      ${groupHtml("New ideas", fresh)}`;
   }
 
   return `
@@ -9508,12 +9569,12 @@ function renderScreenerCard() {
       <div class="presurge-head">
         <div>
           <h3>Screener</h3>
-          <div class="presurge-sub">${visible.length} setup${visible.length === 1 ? "" : "s"} · ${state.preSurgeRanAt ? "Updated " + fmtRel(state.preSurgeRanAt) : ""}</div>
+          <div class="presurge-sub">Setup score 0–100 · ${visible.length} setup${visible.length === 1 ? "" : "s"} · ${state.preSurgeRanAt ? "Updated " + fmtRel(state.preSurgeRanAt) : ""}</div>
         </div>
         <button class="btn btn-sm" data-act="run-presurge">Rescan</button>
       </div>
       ${body}
-      <div class="presurge-footer">Ranks four setups from data already fetched — no AI calls. Tap <b>Analyze</b> only on the names worth spending a credit on. The full read costs the AI call; the shortlist is free.</div>
+      <div class="presurge-footer">Ranks four setups from data already fetched — no AI calls. <b>Your positions</b> come first (what to do with what you own), then <b>new ideas</b>. Tap <b>Analyze</b> only on the names worth a credit.</div>
     </div>`;
 }
 
@@ -9872,14 +9933,14 @@ async function runPreSurge() {
     // Invalidate the screener cache so the next render recomputes on fresh data.
     _screenerSetupCache = { at: 0, map: null };
     renderCurrentView();
-    toast(`${flagged.length} confirmed setup${flagged.length === 1 ? "" : "s"}${added > 0 ? ` · ${added} new today` : ""} · ${watching.length} watching · ${allScored.length} scored`);
+    toast(`Scan complete · ${allScored.length} names scored`);
     // Kick off DTC fetch in background to enrich rows with short-interest badges
     fetchShortInterestBackground();
   } catch (e) {
     state.preSurgeLoading = false;
     state.preSurgeProgress = null;
     renderCurrentView();
-    toast(`Pre-Surge scan failed: ${(e.message || e).slice(0, 80)}`, 3000, "error");
+    toast(`Scan failed: ${(e.message || e).slice(0, 80)}`, 3000, "error");
   }
 }
 
@@ -13798,13 +13859,11 @@ async function runMarketScan(opts = {}) {
   renderCurrentView();
 
   try {
-    const exclude = [
-      ...state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol),
-      ...state.watchlist.map(w => w.symbol),
-    ];
+    // ONE scanner, whole-market sweep: do NOT exclude holdings or watchlist.
+    // The user wants the best 20 bullish opportunities regardless of ownership.
     const bodyReq = {
       uid: state.uid,
-      exclude_symbols: exclude,
+      exclude_symbols: [],
       focus_hint: state.marketScanFocus || undefined,
       write_reads: true,
     };
@@ -13835,7 +13894,7 @@ function renderMarketScannerCard() {
   const reads = {};
   for (const rd of (scan?.reads || [])) reads[rd.symbol] = rd;
 
-  const rows = results.slice(0, 15).map(r => {
+  const rows = results.slice(0, 20).map(r => {
     const rd = reads[r.symbol];
     const tagHtml = (r.tags || []).map(t =>
       `<span class="ms-tag ms-tag-${escAttr(t)}">${escAttr(t.replace(/-/g, " "))}</span>`
@@ -13886,14 +13945,15 @@ function renderMarketScannerCard() {
   return `
   <div class="ms-card">
     <div class="ms-head">
-      <h3>Market Scanner</h3>
+      <h3>Market Opportunities</h3>
       <button class="ms-run" onclick="runMarketScan()" ${loading ? "disabled" : ""}>
         ${loading ? "Scanning…" : "Run scan"}
       </button>
     </div>
     <div class="ms-sub">
-      LLM proposes a fresh universe → live data scores each name on volume surge,
-      momentum/RS, squeeze fuel &amp; coil+catalyst. A screen, not advice.
+      <b>The best 20 bullish setups across the market</b> — held or not. AI proposes a
+      broad universe, then live data scores each name on volume surge, momentum/RS,
+      squeeze fuel &amp; coil+catalyst (25 pts each). Only uptrending names pass. A screen, not advice.
     </div>
 
     <div class="ms-focus">
@@ -13906,7 +13966,7 @@ function renderMarketScannerCard() {
     ${loading ? `
       <div class="ms-loading">
         <div class="ms-spinner"></div>
-        <span>Generating universe &amp; pulling live data… (~20–40s)</span>
+        <span>Sweeping the market &amp; scoring live data… (~40–70s)</span>
       </div>` : ""}
 
     ${!loading && scan?.scan_note ? `<div class="ms-note">${escAttr(scan.scan_note)}</div>` : ""}
@@ -13917,7 +13977,7 @@ function renderMarketScannerCard() {
       <div class="ms-empty">Nothing cleared the screen. Markets quiet, or try a focus hint.</div>` : ""}
 
     ${!loading && !scan ? `
-      <div class="ms-empty">Tap "Run scan" to surface coiling, accumulating, and squeeze-prone names.</div>` : ""}
+      <div class="ms-empty">Tap "Run scan" to sweep the market for the 20 best bullish opportunities.</div>` : ""}
 
     ${ranAt && !loading ? `
       <div class="ms-footer">
@@ -13960,49 +14020,42 @@ function renderDiscover() {
   body.id = "view";
   try {
     // ----------------------------------------------------------------------
-    // Two-panel Discover layout (v1.12):
-    //   TOP PANEL  "Scanners"  — Market Scanner, Screener, Pre-Surge, ETF rotation
-    //   BOTTOM PANEL "Watchlist" — the curated watchlist rows
-    //
-    // renderWatchlist(skipScreener) paints ONLY the watchlist (its Screener is
-    // suppressed); we render the Screener ourselves in the top panel so the
-    // grouping is explicit and not dependent on DOM scraping.
+    // ONE-SCANNER Discover (v1.14):
+    //   PANEL 1 "Market Opportunities" — the single scanner. Sweeps the whole
+    //     market (held or not) and returns the best 20 bullish setups.
+    //   PANEL 2 "Watchlist" — your own saved list (a tracker, not a scanner).
+    // Screener, Pre-Surge, and ETF Rotation were removed from Discover — one
+    // scanner now, as requested. Those functions still exist but aren't shown.
     // ----------------------------------------------------------------------
-
-    // ---- TOP PANEL: Scanners ----
-    const scanPanel = document.createElement("div");
-    scanPanel.className = "discover-panel";
-    scanPanel.innerHTML = `<div class="discover-panel-head"><h2>Scanners</h2></div>`;
-    const scanInner = document.createElement("div");
-    scanInner.className = "discover-panel-body";
-    scanPanel.appendChild(scanInner);
-
-    const appendCard = (html, topGap) => {
+    const makePanel = (title) => {
+      const p = document.createElement("div");
+      p.className = "discover-panel";
+      if (title) p.innerHTML = `<div class="discover-panel-head"><h2>${title}</h2></div>`;
+      const inner = document.createElement("div");
+      inner.className = "discover-panel-body";
+      p.appendChild(inner);
+      return { panel: p, inner };
+    };
+    const addCard = (inner, html, topGap) => {
       if (!html) return;
       const w = document.createElement("div");
       w.innerHTML = topGap ? `<div style="margin-top:20px;">${html}</div>` : html;
-      scanInner.appendChild(w);
+      inner.appendChild(w);
     };
-    appendCard(renderMarketScannerCard(), false);
-    appendCard(renderScreenerCard(), true);
-    appendCard(renderPreSurgeCard(), true);
-    appendCard(renderEtfRotationStrip(), true);
-    body.appendChild(scanPanel);
 
-    // ---- BOTTOM PANEL: Watchlist ----
-    const wlPanel = document.createElement("div");
-    wlPanel.className = "discover-panel";
-    wlPanel.style.marginTop = "20px";
-    const wlInner = document.createElement("div");
-    wlInner.className = "discover-panel-body";
-    wlInner.id = "view";              // renderWatchlist writes to #view
-    body.appendChild(wlPanel);
-    wlPanel.appendChild(wlInner);
-    // Temporarily make the watchlist panel the #view target so renderWatchlist
-    // paints into it, then restore.
+    // ---- PANEL 1: the one scanner ----
+    const p1 = makePanel("Market Opportunities");
+    addCard(p1.inner, renderMarketScannerCard(), false);
+    body.appendChild(p1.panel);
+
+    // ---- PANEL 2: Watchlist ----
+    const p3 = makePanel("Watchlist");
+    p3.panel.style.marginTop = "20px";
+    p3.inner.id = "view";             // renderWatchlist writes to #view
+    body.appendChild(p3.panel);
     body.id = "discoverBody-tmp";
     renderWatchlist({ skipScreener: true });
-    wlInner.id = "watchlistPanelBody";
+    p3.inner.id = "watchlistPanelBody";
     body.id = "view";
   } finally {
     body.id = "discoverBody";
