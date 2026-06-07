@@ -4353,6 +4353,44 @@ body {
 .discover-panel-body .presurge-card {
   box-shadow: none;
 }
+/* Collapsible Watchlist panel header (above the scanner). */
+.watchlist-panel-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 20px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: "Fraunces", serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink, #1a1814);
+  letter-spacing: -0.01em;
+}
+.watchlist-panel-toggle .wlp-count {
+  display: inline-block;
+  margin-left: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted, #6b6256);
+  background: var(--border, rgba(0,0,0,0.06));
+  border-radius: 999px;
+  padding: 1px 8px;
+  vertical-align: middle;
+}
+.watchlist-panel-toggle .wlp-chevron {
+  font-size: 14px;
+  color: var(--ink-muted, #6b6256);
+}
+.watchlist-panel-body { padding: 0 14px 12px; }
+/* Inside the collapsible panel the watchlist already has its own header/scan
+   bar, so trim the duplicate top section heading's gap. */
+.watchlist-panel-body .scan-bar { margin-top: 4px; }
 /* ===== END MARKET SCANNER STYLES ===== */
 </style>
 </head>
@@ -4690,6 +4728,9 @@ const state = {
   marketScanLoading: false,
   marketScanRanAt: null,
   marketScanFocus: "",
+  // Discover: Watchlist shown as a collapsible panel above the scanner.
+  // Collapsed by default; tapping its header expands it.
+  watchlistPanelOpen: false,
   // Investor profile (Phase A) — calibrates AI prompts to the user's stated rules.
   // Loaded from Firestore on auth; written via the Settings → Investor Profile form.
   // Null until first save. When null, prompts fall back to their hardcoded defaults.
@@ -11754,7 +11795,9 @@ async function rescan() {
 // ----- Markets
 function openAsset(symbol, fromView) {
   state.selectedSymbol = symbol;
-  if (fromView) state._fromView = fromView;
+  // Clear any stale source so a scanner tap (no fromView) doesn't inherit a
+  // previous "watchlist" origin and mis-route to the watch-detail page.
+  state._fromView = fromView || null;
   state.currentView = "discover";
   // The destination is always the full asset detail page (chart + AI + verdict).
   // The watchlist tab is just the return path for the back button — set it
@@ -13915,14 +13958,20 @@ function renderMarketScannerCard() {
     const dcHtml = dc != null
       ? `<span class="ms-dc ${dc >= 0 ? "pos" : "neg"}">${dc >= 0 ? "+" : ""}${dc.toFixed(1)}%</span>` : "";
 
+    const held = state.holdings.some(h => h.symbol === r.symbol && h.asset_class !== "cash");
+    const watched = state.watchlist.some(w => w.symbol === r.symbol);
+    const isAnalyzing = !!(state.analyzingSymbols && state.analyzingSymbols[r.symbol]);
+
     return `
-    <div class="ms-row" data-symbol="${escAttr(r.symbol)}">
+    <div class="ms-row" data-act="open-asset" data-symbol="${escAttr(r.symbol)}">
       <div class="ms-rank">${r.rank}</div>
       <div class="ms-mid">
         <div class="ms-sym-row">
           <span class="ms-sym">${escAttr(r.symbol)}</span>
           <span class="ms-composite">${Math.round(r.composite)}</span>
           ${dcHtml}
+          ${held ? `<span class="presurge-tag held">held</span>` : ""}
+          ${watched ? `<span class="presurge-tag watched">watched</span>` : ""}
         </div>
         <div class="ms-name">${escAttr(r.name || "")}</div>
         ${tagHtml ? `<div class="ms-tags">${tagHtml}</div>` : ""}
@@ -13938,6 +13987,15 @@ function renderMarketScannerCard() {
               <div><span class="ms-conv ms-conv-${escAttr(rd.conviction)}">${escAttr(rd.conviction)} conviction</span></div>
             </div>
           </div>` : ""}
+        <div class="ms-actions">
+          <button class="btn btn-sm ${isAnalyzing ? 'analyzing' : ''}"
+                  data-act="vrow-analyze" data-symbol="${escAttr(r.symbol)}"
+                  ${isAnalyzing ? 'disabled' : ''}
+                  onclick="event.stopPropagation()">
+            ${isAnalyzing ? `<span class="spinner"></span>` : "⚡ Analyze"}
+          </button>
+          ${(!watched && !held) ? `<button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(r.symbol)}" data-name="${escAttr(r.symbol)}" onclick="event.stopPropagation()">+ Watch</button>` : ""}
+        </div>
       </div>
     </div>`;
   }).join("");
@@ -13951,7 +14009,7 @@ function renderMarketScannerCard() {
       </button>
     </div>
     <div class="ms-sub">
-      <b>The best 20 bullish setups across the market</b> — held or not. AI proposes a
+      <b>The best bullish setups across the market${results.length ? ` — ${Math.min(results.length, 20)} found` : ""}</b> — held or not. AI proposes a
       broad universe, then live data scores each name on volume surge, momentum/RS,
       squeeze fuel &amp; coil+catalyst (25 pts each). Only uptrending names pass. A screen, not advice.
     </div>
@@ -13977,7 +14035,7 @@ function renderMarketScannerCard() {
       <div class="ms-empty">Nothing cleared the screen. Markets quiet, or try a focus hint.</div>` : ""}
 
     ${!loading && !scan ? `
-      <div class="ms-empty">Tap "Run scan" to sweep the market for the 20 best bullish opportunities.</div>` : ""}
+      <div class="ms-empty">Tap "Run scan" to sweep the market for the best bullish opportunities.</div>` : ""}
 
     ${ranAt && !loading ? `
       <div class="ms-footer">
@@ -14003,7 +14061,13 @@ function renderDiscover() {
   // Detail-view passthrough: if a symbol is selected, defer to the existing
   // detail renderers — they already handle their own back-navigation.
   if (state.selectedSymbol) {
-    if (state.discoverTab === "watchlist") return renderWatchDetail(state.selectedSymbol);
+    // Route by where the symbol actually lives, not by a forced tab flag.
+    // A symbol opened from the Market scanner is usually NOT on the watchlist
+    // and must land on the full asset detail (chart + AI + analyze), not the
+    // watch-detail page. Only use watch-detail when the user explicitly came
+    // from the Watchlist (openWatchItem sets _fromView) AND it's a watched name.
+    const onWatch = state.watchlist.some(w => w.symbol === state.selectedSymbol);
+    if (state._fromView === "watchlist" && onWatch) return renderWatchDetail(state.selectedSymbol);
     return renderAssetDetail(state.selectedSymbol);
   }
   // After the 3-tab cleanup, Discover always shows Watchlist as the primary
@@ -14021,9 +14085,10 @@ function renderDiscover() {
   try {
     // ----------------------------------------------------------------------
     // ONE-SCANNER Discover (v1.14):
-    //   PANEL 1 "Market Opportunities" — the single scanner. Sweeps the whole
-    //     market (held or not) and returns the best 20 bullish setups.
-    //   PANEL 2 "Watchlist" — your own saved list (a tracker, not a scanner).
+    //   PANEL 1 "Watchlist" — collapsible panel ABOVE the scanner. Collapsed
+    //     by default; tap the header to expand and see the saved list.
+    //   PANEL 2 "Market Opportunities" — the single scanner. Sweeps the whole
+    //     market (held or not) and returns the best bullish setups.
     // Screener, Pre-Surge, and ETF Rotation were removed from Discover — one
     // scanner now, as requested. Those functions still exist but aren't shown.
     // ----------------------------------------------------------------------
@@ -14043,20 +14108,34 @@ function renderDiscover() {
       inner.appendChild(w);
     };
 
-    // ---- PANEL 1: the one scanner ----
+    // ---- PANEL 1: Watchlist (collapsible, on top) ----
+    const open = !!state.watchlistPanelOpen;
+    const wlCount = state.watchlist.length;
+    const wlPanel = document.createElement("div");
+    wlPanel.className = "discover-panel watchlist-panel";
+    wlPanel.innerHTML = `
+      <button class="watchlist-panel-toggle" data-act="toggle-watchlist-panel" aria-expanded="${open}">
+        <span class="wlp-title">Watchlist${wlCount ? ` <span class="wlp-count">${wlCount}</span>` : ""}</span>
+        <span class="wlp-chevron">${open ? "▾" : "▸"}</span>
+      </button>`;
+    const wlBody = document.createElement("div");
+    wlBody.className = "discover-panel-body watchlist-panel-body";
+    if (!open) wlBody.style.display = "none";
+    wlPanel.appendChild(wlBody);
+    body.appendChild(wlPanel);
+    if (open) {
+      wlBody.id = "view";             // renderWatchlist writes to #view
+      body.id = "discoverBody-tmp";
+      renderWatchlist({ skipScreener: true });
+      wlBody.id = "watchlistPanelBody";
+      body.id = "view";
+    }
+
+    // ---- PANEL 2: the one scanner ----
     const p1 = makePanel("Market Opportunities");
+    p1.panel.style.marginTop = "20px";
     addCard(p1.inner, renderMarketScannerCard(), false);
     body.appendChild(p1.panel);
-
-    // ---- PANEL 2: Watchlist ----
-    const p3 = makePanel("Watchlist");
-    p3.panel.style.marginTop = "20px";
-    p3.inner.id = "view";             // renderWatchlist writes to #view
-    body.appendChild(p3.panel);
-    body.id = "discoverBody-tmp";
-    renderWatchlist({ skipScreener: true });
-    p3.inner.id = "watchlistPanelBody";
-    body.id = "view";
   } finally {
     body.id = "discoverBody";
     realView.id = "view";
@@ -15650,6 +15729,10 @@ document.addEventListener("click", (e) => {
   try {
     switch (act) {
       case "open-asset":             openAsset(symbol); break;
+      case "toggle-watchlist-panel":
+        state.watchlistPanelOpen = !state.watchlistPanelOpen;
+        renderDiscover();
+        break;
       case "open-asset-from-watch":  openAsset(symbol, "watchlist"); break;
       case "open-watch":             openWatchItem(symbol); break;
       case "back-watch":             backToWatchlist(); break;
