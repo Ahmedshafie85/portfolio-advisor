@@ -4174,6 +4174,131 @@ body {
 }
 .collapsible-card.expanded .collapsible-body { display: block; }
 
+
+/* ===== MARKET SCANNER STYLES (v1.12) ===== */
+/* ============================================================================
+   MARKET SCANNER CARD — styles (paste into the <style> block in index.html)
+   Uses your existing CSS variables (--bg-card, --ink, --accent, etc.)
+   ============================================================================ */
+.ms-card {
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius, 14px);
+  padding: 18px 16px 12px;
+  margin: 16px 0;
+  box-shadow: var(--shadow);
+  position: relative;
+}
+.ms-card::before {
+  content: "";
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, var(--gold), var(--accent));
+  border-radius: var(--radius, 14px) 0 0 var(--radius, 14px);
+}
+.ms-head { display: flex; align-items: center; justify-content: space-between; }
+.ms-head h3 {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 600; font-size: 1.25rem; margin: 0; color: var(--ink);
+}
+.ms-run {
+  font-family: "IBM Plex Sans", sans-serif; font-weight: 500; font-size: 0.85rem;
+  background: var(--ink); color: var(--bg); border: none;
+  padding: 7px 16px; border-radius: 999px; cursor: pointer;
+  transition: opacity .15s;
+}
+.ms-run:disabled { opacity: 0.5; cursor: default; }
+.ms-sub {
+  font-size: 0.78rem; color: var(--ink-muted); line-height: 1.4;
+  margin: 6px 0 12px; max-width: 52ch;
+}
+.ms-focus { margin-bottom: 12px; }
+.ms-focus input {
+  width: 100%; box-sizing: border-box;
+  font-family: "IBM Plex Sans", sans-serif; font-size: 0.85rem;
+  background: var(--bg); border: 1px solid var(--rule);
+  border-radius: 10px; padding: 9px 12px; color: var(--ink);
+}
+.ms-focus input::placeholder { color: var(--ink-muted); }
+
+.ms-loading { display: flex; align-items: center; gap: 10px; padding: 14px 0; color: var(--ink-soft); font-size: 0.85rem; }
+.ms-spinner {
+  width: 16px; height: 16px; border: 2px solid var(--rule);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: ms-spin .7s linear infinite;
+}
+@keyframes ms-spin { to { transform: rotate(360deg); } }
+
+.ms-note {
+  font-size: 0.82rem; color: var(--ink-soft); line-height: 1.45;
+  background: var(--bg-elev); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
+}
+.ms-empty { font-size: 0.85rem; color: var(--ink-muted); padding: 14px 0; }
+
+.ms-list { display: flex; flex-direction: column; gap: 10px; }
+.ms-row {
+  display: flex; gap: 12px; padding: 12px;
+  border: 1px solid var(--rule-soft); border-radius: 12px;
+  background: var(--bg); transition: background .15s;
+}
+.ms-row:hover { background: var(--bg-elev); }
+.ms-rank {
+  font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 1.1rem;
+  color: var(--ink-muted); min-width: 22px; text-align: center; padding-top: 2px;
+}
+.ms-mid { flex: 1; min-width: 0; }
+.ms-sym-row { display: flex; align-items: baseline; gap: 8px; }
+.ms-sym { font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 1rem; color: var(--ink); }
+.ms-composite {
+  font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 0.95rem;
+  color: var(--accent); background: rgba(161,61,45,0.08);
+  padding: 1px 8px; border-radius: 999px;
+}
+.ms-dc { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; }
+.ms-dc.pos { color: var(--green); }
+.ms-dc.neg { color: var(--red); }
+.ms-name { font-size: 0.75rem; color: var(--ink-muted); margin: 1px 0 6px; }
+
+.ms-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.ms-tag {
+  font-size: 0.66rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 2px 7px; border-radius: 999px; border: 1px solid var(--rule);
+  color: var(--ink-soft); background: var(--bg-card);
+}
+.ms-tag-volume-surge { color: var(--gold); border-color: var(--gold); }
+.ms-tag-rs-leader    { color: var(--green); border-color: var(--green-soft); }
+.ms-tag-squeeze-fuel { color: var(--red); border-color: var(--red-soft); }
+.ms-tag-coiled       { color: #6b7a9b; border-color: #6b7a9b; }
+.ms-tag-catalyst-near{ color: var(--accent); border-color: var(--accent-soft); }
+
+.ms-bars { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.ms-bar-row { display: flex; align-items: center; gap: 8px; }
+.ms-bar-lbl { font-size: 0.66rem; color: var(--ink-muted); min-width: 30px; font-family: "IBM Plex Mono", monospace; }
+.ms-bar-track { flex: 1; height: 5px; background: var(--rule-soft); border-radius: 3px; overflow: hidden; }
+.ms-bar-fill { display: block; height: 100%; border-radius: 3px; transition: width .4s ease; }
+.ms-bar-val { font-size: 0.68rem; color: var(--ink-soft); min-width: 18px; text-align: right; font-family: "IBM Plex Mono", monospace; }
+
+.ms-read {
+  border-top: 1px dashed var(--rule); margin-top: 8px; padding-top: 8px;
+}
+.ms-read-one { font-size: 0.82rem; font-weight: 500; color: var(--ink); margin-bottom: 3px; }
+.ms-read-setup { font-size: 0.78rem; color: var(--ink-soft); line-height: 1.4; margin-bottom: 6px; }
+.ms-read-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px;
+  font-size: 0.74rem; color: var(--ink-soft);
+}
+.ms-read-k { color: var(--ink-muted); font-weight: 500; }
+.ms-conv { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+.ms-conv-high { color: var(--green); }
+.ms-conv-medium { color: var(--gold); }
+.ms-conv-low { color: var(--ink-muted); }
+
+.ms-footer {
+  font-size: 0.7rem; color: var(--ink-muted); margin-top: 12px;
+  padding-top: 8px; border-top: 1px solid var(--rule-soft);
+  font-family: "IBM Plex Mono", monospace;
+}
+
+/* ===== END MARKET SCANNER STYLES ===== */
 </style>
 </head>
 <body>
@@ -4505,6 +4630,11 @@ const state = {
   prices: {},
   analyses: {},
   portfolioAnalysis: null,
+  // Market Scanner (v1.12) — POST /scan-market results + UI state.
+  marketScan: null,
+  marketScanLoading: false,
+  marketScanRanAt: null,
+  marketScanFocus: "",
   // Investor profile (Phase A) — calibrates AI prompts to the user's stated rules.
   // Loaded from Firestore on auth; written via the Settings → Investor Profile form.
   // Null until first save. When null, prompts fall back to their hardcoded defaults.
@@ -13627,6 +13757,159 @@ async function runPaperSimulation({ force = false } = {}) {
 // 3-tab cleanup). Asset detail drill-downs use renderAssetDetail /
 // renderWatchDetail directly — selected-symbol routing is below.
 // ============================================================================
+
+// ============================================================================
+// MARKET SCANNER — FRONTEND (v1.12). Calls worker POST /scan-market.
+// Adapted to this file's helpers: uses escAttr() (not escapeHtml) and
+// renderCurrentView() for re-render. Self-contained timeAgo below.
+// ============================================================================
+async function runMarketScan(opts = {}) {
+  if (state.marketScanLoading) return;
+  state.marketScanLoading = true;
+  renderCurrentView();
+
+  try {
+    const exclude = [
+      ...state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol),
+      ...state.watchlist.map(w => w.symbol),
+    ];
+    const bodyReq = {
+      uid: state.uid,
+      exclude_symbols: exclude,
+      focus_hint: state.marketScanFocus || undefined,
+      write_reads: true,
+    };
+    const r = await fetch(`${WORKER_URL}/scan-market`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bodyReq),
+    });
+    if (!r.ok) throw new Error(`scan-market ${r.status}`);
+    const j = await r.json();
+    state.marketScan = j;
+    state.marketScanRanAt = new Date().toISOString();
+  } catch (e) {
+    console.warn("market scan failed:", e.message || e);
+    state.marketScan = { results: [], reads: [], scan_note: "Scan failed — try again.", _error: String(e.message || e) };
+  } finally {
+    state.marketScanLoading = false;
+    renderCurrentView();
+  }
+}
+
+function renderMarketScannerCard() {
+  const scan = state.marketScan;
+  const loading = state.marketScanLoading;
+  const ranAt = state.marketScanRanAt ? msTimeAgo(state.marketScanRanAt) : null;
+
+  const results = scan?.results || [];
+  const reads = {};
+  for (const rd of (scan?.reads || [])) reads[rd.symbol] = rd;
+
+  const rows = results.slice(0, 15).map(r => {
+    const rd = reads[r.symbol];
+    const tagHtml = (r.tags || []).map(t =>
+      `<span class="ms-tag ms-tag-${escAttr(t)}">${escAttr(t.replace(/-/g, " "))}</span>`
+    ).join("");
+    const bars = [
+      ["Vol", r.components.volume.score, r.components.volume.max, "#b08d3c"],
+      ["Mom", r.components.momentum.score, r.components.momentum.max, "#4a7a4a"],
+      ["Sqz", r.components.squeeze.score, r.components.squeeze.max, "#a13d2d"],
+      ["Coil", r.components.compression.score, r.components.compression.max, "#6b7a9b"],
+    ].map(([lbl, sc, mx, col]) => `
+      <div class="ms-bar-row">
+        <span class="ms-bar-lbl">${lbl}</span>
+        <span class="ms-bar-track"><span class="ms-bar-fill" style="width:${(sc / mx * 100).toFixed(0)}%;background:${col}"></span></span>
+        <span class="ms-bar-val">${Math.round(sc)}</span>
+      </div>`).join("");
+
+    const dc = r.day_change_pct;
+    const dcHtml = dc != null
+      ? `<span class="ms-dc ${dc >= 0 ? "pos" : "neg"}">${dc >= 0 ? "+" : ""}${dc.toFixed(1)}%</span>` : "";
+
+    return `
+    <div class="ms-row" data-symbol="${escAttr(r.symbol)}">
+      <div class="ms-rank">${r.rank}</div>
+      <div class="ms-mid">
+        <div class="ms-sym-row">
+          <span class="ms-sym">${escAttr(r.symbol)}</span>
+          <span class="ms-composite">${Math.round(r.composite)}</span>
+          ${dcHtml}
+        </div>
+        <div class="ms-name">${escAttr(r.name || "")}</div>
+        ${tagHtml ? `<div class="ms-tags">${tagHtml}</div>` : ""}
+        <div class="ms-bars">${bars}</div>
+        ${rd ? `
+          <div class="ms-read">
+            <div class="ms-read-one">${escAttr(rd.one_liner)}</div>
+            <div class="ms-read-setup">${escAttr(rd.setup)}</div>
+            <div class="ms-read-grid">
+              <div><span class="ms-read-k">Watch</span> ${escAttr(rd.watch_level)}</div>
+              <div><span class="ms-read-k">Confirm</span> ${escAttr(rd.confirmation)}</div>
+              <div><span class="ms-read-k">Invalid</span> ${escAttr(rd.invalidation)}</div>
+              <div><span class="ms-conv ms-conv-${escAttr(rd.conviction)}">${escAttr(rd.conviction)} conviction</span></div>
+            </div>
+          </div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  return `
+  <div class="ms-card">
+    <div class="ms-head">
+      <h3>Market Scanner</h3>
+      <button class="ms-run" onclick="runMarketScan()" ${loading ? "disabled" : ""}>
+        ${loading ? "Scanning…" : "Run scan"}
+      </button>
+    </div>
+    <div class="ms-sub">
+      LLM proposes a fresh universe → live data scores each name on volume surge,
+      momentum/RS, squeeze fuel &amp; coil+catalyst. A screen, not advice.
+    </div>
+
+    <div class="ms-focus">
+      <input type="text" id="ms-focus-input" placeholder="Optional focus (e.g. 'AI semis', 'biotech catalysts')"
+        value="${escAttr(state.marketScanFocus || "")}"
+        oninput="state.marketScanFocus = this.value"
+        onkeydown="if(event.key==='Enter') runMarketScan()" />
+    </div>
+
+    ${loading ? `
+      <div class="ms-loading">
+        <div class="ms-spinner"></div>
+        <span>Generating universe &amp; pulling live data… (~20–40s)</span>
+      </div>` : ""}
+
+    ${!loading && scan?.scan_note ? `<div class="ms-note">${escAttr(scan.scan_note)}</div>` : ""}
+
+    ${!loading && results.length ? `<div class="ms-list">${rows}</div>` : ""}
+
+    ${!loading && scan && !results.length ? `
+      <div class="ms-empty">Nothing cleared the screen. Markets quiet, or try a focus hint.</div>` : ""}
+
+    ${!loading && !scan ? `
+      <div class="ms-empty">Tap "Run scan" to surface coiling, accumulating, and squeeze-prone names.</div>` : ""}
+
+    ${ranAt && !loading ? `
+      <div class="ms-footer">
+        Scanned ${scan?.scored_count ?? 0} of ${scan?.universe_size ?? 0} · ${escAttr(ranAt)}
+        ${scan?.universe_source === "llm_generated" ? " · AI universe" : ""}
+      </div>` : ""}
+  </div>`;
+}
+
+function msTimeAgo(iso) {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+// ============================================================================
+// END MARKET SCANNER FRONTEND
+// ============================================================================
+
+
 function renderDiscover() {
   // Detail-view passthrough: if a symbol is selected, defer to the existing
   // detail renderers — they already handle their own back-navigation.
@@ -13661,6 +13944,13 @@ function renderDiscover() {
     if (presurgeHtml) {
       const wrap = document.createElement("div");
       wrap.innerHTML = `<div style="margin-top:20px;">${presurgeHtml}</div>`;
+      body.appendChild(wrap);
+    }
+    // Market Scanner (v1.12) — sits below Pre-Surge as a fresh-name discovery tool.
+    const scannerHtml = renderMarketScannerCard();
+    if (scannerHtml) {
+      const wrap = document.createElement("div");
+      wrap.innerHTML = `<div style="margin-top:20px;">${scannerHtml}</div>`;
       body.appendChild(wrap);
     }
   } finally {
