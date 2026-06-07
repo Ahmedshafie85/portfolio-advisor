@@ -13937,7 +13937,7 @@ function renderMarketScannerCard() {
   const reads = {};
   for (const rd of (scan?.reads || [])) reads[rd.symbol] = rd;
 
-  const rows = results.slice(0, 20).map(r => {
+  const rows = results.slice(0, 30).map(r => {
     const rd = reads[r.symbol];
     const tagHtml = (r.tags || []).map(t =>
       `<span class="ms-tag ms-tag-${escAttr(t)}">${escAttr(t.replace(/-/g, " "))}</span>`
@@ -14009,7 +14009,7 @@ function renderMarketScannerCard() {
       </button>
     </div>
     <div class="ms-sub">
-      <b>The best bullish setups across the market${results.length ? ` — ${Math.min(results.length, 20)} found` : ""}</b> — held or not. AI proposes a
+      <b>The best bullish setups across the market${results.length ? ` — ${results.length} found` : ""}</b> — held or not. AI proposes a
       broad universe, then live data scores each name on volume surge, momentum/RS,
       squeeze fuel &amp; coil+catalyst (25 pts each). Only uptrending names pass. A screen, not advice.
     </div>
