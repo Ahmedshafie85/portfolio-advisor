@@ -4298,6 +4298,34 @@ body {
   font-family: "IBM Plex Mono", monospace;
 }
 
+/* ===== DISCOVER TWO-PANEL LAYOUT (v1.12) ===== */
+.discover-panel {
+  background: var(--bg-card, #fffdf8);
+  border: 1px solid var(--border, rgba(0,0,0,0.08));
+  border-radius: 14px;
+  overflow: hidden;
+}
+.discover-panel-head {
+  padding: 16px 20px 0;
+}
+.discover-panel-head h2 {
+  margin: 0;
+  font-family: "Fraunces", serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink, #1a1814);
+  letter-spacing: -0.01em;
+}
+.discover-panel-body {
+  padding: 12px 14px 16px;
+}
+/* Cards already carry their own background; inside a panel, soften their
+   borders so the panel reads as the container. */
+.discover-panel-body .ms-card,
+.discover-panel-body .screener-card,
+.discover-panel-body .presurge-card {
+  box-shadow: none;
+}
 /* ===== END MARKET SCANNER STYLES ===== */
 </style>
 </head>
@@ -10646,7 +10674,8 @@ function renderUnifiedAction(symbol, currentPrice, isHeld) {
   return `<div class="vrow-directive-note" style="margin-top:8px;">Not yet scanned. Tap Scan, then Analyze for a read.</div>`;
 }
 
-function renderWatchlist() {
+function renderWatchlist(opts) {
+  const skipScreener = !!(opts && opts.skipScreener);
   if (state.selectedSymbol) {
     renderWatchDetail(state.selectedSymbol);
     return;
@@ -10663,7 +10692,7 @@ function renderWatchlist() {
         <p>Add tickers you'd consider buying. The app watches them and surfaces setups when conditions trigger.</p>
         <button class="btn" data-act="add-watch">Add to Watchlist</button>
       </div>
-      ${renderScreenerCard()}
+      ${skipScreener ? "" : renderScreenerCard()}
     `;
     return;
   }
@@ -10736,7 +10765,7 @@ function renderWatchlist() {
       <button class="btn-ghost" data-act="add-watch" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;">+ Add</button>
     </div>
     <div class="holdings">${rows}</div>
-    ${renderScreenerCard()}
+    ${skipScreener ? "" : renderScreenerCard()}
   `;
 
   // Lazy snapshot fetch if missing
@@ -13930,29 +13959,51 @@ function renderDiscover() {
   realView.id = "view-outer";
   body.id = "view";
   try {
-    // renderWatchlist now renders the single scored Screener as its discovery
-    // list. Below it: the ETF Rotation map (sectors ranked vs each other — the
-    // one view that needs grouping), then Pre-Surge (slower accumulation).
-    renderWatchlist();
-    const rotationHtml = renderEtfRotationStrip();
-    if (rotationHtml) {
-      const wrap = document.createElement("div");
-      wrap.innerHTML = `<div style="margin-top:20px;">${rotationHtml}</div>`;
-      body.appendChild(wrap);
-    }
-    const presurgeHtml = renderPreSurgeCard();
-    if (presurgeHtml) {
-      const wrap = document.createElement("div");
-      wrap.innerHTML = `<div style="margin-top:20px;">${presurgeHtml}</div>`;
-      body.appendChild(wrap);
-    }
-    // Market Scanner (v1.12) — sits below Pre-Surge as a fresh-name discovery tool.
-    const scannerHtml = renderMarketScannerCard();
-    if (scannerHtml) {
-      const wrap = document.createElement("div");
-      wrap.innerHTML = `<div style="margin-top:20px;">${scannerHtml}</div>`;
-      body.appendChild(wrap);
-    }
+    // ----------------------------------------------------------------------
+    // Two-panel Discover layout (v1.12):
+    //   TOP PANEL  "Scanners"  — Market Scanner, Screener, Pre-Surge, ETF rotation
+    //   BOTTOM PANEL "Watchlist" — the curated watchlist rows
+    //
+    // renderWatchlist(skipScreener) paints ONLY the watchlist (its Screener is
+    // suppressed); we render the Screener ourselves in the top panel so the
+    // grouping is explicit and not dependent on DOM scraping.
+    // ----------------------------------------------------------------------
+
+    // ---- TOP PANEL: Scanners ----
+    const scanPanel = document.createElement("div");
+    scanPanel.className = "discover-panel";
+    scanPanel.innerHTML = `<div class="discover-panel-head"><h2>Scanners</h2></div>`;
+    const scanInner = document.createElement("div");
+    scanInner.className = "discover-panel-body";
+    scanPanel.appendChild(scanInner);
+
+    const appendCard = (html, topGap) => {
+      if (!html) return;
+      const w = document.createElement("div");
+      w.innerHTML = topGap ? `<div style="margin-top:20px;">${html}</div>` : html;
+      scanInner.appendChild(w);
+    };
+    appendCard(renderMarketScannerCard(), false);
+    appendCard(renderScreenerCard(), true);
+    appendCard(renderPreSurgeCard(), true);
+    appendCard(renderEtfRotationStrip(), true);
+    body.appendChild(scanPanel);
+
+    // ---- BOTTOM PANEL: Watchlist ----
+    const wlPanel = document.createElement("div");
+    wlPanel.className = "discover-panel";
+    wlPanel.style.marginTop = "20px";
+    const wlInner = document.createElement("div");
+    wlInner.className = "discover-panel-body";
+    wlInner.id = "view";              // renderWatchlist writes to #view
+    body.appendChild(wlPanel);
+    wlPanel.appendChild(wlInner);
+    // Temporarily make the watchlist panel the #view target so renderWatchlist
+    // paints into it, then restore.
+    body.id = "discoverBody-tmp";
+    renderWatchlist({ skipScreener: true });
+    wlInner.id = "watchlistPanelBody";
+    body.id = "view";
   } finally {
     body.id = "discoverBody";
     realView.id = "view";
