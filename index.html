@@ -4234,9 +4234,17 @@ body {
   transition: opacity .15s;
 }
 .ms-run:disabled { opacity: 0.5; cursor: default; }
+.ms-actions-top {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end;
+}
+.ms-run.secondary {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
 .ms-sub {
   font-size: 0.78rem; color: var(--ink-muted); line-height: 1.4;
-  margin: 6px 0 12px; max-width: 52ch;
+  margin: 6px 0 12px; max-width: 62ch;
 }
 .ms-focus { margin-bottom: 12px; }
 .ms-focus input {
@@ -4260,6 +4268,65 @@ body {
   background: var(--bg-elev); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
 }
 .ms-empty { font-size: 0.85rem; color: var(--ink-muted); padding: 14px 0; }
+.ms-lanes {
+  display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin: 2px 0 10px;
+  scrollbar-width: none;
+}
+.ms-lanes::-webkit-scrollbar { display: none; }
+.ms-lane {
+  flex: 0 0 auto;
+  border: 1px solid var(--rule);
+  background: var(--bg);
+  color: var(--ink-soft);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-family: var(--sans);
+  font-size: 0.76rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ms-lane.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.ms-lane-count { font-family: var(--mono); opacity: 0.72; margin-left: 3px; }
+.ms-desk {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px; margin: 0 0 12px;
+}
+.ms-desk-cell {
+  background: var(--bg-elev);
+  border: 1px solid var(--rule-soft);
+  border-radius: 8px;
+  padding: 8px 9px;
+}
+.ms-desk-k {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ms-desk-v {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+.ms-toggle-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: -2px 0 10px;
+}
+.ms-toggle {
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.ms-toggle.active { border-color: var(--ink); color: var(--ink); background: var(--bg-elev); }
 
 .ms-list { display: flex; flex-direction: column; gap: 10px; }
 .ms-row {
@@ -4284,6 +4351,58 @@ body {
 .ms-dc.pos { color: var(--green); }
 .ms-dc.neg { color: var(--red); }
 .ms-name { font-size: 0.75rem; color: var(--ink-muted); margin: 1px 0 6px; }
+.ms-meta-row {
+  display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px;
+}
+.ms-meta {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  color: var(--ink-soft);
+  background: var(--bg-card);
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+.ms-meta.good { color: var(--green); border-color: rgba(74,122,74,0.35); }
+.ms-meta.warn { color: var(--gold); border-color: rgba(176,141,60,0.45); }
+.ms-meta.bad { color: var(--red); border-color: rgba(161,61,45,0.35); }
+.ms-fit {
+  margin: 6px 0 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.ms-fit-box {
+  border: 1px solid var(--rule-soft);
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: var(--bg-card);
+  min-width: 0;
+}
+.ms-fit-k {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ms-fit-v {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  line-height: 1.25;
+}
+.ms-why {
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+  background: var(--bg-elev);
+  border-radius: 8px;
+  padding: 7px 9px;
+  margin: 0 0 8px;
+  line-height: 1.35;
+}
 
 .ms-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
 .ms-tag {
@@ -4331,6 +4450,12 @@ body {
   font-size: 0.7rem; color: var(--ink-muted); margin-top: 12px;
   padding-top: 8px; border-top: 1px solid var(--rule-soft);
   font-family: "IBM Plex Mono", monospace;
+}
+@media (max-width: 560px) {
+  .ms-head { align-items: flex-start; gap: 10px; }
+  .ms-actions-top { justify-content: flex-start; }
+  .ms-desk { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ms-fit { grid-template-columns: 1fr; }
 }
 
 /* ===== DISCOVER TWO-PANEL LAYOUT (v1.12) ===== */
@@ -4736,6 +4861,8 @@ const state = {
   marketScanLoading: false,
   marketScanRanAt: null,
   marketScanFocus: "",
+  marketScanLane: "all",
+  marketScanHideSoft: false,
   // Discover: Watchlist shown as a collapsible panel above the scanner.
   // Collapsed by default; tapping its header expands it.
   watchlistPanelOpen: false,
@@ -13967,6 +14094,135 @@ async function runMarketScan(opts = {}) {
   }
 }
 
+const MARKET_SCAN_LANES = [
+  { id: "all", label: "All" },
+  { id: "momentum", label: "Momentum leaders" },
+  { id: "pullback", label: "Pullback entries" },
+  { id: "catalyst", label: "Catalyst/flow" },
+  { id: "rotation", label: "Rotation" },
+];
+
+function msComponent(row, key) {
+  const c = row?.components?.[key];
+  const score = Number(c?.score);
+  return Number.isFinite(score) ? score : 0;
+}
+function msNum(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+function msTags(row) {
+  return Array.isArray(row?.tags) ? row.tags : [];
+}
+function msLaneFor(row) {
+  const tags = msTags(row);
+  const ret20 = msNum(row.return_20d);
+  const rsi = msNum(row.rsi14);
+  const fromHigh = msNum(row.pct_from_52w_high);
+  const momScore = msComponent(row, "momentum");
+  const volScore = msComponent(row, "volume");
+  const optScore = msComponent(row, "optflow");
+  const coilScore = msComponent(row, "compression");
+
+  if (tags.includes("bullish-flow") || optScore >= 12 || volScore >= 15) return "catalyst";
+  if (
+    row.trend === "above_200ma" &&
+    fromHigh != null && fromHigh <= -3 && fromHigh >= -22 &&
+    (ret20 == null || ret20 > -6) &&
+    (rsi == null || (rsi >= 38 && rsi <= 64))
+  ) return "pullback";
+  if (tags.includes("coiled") || (coilScore >= 10 && momScore >= 8)) return "rotation";
+  if (tags.includes("rs-leader") || momScore >= 14 || (ret20 != null && ret20 >= 7)) return "momentum";
+  return "all";
+}
+function msRowMatchesLane(row, lane) {
+  if (!lane || lane === "all") return true;
+  const primary = msLaneFor(row);
+  if (primary === lane) return true;
+  if (lane === "momentum") return msComponent(row, "momentum") >= 12 || msNum(row.return_20d) >= 5;
+  if (lane === "pullback") {
+    const fromHigh = msNum(row.pct_from_52w_high);
+    const rsi = msNum(row.rsi14);
+    return row.trend === "above_200ma" && fromHigh != null && fromHigh < -2 && (rsi == null || rsi < 66);
+  }
+  if (lane === "catalyst") return msComponent(row, "optflow") >= 8 || msComponent(row, "volume") >= 12;
+  if (lane === "rotation") return msTags(row).includes("coiled") || (msComponent(row, "compression") >= 7 && msComponent(row, "momentum") >= 7);
+  return false;
+}
+function msSector(symbol) {
+  const s = String(symbol || "").toUpperCase();
+  const groups = [
+    ["Technology", ["AAPL","MSFT","NVDA","AVGO","ORCL","CRM","AMD","NOW","PLTR","ADBE","CSCO","ACN","INTC","QCOM","TXN","MU","ANET","PANW","CRWD","SNPS","SMCI","MRVL","ON","ARM","DDOG","NET","SNOW","ZS","MDB","CFLT","HUBS","TEAM","WDAY","FTNT","CDNS","KLAC","LRCX","SMH","IGM","CIBR","CHAT","AIQ","BOTZ"]],
+    ["Communication", ["GOOGL","META","NFLX","DIS","TMUS","CMCSA","RBLX","SPOT","PINS","TTD","RDDT"]],
+    ["Discretionary", ["AMZN","TSLA","HD","MCD","NKE","BKNG","LOW","SBUX","TJX","CMG","ABNB","DKNG","CAVA","RCL","DECK","WSM"]],
+    ["Staples", ["WMT","COST","PG","KO","PEP","MDLZ","CL","CELH","MNST","DG"]],
+    ["Financials", ["JPM","BAC","V","MA","GS","BRK.B","WFC","MS","AXP","SCHW","BLK","HOOD","COIN","SOFI","AFRM","XYZ"]],
+    ["Health Care", ["UNH","LLY","JNJ","ABBV","MRK","ISRG","TMO","ABT","AMGN","VRTX","DXCM","HIMS","NVO"]],
+    ["Industrials", ["GE","CAT","BA","UBER","HON","RTX","UNP","DE","LMT","AXON","PWR","BLDR","ITA","SHLD"]],
+    ["Energy", ["XOM","CVX","COP","SLB","EOG","FANG","LNG","XLE","KMI"]],
+    ["Materials", ["LIN","FCX","NEM","SHW","ALB","GLD","SLV","SIL","SLVR","GDX","GDXJ","PPLT","GUNR","URA","SMRF"]],
+    ["Utilities", ["NEE","SO","DUK","VST","CEG","XLU","GRID","ELFY","ACES"]],
+    ["Real Estate", ["PLD","AMT","EQIX"]],
+    ["International", ["SWRD","EIMI","LVMUY","ARGT","VEA","EFA","EWJ","EEM"]],
+    ["Crypto", ["BTC","ETH","MSTR"]],
+  ];
+  for (const [sector, syms] of groups) if (syms.includes(s)) return sector;
+  return "Unknown";
+}
+function msHoldingApproxValue(holding) {
+  if (!holding || holding.asset_class === "cash") return 0;
+  const px = state.prices?.[holding.symbol]?.current_price;
+  if (px != null && holding.quantity != null) return Number(px) * Number(holding.quantity);
+  return Number(holding.avg_cost_total) || 0;
+}
+function msPortfolioFit(row, held, watched) {
+  if (held) return { label: "Already held", tone: "warn" };
+  if (watched) return { label: "On watchlist", tone: "good" };
+  const sector = msSector(row.symbol);
+  let total = 0, same = 0;
+  for (const h of state.holdings || []) {
+    const value = msHoldingApproxValue(h);
+    total += value;
+    if (msSector(h.symbol) === sector) same += value;
+  }
+  const weight = total > 0 ? same / total * 100 : 0;
+  if (sector === "Unknown") return { label: "Fit: research sector", tone: "" };
+  if (weight >= 35) return { label: `Fit: crowded ${sector}`, tone: "warn" };
+  if (weight <= 10) return { label: `Fit: diversifies into ${sector}`, tone: "good" };
+  return { label: `Fit: balanced ${sector}`, tone: "" };
+}
+function msRiskReward(row) {
+  const price = msNum(row.current_price);
+  const support = msNum(row.nearest_support);
+  const resistance = msNum(row.nearest_resistance);
+  if (!(price > 0 && support > 0 && resistance > price && support < price)) return null;
+  const risk = price - support;
+  const reward = resistance - price;
+  if (!(risk > 0 && reward > 0)) return null;
+  return reward / risk;
+}
+function msWhyNot(row, read) {
+  const rr = msRiskReward(row);
+  const rsi = msNum(row.rsi14);
+  const day = msNum(row.day_change_pct);
+  const ret20 = msNum(row.return_20d);
+  if (row._soft) return "Not actable yet: softer fallback. Wait for confirmation or a cleaner entry.";
+  if (day != null && day <= -3) return "Not actable yet: today is a selloff. Let price stabilize first.";
+  if (row.trend !== "above_200ma" && (ret20 == null || ret20 <= 0)) return "Not actable yet: trend is not confirmed.";
+  if (rsi != null && rsi >= 72) return "Not actable yet: extended. Prefer pullback or breakout retest.";
+  if (rr != null && rr < 2) return "Not actable yet: reward/risk is below 2:1 from here.";
+  if (!read) return "Research step: run Analyze before turning this screen into a trade.";
+  return "Next step: watch confirmation, entry zone, and invalidation before sizing.";
+}
+function msSetupLabel(row) {
+  const lane = msLaneFor(row);
+  if (lane === "momentum") return "Momentum";
+  if (lane === "pullback") return "Pullback";
+  if (lane === "catalyst") return "Catalyst/flow";
+  if (lane === "rotation") return "Rotation";
+  return "General";
+}
+
 function renderMarketScannerCard() {
   const scan = state.marketScan;
   const loading = state.marketScanLoading;
@@ -13980,34 +14236,54 @@ function renderMarketScannerCard() {
   const reads = {};
   for (const rd of (scan?.reads || [])) reads[rd.symbol] = rd;
 
-  const rows = results.slice(0, 20).map(r => {
+  const activeLane = state.marketScanLane || "all";
+  const hideSoft = !!state.marketScanHideSoft;
+  const baseResults = hideSoft ? results.filter(r => !r._soft) : results;
+  const laneResults = baseResults.filter(r => msRowMatchesLane(r, activeLane));
+  const visibleResults = laneResults.slice(0, 20);
+  const softCount = results.filter(r => r._soft).length;
+  const highCount = results.filter(r => !r._soft && msNum(r.composite) >= 70).length;
+  const pullbackCount = results.filter(r => msRowMatchesLane(r, "pullback")).length;
+  const catalystCount = results.filter(r => msRowMatchesLane(r, "catalyst")).length;
+  const laneHtml = MARKET_SCAN_LANES.map(l => {
+    const count = l.id === "all" ? baseResults.length : baseResults.filter(r => msRowMatchesLane(r, l.id)).length;
+    return `<button class="ms-lane ${activeLane === l.id ? "active" : ""}" data-act="set-ms-lane" data-lane="${escAttr(l.id)}">
+      ${escAttr(l.label)} <span class="ms-lane-count">${count}</span>
+    </button>`;
+  }).join("");
+
+  const rows = visibleResults.map(r => {
     const rd = reads[r.symbol];
-    const tagHtml = (r.tags || []).map(t =>
+    const tagHtml = msTags(r).map(t =>
       `<span class="ms-tag ms-tag-${escAttr(t)}">${escAttr(t.replace(/-/g, " "))}</span>`
     ).join("");
+    const comp = r.components || {};
     const bars = [
-      ["Vol", r.components.volume.score, r.components.volume.max, "#b08d3c"],
-      ["Mom", r.components.momentum.score, r.components.momentum.max, "#4a7a4a"],
-      ...(r.components.compression && r.components.compression.score > 0 ? [["Coil", r.components.compression.score, r.components.compression.max, "#6b7a9b"]] : []),
-      ...(r.components.optflow ? [["Opt", r.components.optflow.score, r.components.optflow.max, "#8a5fb0"]] : []),
+      ["Vol", msComponent(r, "volume"), comp.volume?.max || 20, "#b08d3c"],
+      ["Mom", msComponent(r, "momentum"), comp.momentum?.max || 20, "#4a7a4a"],
+      ...(comp.compression && msComponent(r, "compression") > 0 ? [["Coil", msComponent(r, "compression"), comp.compression.max || 20, "#6b7a9b"]] : []),
+      ...(comp.optflow ? [["Opt", msComponent(r, "optflow"), comp.optflow.max || 20, "#8a5fb0"]] : []),
     ].map(([lbl, sc, mx, col]) => `
       <div class="ms-bar-row">
         <span class="ms-bar-lbl">${lbl}</span>
-        <span class="ms-bar-track"><span class="ms-bar-fill" style="width:${(sc / mx * 100).toFixed(0)}%;background:${col}"></span></span>
+        <span class="ms-bar-track"><span class="ms-bar-fill" style="width:${Math.max(0, Math.min(100, sc / mx * 100)).toFixed(0)}%;background:${col}"></span></span>
         <span class="ms-bar-val">${Math.round(sc)}</span>
       </div>`).join("");
 
-    const dc = r.day_change_pct;
+    const dc = msNum(r.day_change_pct);
     const dcHtml = dc != null
       ? `<span class="ms-dc ${dc >= 0 ? "pos" : "neg"}">${dc >= 0 ? "+" : ""}${dc.toFixed(1)}%</span>` : "";
-
     const held = state.holdings.some(h => h.symbol === r.symbol && h.asset_class !== "cash");
     const watched = state.watchlist.some(w => w.symbol === r.symbol);
+    const fit = msPortfolioFit(r, held, watched);
+    const rr = msRiskReward(r);
+    const setupLabel = msSetupLabel(r);
+    const sector = msSector(r.symbol);
+    const why = msWhyNot(r, rd);
     const isAnalyzing = !!(state.analyzingSymbols && state.analyzingSymbols[r.symbol]);
-
     const of = r.options_flow;
     const ofHtml = of && (of.cp_vol_ratio != null || of.call_vol_oi != null)
-      ? `<div class="ms-flow">📈 Options: ${of.cp_vol_ratio != null ? `C/P ${of.cp_vol_ratio}` : ""}${of.cp_vol_ratio != null && of.call_vol_oi != null ? " · " : ""}${of.call_vol_oi != null ? `CallVol/OI ${of.call_vol_oi}` : ""}${of.expiry ? ` · exp ${escAttr(of.expiry)}` : ""}</div>`
+      ? `<div class="ms-flow">Options: ${of.cp_vol_ratio != null ? `C/P ${of.cp_vol_ratio}` : ""}${of.cp_vol_ratio != null && of.call_vol_oi != null ? " · " : ""}${of.call_vol_oi != null ? `CallVol/OI ${of.call_vol_oi}` : ""}${of.expiry ? ` · exp ${escAttr(of.expiry)}` : ""}</div>`
       : "";
 
     return `
@@ -14023,7 +14299,18 @@ function renderMarketScannerCard() {
           ${r._soft ? `<span class="presurge-tag" style="background:rgba(107,122,155,0.15);color:#6b7a9b;border-color:#6b7a9b;">softer</span>` : ""}
         </div>
         <div class="ms-name">${escAttr(r.name || "")}</div>
+        <div class="ms-meta-row">
+          <span class="ms-meta good">${escAttr(setupLabel)}</span>
+          <span class="ms-meta">${escAttr(sector)}</span>
+          ${rr != null ? `<span class="ms-meta ${rr >= 2 ? "good" : "warn"}">R:R ${rr.toFixed(1)}:1</span>` : ""}
+          ${r.rsi14 != null ? `<span class="ms-meta">RSI ${Number(r.rsi14).toFixed(0)}</span>` : ""}
+          ${r.return_20d != null ? `<span class="ms-meta">${Number(r.return_20d) >= 0 ? "+" : ""}${Number(r.return_20d).toFixed(1)}% 20d</span>` : ""}
+        </div>
         ${tagHtml ? `<div class="ms-tags">${tagHtml}</div>` : ""}
+        <div class="ms-fit">
+          <div class="ms-fit-box"><span class="ms-fit-k">Portfolio fit</span><span class="ms-fit-v ${escAttr(fit.tone)}">${escAttr(fit.label)}</span></div>
+          <div class="ms-fit-box"><span class="ms-fit-k">Entry quality</span><span class="ms-fit-v">${escAttr(why)}</span></div>
+        </div>
         <div class="ms-bars">${bars}</div>
         ${ofHtml}
         ${rd ? `
@@ -14042,7 +14329,7 @@ function renderMarketScannerCard() {
                   data-act="vrow-analyze" data-symbol="${escAttr(r.symbol)}"
                   ${isAnalyzing ? 'disabled' : ''}
                   onclick="event.stopPropagation()">
-            ${isAnalyzing ? `<span class="spinner"></span>` : "⚡ Analyze"}
+            ${isAnalyzing ? `<span class="spinner"></span>` : "Analyze"}
           </button>
           ${(!watched && !held) ? `<button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(r.symbol)}" data-name="${escAttr(r.symbol)}" onclick="event.stopPropagation()">+ Watch</button>` : ""}
         </div>
@@ -14053,48 +14340,61 @@ function renderMarketScannerCard() {
   return `
   <div class="ms-card">
     <div class="ms-head">
-      <h3>Market Opportunities</h3>
-      <div style="display:flex;gap:8px;">
-        <button class="ms-run" onclick="runMarketScan({discover:true})" ${loading ? "disabled" : ""} style="background:transparent;border:1px solid var(--accent,#8a5fb0);color:var(--accent,#8a5fb0);" title="Surface mid-cap names beyond the megacaps (slower)">
-          ${loading ? "…" : "🔍 Discover"}
+      <h3>Opportunity Desk</h3>
+      <div class="ms-actions-top">
+        <button class="ms-run secondary" onclick="runMarketScan({discover:true})" ${loading ? "disabled" : ""} title="Surface less obvious mid-cap names beyond the default list">
+          ${loading ? "..." : "Deep discovery"}
         </button>
         <button class="ms-run" onclick="runMarketScan()" ${loading ? "disabled" : ""}>
-          ${loading ? "Scanning…" : "Run scan"}
+          ${loading ? "Scanning..." : "Fresh scan"}
         </button>
       </div>
     </div>
     <div class="ms-sub">
-      <b>The top 20 bullish setups across the market${results.length ? ` — ${results.length} shown` : ""}</b> — all sectors, held or not. Live data scores volume <i>on up-days</i>, momentum/RS, coil &amp; unusual options flow. Crashing names are excluded; when few are strongly bullish, the next-best non-crashing names fill in (tagged <i>softer</i>). Type a focus for a themed scan. A screen, not advice.
+      <b>${visibleResults.length || results.length ? `${visibleResults.length || results.length} opportunities in view` : "Opportunity lanes"}</b> from a live screen of volume accumulation, momentum/relative strength, compression, and bullish options flow. Use lanes to move from broad discovery to a tradeable watchlist.
     </div>
 
     <div class="ms-focus">
-      <input type="text" id="ms-focus-input" placeholder="Optional focus (e.g. 'AI semis', 'biotech catalysts')"
+      <input type="text" id="ms-focus-input" placeholder="Focus a lane or theme (AI power, biotech catalysts, uranium, banks)"
         value="${escAttr(state.marketScanFocus || "")}"
         oninput="state.marketScanFocus = this.value"
         onkeydown="if(event.key==='Enter') runMarketScan()" />
     </div>
 
+    <div class="ms-desk">
+      <div class="ms-desk-cell"><span class="ms-desk-k">High quality</span><span class="ms-desk-v">${highCount}</span></div>
+      <div class="ms-desk-cell"><span class="ms-desk-k">Pullbacks</span><span class="ms-desk-v">${pullbackCount}</span></div>
+      <div class="ms-desk-cell"><span class="ms-desk-k">Flow/catalyst</span><span class="ms-desk-v">${catalystCount}</span></div>
+      <div class="ms-desk-cell"><span class="ms-desk-k">Softer</span><span class="ms-desk-v">${softCount}</span></div>
+    </div>
+
+    <div class="ms-lanes">${laneHtml}</div>
+    <div class="ms-toggle-row">
+      <span class="ms-sub" style="margin:0;">${activeLane === "all" ? "Showing every setup lane" : `Showing ${escAttr(MARKET_SCAN_LANES.find(l => l.id === activeLane)?.label || activeLane)}`}</span>
+      <button class="ms-toggle ${hideSoft ? "active" : ""}" data-act="toggle-ms-soft">${hideSoft ? "Showing strong only" : "Hide softer"}</button>
+    </div>
+
     ${loading ? `
       <div class="ms-loading">
         <div class="ms-spinner"></div>
-        <span>Sweeping the market &amp; scoring live data… (~40–70s)</span>
+        <span>Sweeping the market and scoring live data... (~40-70s)</span>
       </div>` : ""}
 
     ${!loading && scan?.scan_note ? `<div class="ms-note">${escAttr(scan.scan_note)}</div>` : ""}
 
-    ${!loading && results.length ? `<div class="ms-list">${rows}</div>` : ""}
+    ${!loading && visibleResults.length ? `<div class="ms-list">${rows}</div>` : ""}
 
-    ${!loading && scan && !results.length ? `
-      <div class="ms-empty">Nothing cleared the screen. Markets quiet, or try a focus hint.</div>` : ""}
+    ${!loading && scan && !visibleResults.length ? `
+      <div class="ms-empty">Nothing in this lane right now. Try another lane, clear the softer filter, or run a focused scan.</div>` : ""}
 
     ${!loading && !scan ? `
-      <div class="ms-empty">Tap "Run scan" to sweep the market for the best bullish opportunities.</div>` : ""}
+      <div class="ms-empty">Tap "Fresh scan" to sweep the market, or "Deep discovery" for less obvious mid-cap setups.</div>` : ""}
 
     ${ranAt && !loading ? `
       <div class="ms-footer">
-        ${results.length} shown · ${scan?.scored_count ?? 0} scanned of ${scan?.universe_size ?? 0} · ${escAttr(ranAt)}
+        ${visibleResults.length} shown · ${scan?.scored_count ?? 0} scanned of ${scan?.universe_size ?? 0} · ${escAttr(ranAt)}
         ${scan?.universe_source === "llm_focus" ? " · focused" : ""}
-        ${scan?.universe_source === "discovery" ? " · discovery" : ""}
+        ${scan?.universe_source === "discovery" ? " · deep discovery" : ""}
         ${scan?._cached ? " · auto-updated" : ""}
       </div>` : ""}
   </div>`;
@@ -14186,8 +14486,8 @@ function renderDiscover() {
       body.id = "view";
     }
 
-    // ---- PANEL 2: the one scanner ----
-    const p1 = makePanel("Market Opportunities");
+    // ---- PANEL 2: the opportunity desk ----
+    const p1 = makePanel(null);
     p1.panel.style.marginTop = "20px";
     addCard(p1.inner, renderMarketScannerCard(), false);
     body.appendChild(p1.panel);
@@ -15787,6 +16087,14 @@ document.addEventListener("click", (e) => {
       case "toggle-watchlist-panel":
         state.watchlistPanelOpen = !state.watchlistPanelOpen;
         renderDiscover();
+        break;
+      case "set-ms-lane":
+        state.marketScanLane = target.dataset.lane || "all";
+        renderCurrentView();
+        break;
+      case "toggle-ms-soft":
+        state.marketScanHideSoft = !state.marketScanHideSoft;
+        renderCurrentView();
         break;
       case "open-asset-from-watch":  openAsset(symbol, "watchlist"); break;
       case "open-watch":             openWatchItem(symbol); break;
