@@ -13904,6 +13904,35 @@ async function runPaperSimulation({ force = false } = {}) {
 // Adapted to this file's helpers: uses escAttr() (not escapeHtml) and
 // renderCurrentView() for re-render. Self-contained timeAgo below.
 // ============================================================================
+// Load the cron pre-warmed scan from Firestore (market_scan/latest) for an
+// INSTANT first paint — no waiting on a live scan. "Run scan" still does a
+// fresh live scan on demand. Falls back silently if the doc isn't there yet.
+let _cachedScanTried = false;
+async function loadCachedScan() {
+  if (_cachedScanTried) return;
+  _cachedScanTried = true;
+  try {
+    const snap = await db.collection("market_scan").doc("latest").get();
+    if (!snap.exists) return;
+    const d = snap.data() || {};
+    const results = d.results_json ? JSON.parse(d.results_json) : [];
+    const reads = d.reads_json ? JSON.parse(d.reads_json) : [];
+    if (!results.length) return;
+    // Don't clobber a fresh live scan the user just ran.
+    if (state.marketScan && state.marketScanRanAt) return;
+    state.marketScan = {
+      results, reads,
+      scan_note: d.scan_note || "",
+      universe_source: d.universe_source || "",
+      universe_size: d.universe_size || 0,
+      scored_count: d.scored_count || 0,
+      _cached: true,
+    };
+    state.marketScanRanAt = d.generated_at || null;
+    renderCurrentView();
+  } catch (e) { /* no cached scan yet — fine */ }
+}
+
 async function runMarketScan(opts = {}) {
   if (state.marketScanLoading) return;
   state.marketScanLoading = true;
@@ -13940,6 +13969,10 @@ function renderMarketScannerCard() {
   const scan = state.marketScan;
   const loading = state.marketScanLoading;
   const ranAt = state.marketScanRanAt ? msTimeAgo(state.marketScanRanAt) : null;
+
+  // First paint with no scan in memory: pull the cron pre-warmed list from
+  // Firestore for an instant result. Fire-and-forget; re-renders when ready.
+  if (!scan && !loading) loadCachedScan();
 
   const results = scan?.results || [];
   const reads = {};
@@ -13986,6 +14019,7 @@ function renderMarketScannerCard() {
           ${dcHtml}
           ${held ? `<span class="presurge-tag held">held</span>` : ""}
           ${watched ? `<span class="presurge-tag watched">watched</span>` : ""}
+          ${r._soft ? `<span class="presurge-tag" style="background:rgba(107,122,155,0.15);color:#6b7a9b;border-color:#6b7a9b;">softer</span>` : ""}
         </div>
         <div class="ms-name">${escAttr(r.name || "")}</div>
         ${tagHtml ? `<div class="ms-tags">${tagHtml}</div>` : ""}
@@ -14024,9 +14058,8 @@ function renderMarketScannerCard() {
       </button>
     </div>
     <div class="ms-sub">
-      <b>The top 20 bullish setups across the market${results.length ? ` — ${results.length} shown` : ""}</b> — any sector, held or not. AI proposes a
-      broad universe, then live data scores volume <i>on up-days</i>, momentum/RS,
-      squeeze fuel, coil+catalyst &amp; unusual options flow (20 pts each). Names down hard today are excluded, so a red market day yields a shorter list. A screen, not advice.
+      <b>The top 20 bullish setups across the market${results.length ? ` — ${results.length} shown` : ""}</b> — all sectors, held or not. Live data scores volume <i>on up-days</i>, momentum/RS,
+      squeeze fuel, coil+catalyst &amp; unusual options flow (20 pts each). Crashing names are excluded; when few are strongly bullish, the next-best non-crashing names fill in (tagged <i>softer</i>). Type a focus for a themed scan. A screen, not advice.
     </div>
 
     <div class="ms-focus">
@@ -14055,7 +14088,8 @@ function renderMarketScannerCard() {
     ${ranAt && !loading ? `
       <div class="ms-footer">
         Scanned ${scan?.scored_count ?? 0} of ${scan?.universe_size ?? 0} · ${escAttr(ranAt)}
-        ${scan?.universe_source === "llm_generated" ? " · AI universe" : ""}
+        ${scan?.universe_source === "llm_focus" ? " · focused universe" : ""}
+        ${scan?._cached ? " · auto-updated" : ""}
       </div>` : ""}
   </div>`;
 }
