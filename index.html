@@ -13988,8 +13988,7 @@ function renderMarketScannerCard() {
     const bars = [
       ["Vol", r.components.volume.score, r.components.volume.max, "#b08d3c"],
       ["Mom", r.components.momentum.score, r.components.momentum.max, "#4a7a4a"],
-      ["Sqz", r.components.squeeze.score, r.components.squeeze.max, "#a13d2d"],
-      ["Coil", r.components.compression.score, r.components.compression.max, "#6b7a9b"],
+      ...(r.components.compression && r.components.compression.score > 0 ? [["Coil", r.components.compression.score, r.components.compression.max, "#6b7a9b"]] : []),
       ...(r.components.optflow ? [["Opt", r.components.optflow.score, r.components.optflow.max, "#8a5fb0"]] : []),
     ].map(([lbl, sc, mx, col]) => `
       <div class="ms-bar-row">
@@ -14060,8 +14059,7 @@ function renderMarketScannerCard() {
       </button>
     </div>
     <div class="ms-sub">
-      <b>The top 20 bullish setups across the market${results.length ? ` — ${results.length} shown` : ""}</b> — all sectors, held or not. Live data scores volume <i>on up-days</i>, momentum/RS,
-      squeeze fuel, coil+catalyst &amp; unusual options flow (20 pts each). Crashing names are excluded; when few are strongly bullish, the next-best non-crashing names fill in (tagged <i>softer</i>). Type a focus for a themed scan. A screen, not advice.
+      <b>The top 20 bullish setups across the market${results.length ? ` — ${results.length} shown` : ""}</b> — all sectors, held or not. Live data scores volume <i>on up-days</i>, momentum/RS, coil &amp; unusual options flow. Crashing names are excluded; when few are strongly bullish, the next-best non-crashing names fill in (tagged <i>softer</i>). Type a focus for a themed scan. A screen, not advice.
     </div>
 
     <div class="ms-focus">
