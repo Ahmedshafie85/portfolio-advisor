@@ -13940,11 +13940,13 @@ async function runMarketScan(opts = {}) {
 
   try {
     // ONE scanner, whole-market sweep: do NOT exclude holdings or watchlist.
-    // The user wants the best 20 bullish opportunities regardless of ownership.
+    // force:true => fresh live patient scan (the "Run scan" button). Without a
+    // focus, the server persists it so later opens are instant and identical.
     const bodyReq = {
       uid: state.uid,
       exclude_symbols: [],
       focus_hint: state.marketScanFocus || undefined,
+      force: !state.marketScanFocus,   // focused scans are always live anyway
       write_reads: true,
     };
     const r = await fetch(`${WORKER_URL}/scan-market`, {
@@ -13955,7 +13957,7 @@ async function runMarketScan(opts = {}) {
     if (!r.ok) throw new Error(`scan-market ${r.status}`);
     const j = await r.json();
     state.marketScan = j;
-    state.marketScanRanAt = new Date().toISOString();
+    state.marketScanRanAt = j.generated_at || new Date().toISOString();
   } catch (e) {
     console.warn("market scan failed:", e.message || e);
     state.marketScan = { results: [], reads: [], scan_note: "Scan failed — try again.", _error: String(e.message || e) };
