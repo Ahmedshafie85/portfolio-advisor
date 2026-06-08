@@ -13940,13 +13940,13 @@ async function runMarketScan(opts = {}) {
 
   try {
     // ONE scanner, whole-market sweep: do NOT exclude holdings or watchlist.
-    // force:true => fresh live patient scan (the "Run scan" button). Without a
-    // focus, the server persists it so later opens are instant and identical.
+    // force:true => fresh live patient scan. discover:true => broad mid-cap mode.
     const bodyReq = {
       uid: state.uid,
       exclude_symbols: [],
       focus_hint: state.marketScanFocus || undefined,
-      force: !state.marketScanFocus,   // focused scans are always live anyway
+      discover_mode: opts.discover === true,
+      force: opts.discover === true || !state.marketScanFocus,
       write_reads: true,
     };
     const r = await fetch(`${WORKER_URL}/scan-market`, {
@@ -14054,9 +14054,14 @@ function renderMarketScannerCard() {
   <div class="ms-card">
     <div class="ms-head">
       <h3>Market Opportunities</h3>
-      <button class="ms-run" onclick="runMarketScan()" ${loading ? "disabled" : ""}>
-        ${loading ? "Scanning…" : "Run scan"}
-      </button>
+      <div style="display:flex;gap:8px;">
+        <button class="ms-run" onclick="runMarketScan({discover:true})" ${loading ? "disabled" : ""} style="background:transparent;border:1px solid var(--accent,#8a5fb0);color:var(--accent,#8a5fb0);" title="Surface mid-cap names beyond the megacaps (slower)">
+          ${loading ? "…" : "🔍 Discover"}
+        </button>
+        <button class="ms-run" onclick="runMarketScan()" ${loading ? "disabled" : ""}>
+          ${loading ? "Scanning…" : "Run scan"}
+        </button>
+      </div>
     </div>
     <div class="ms-sub">
       <b>The top 20 bullish setups across the market${results.length ? ` — ${results.length} shown` : ""}</b> — all sectors, held or not. Live data scores volume <i>on up-days</i>, momentum/RS, coil &amp; unusual options flow. Crashing names are excluded; when few are strongly bullish, the next-best non-crashing names fill in (tagged <i>softer</i>). Type a focus for a themed scan. A screen, not advice.
@@ -14087,8 +14092,9 @@ function renderMarketScannerCard() {
 
     ${ranAt && !loading ? `
       <div class="ms-footer">
-        Scanned ${scan?.scored_count ?? 0} of ${scan?.universe_size ?? 0} · ${escAttr(ranAt)}
-        ${scan?.universe_source === "llm_focus" ? " · focused universe" : ""}
+        ${results.length} shown · ${scan?.scored_count ?? 0} scanned of ${scan?.universe_size ?? 0} · ${escAttr(ranAt)}
+        ${scan?.universe_source === "llm_focus" ? " · focused" : ""}
+        ${scan?.universe_source === "discovery" ? " · discovery" : ""}
         ${scan?._cached ? " · auto-updated" : ""}
       </div>` : ""}
   </div>`;
