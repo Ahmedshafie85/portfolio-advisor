@@ -14327,11 +14327,10 @@ function renderMarketScannerCard() {
         <div class="ms-actions">
           <button class="btn btn-sm ${isAnalyzing ? 'analyzing' : ''}"
                   data-act="vrow-analyze" data-symbol="${escAttr(r.symbol)}"
-                  ${isAnalyzing ? 'disabled' : ''}
-                  onclick="event.stopPropagation()">
+                  ${isAnalyzing ? 'disabled' : ''}>
             ${isAnalyzing ? `<span class="spinner"></span>` : "Analyze"}
           </button>
-          ${(!watched && !held) ? `<button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(r.symbol)}" data-name="${escAttr(r.symbol)}" onclick="event.stopPropagation()">+ Watch</button>` : ""}
+          ${(!watched && !held) ? `<button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(r.symbol)}" data-name="${escAttr(r.symbol)}">+ Watch</button>` : ""}
         </div>
       </div>
     </div>`;
