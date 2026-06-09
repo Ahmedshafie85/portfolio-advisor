@@ -4861,8 +4861,8 @@ const state = {
   marketScanLoading: false,
   marketScanRanAt: null,
   marketScanFocus: "",
-  marketScanLane: "all",
-  marketScanHideSoft: false,
+  marketScanLane: "actable",
+  marketScanHideSoft: true,
   // Discover: Watchlist shown as a collapsible panel above the scanner.
   // Collapsed by default; tapping its header expands it.
   watchlistPanelOpen: false,
@@ -12768,7 +12768,8 @@ async function loadSentiment(symbol) {
   }
 }
 
-async function runAnalysis(symbol) {
+async function runAnalysis(symbol, opts = {}) {
+  const stayInline = !!opts.stayInline;
   const btn = $(`[data-act="run-analysis"][data-symbol="${symbol}"]`);
   if (btn) { btn.innerHTML = '<span class="spinner"></span> Analyzing…'; btn.disabled = true; }
   try {
@@ -12841,7 +12842,8 @@ async function runAnalysis(symbol) {
           : null,
       };
       toast("Analysis complete");
-      renderAssetDetail(symbol);
+      if (stayInline) renderCurrentView();
+      else renderAssetDetail(symbol);
       // Phase C — fresh analysis invalidates the verdict cache for this symbol.
       // Force a /verdict re-run so the row on Portfolio reflects the new read.
       runVerdict(true).catch(() => {});
@@ -12849,6 +12851,7 @@ async function runAnalysis(symbol) {
   } catch (e) {
     errorToast("Analysis", e);
     if (btn) { btn.innerHTML = "Try Again"; btn.disabled = false; }
+    if (stayInline) renderCurrentView();
   }
 }
 
@@ -12866,7 +12869,7 @@ async function analyzeSymbolFromCard(symbol) {
   state.analyzingSymbols[symbol] = true;
   renderCurrentView();
   try {
-    await runAnalysis(symbol);
+    await runAnalysis(symbol, { stayInline: true });
   } catch (e) {
     toast("AI Analyze failed: " + (e.message || "unknown error").slice(0, 80), 3000, "error");
   } finally {
@@ -13248,7 +13251,7 @@ async function analyzeAllSymbols() {
     state.analyzingSymbols[sym] = true;
     if (state.currentView === "portfolio") renderPortfolio();
     try {
-      await runAnalysis(sym);
+      await runAnalysis(sym, { stayInline: true });
       successes++;
     } catch (e) {
       failures++;
@@ -13300,15 +13303,15 @@ async function inlineAnalyzeFromRow(symbol) {
   if (!state.analyzingSymbols) state.analyzingSymbols = {};
   if (state.analyzingSymbols[symbol]) return;
   state.analyzingSymbols[symbol] = true;
-  if (state.currentView === "portfolio") renderPortfolio();
+  renderCurrentView();
   try {
-    await runAnalysis(symbol);
+    await runAnalysis(symbol, { stayInline: true });
     // runAnalysis already toasts + triggers a /verdict refresh on success.
   } catch (e) {
     // runAnalysis handles its own error toast — no double-toast here.
   } finally {
     if (state.analyzingSymbols) delete state.analyzingSymbols[symbol];
-    if (state.currentView === "portfolio") renderPortfolio();
+    renderCurrentView();
   }
 }
 
@@ -14095,6 +14098,7 @@ async function runMarketScan(opts = {}) {
 }
 
 const MARKET_SCAN_LANES = [
+  { id: "actable", label: "Actable" },
   { id: "all", label: "All" },
   { id: "momentum", label: "Momentum leaders" },
   { id: "pullback", label: "Pullback entries" },
@@ -14113,6 +14117,19 @@ function msNum(v) {
 }
 function msTags(row) {
   return Array.isArray(row?.tags) ? row.tags : [];
+}
+function msIsActable(row, read) {
+  if (!row || row._soft) return false;
+  const composite = msNum(row.composite) ?? 0;
+  const rr = msRiskReward(row);
+  const rsi = msNum(row.rsi14);
+  const day = msNum(row.day_change_pct);
+  const ret20 = msNum(row.return_20d);
+  const trendOk = row.trend === "above_200ma" || ret20 > 0 || row.optflow_bullish === true;
+  const entryOk = rr == null || rr >= 2;
+  const notExtended = rsi == null || rsi < 72;
+  const notSellingOff = day == null || day > -3;
+  return composite >= 45 && trendOk && entryOk && notExtended && notSellingOff && !!read;
 }
 function msLaneFor(row) {
   const tags = msTags(row);
@@ -14136,6 +14153,7 @@ function msLaneFor(row) {
   return "all";
 }
 function msRowMatchesLane(row, lane) {
+  if (lane === "actable") return msIsActable(row, null) || (!row?._soft && msNum(row.composite) >= 65);
   if (!lane || lane === "all") return true;
   const primary = msLaneFor(row);
   if (primary === lane) return true;
@@ -14206,7 +14224,8 @@ function msWhyNot(row, read) {
   const rsi = msNum(row.rsi14);
   const day = msNum(row.day_change_pct);
   const ret20 = msNum(row.return_20d);
-  if (row._soft) return "Not actable yet: softer fallback. Wait for confirmation or a cleaner entry.";
+  if (msIsActable(row, read)) return "Actable research setup: confirm levels, size small, and respect invalidation.";
+  if (row._soft) return "Watch only: softer fallback. Wait for a stronger signal.";
   if (day != null && day <= -3) return "Not actable yet: today is a selloff. Let price stabilize first.";
   if (row.trend !== "above_200ma" && (ret20 == null || ret20 <= 0)) return "Not actable yet: trend is not confirmed.";
   if (rsi != null && rsi >= 72) return "Not actable yet: extended. Prefer pullback or breakout retest.";
@@ -14239,14 +14258,27 @@ function renderMarketScannerCard() {
   const activeLane = state.marketScanLane || "all";
   const hideSoft = !!state.marketScanHideSoft;
   const baseResults = hideSoft ? results.filter(r => !r._soft) : results;
-  const laneResults = baseResults.filter(r => msRowMatchesLane(r, activeLane));
+  let laneResults = baseResults.filter(r => {
+    if (activeLane === "actable") return msIsActable(r, reads[r.symbol]);
+    return msRowMatchesLane(r, activeLane);
+  });
+  if (activeLane === "actable" && laneResults.length === 0) {
+    laneResults = baseResults
+      .filter(r => msNum(r.composite) >= 55 && (msNum(r.day_change_pct) == null || msNum(r.day_change_pct) > -3))
+      .slice(0, 8);
+  }
   const visibleResults = laneResults.slice(0, 20);
   const softCount = results.filter(r => r._soft).length;
-  const highCount = results.filter(r => !r._soft && msNum(r.composite) >= 70).length;
+  const actableCount = results.filter(r => msIsActable(r, reads[r.symbol])).length;
+  const highCount = results.filter(r => !r._soft && msNum(r.composite) >= 65).length;
   const pullbackCount = results.filter(r => msRowMatchesLane(r, "pullback")).length;
   const catalystCount = results.filter(r => msRowMatchesLane(r, "catalyst")).length;
   const laneHtml = MARKET_SCAN_LANES.map(l => {
-    const count = l.id === "all" ? baseResults.length : baseResults.filter(r => msRowMatchesLane(r, l.id)).length;
+    const count = l.id === "all"
+      ? baseResults.length
+      : l.id === "actable"
+        ? baseResults.filter(r => msIsActable(r, reads[r.symbol])).length
+        : baseResults.filter(r => msRowMatchesLane(r, l.id)).length;
     return `<button class="ms-lane ${activeLane === l.id ? "active" : ""}" data-act="set-ms-lane" data-lane="${escAttr(l.id)}">
       ${escAttr(l.label)} <span class="ms-lane-count">${count}</span>
     </button>`;
@@ -14361,16 +14393,16 @@ function renderMarketScannerCard() {
     </div>
 
     <div class="ms-desk">
+      <div class="ms-desk-cell"><span class="ms-desk-k">Actable</span><span class="ms-desk-v">${actableCount}</span></div>
       <div class="ms-desk-cell"><span class="ms-desk-k">High quality</span><span class="ms-desk-v">${highCount}</span></div>
       <div class="ms-desk-cell"><span class="ms-desk-k">Pullbacks</span><span class="ms-desk-v">${pullbackCount}</span></div>
       <div class="ms-desk-cell"><span class="ms-desk-k">Flow/catalyst</span><span class="ms-desk-v">${catalystCount}</span></div>
-      <div class="ms-desk-cell"><span class="ms-desk-k">Softer</span><span class="ms-desk-v">${softCount}</span></div>
     </div>
 
     <div class="ms-lanes">${laneHtml}</div>
     <div class="ms-toggle-row">
-      <span class="ms-sub" style="margin:0;">${activeLane === "all" ? "Showing every setup lane" : `Showing ${escAttr(MARKET_SCAN_LANES.find(l => l.id === activeLane)?.label || activeLane)}`}</span>
-      <button class="ms-toggle ${hideSoft ? "active" : ""}" data-act="toggle-ms-soft">${hideSoft ? "Showing strong only" : "Hide softer"}</button>
+      <span class="ms-sub" style="margin:0;">${activeLane === "all" ? "Showing strong setups across every lane" : `Showing ${escAttr(MARKET_SCAN_LANES.find(l => l.id === activeLane)?.label || activeLane)}`}</span>
+      <button class="ms-toggle ${hideSoft ? "active" : ""}" data-act="toggle-ms-soft">${hideSoft ? `Strong only (${softCount} hidden)` : "Hide softer"}</button>
     </div>
 
     ${loading ? `
@@ -14384,7 +14416,7 @@ function renderMarketScannerCard() {
     ${!loading && visibleResults.length ? `<div class="ms-list">${rows}</div>` : ""}
 
     ${!loading && scan && !visibleResults.length ? `
-      <div class="ms-empty">Nothing in this lane right now. Try another lane, clear the softer filter, or run a focused scan.</div>` : ""}
+      <div class="ms-empty">No clean setups in this lane. Try Momentum leaders, show softer rows, or run a focused scan for a theme you care about.</div>` : ""}
 
     ${!loading && !scan ? `
       <div class="ms-empty">Tap "Fresh scan" to sweep the market, or "Deep discovery" for less obvious mid-cap setups.</div>` : ""}
@@ -16118,7 +16150,7 @@ document.addEventListener("click", (e) => {
         // Phase M: same as run-analysis but doesn't navigate away. Stays
         // on the current row so the verdict expander can reflect the new
         // analysis once it lands.
-        runAnalysis(symbol);
+        inlineAnalyzeFromRow(symbol);
         break;
       case "add-holding":            openAddHolding(); break;
       case "submit-add":             submitAddHolding(); break;
