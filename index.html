@@ -4137,6 +4137,35 @@ body {
 .recommended-action-banner.hold,
 .recommended-action-banner.wait,
 .recommended-action-banner.neutral { border-left-color: var(--gold); background: rgba(176,141,60,0.08); }
+.decision-gate {
+  margin: 0 20px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule-soft);
+  border-left: 4px solid var(--gold);
+  border-radius: 8px;
+  background: var(--bg-card);
+}
+.decision-gate.pass { border-left-color: var(--green); background: rgba(74,122,74,0.07); }
+.decision-gate.reject { border-left-color: var(--red); background: rgba(161,61,45,0.07); }
+.dg-top { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.dg-label {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+}
+.dg-status {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink);
+}
+.dg-reason {
+  margin-top: 5px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  line-height: 1.35;
+}
 .rab-lbl {
   font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.10em;
   text-transform: uppercase; color: var(--ink-muted);
@@ -4366,10 +4395,13 @@ body {
 .ms-meta.good { color: var(--green); border-color: rgba(74,122,74,0.35); }
 .ms-meta.warn { color: var(--gold); border-color: rgba(176,141,60,0.45); }
 .ms-meta.bad { color: var(--red); border-color: rgba(161,61,45,0.35); }
+.ms-meta.pass { color: var(--green); border-color: rgba(74,122,74,0.42); background: rgba(74,122,74,0.08); }
+.ms-meta.workup { color: var(--gold); border-color: rgba(176,141,60,0.52); background: rgba(176,141,60,0.08); }
+.ms-meta.reject { color: var(--red); border-color: rgba(161,61,45,0.42); background: rgba(161,61,45,0.08); }
 .ms-fit {
   margin: 6px 0 8px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 .ms-fit-box {
@@ -4394,6 +4426,9 @@ body {
   color: var(--ink-soft);
   line-height: 1.25;
 }
+.ms-fit-v.good { color: var(--green); }
+.ms-fit-v.warn { color: var(--gold); }
+.ms-fit-v.bad { color: var(--red); }
 .ms-why {
   font-size: 0.74rem;
   color: var(--ink-soft);
@@ -11456,6 +11491,7 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
   const decay = opts.decay ?? (analysis ? convictionDecay(analysis, holding?.asset_class || analysis?.asset_class || "us_stock") : null);
   const stance = (analysis?.stance || analysis?.signal || "").toUpperCase();
   const conviction = (analysis?.conviction || "").toLowerCase();
+  const confidence = (analysis?.confidence || "").toLowerCase();
   const price = opts.currentPrice ?? null;
 
   // ------ Missing / stale → WATCH --------------------------------------------
@@ -11499,7 +11535,8 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
   const actionWhat = analysis.action?.what || "";
   const inZone = priceInZone(price, priceZone);
   const rr = analysis.reward_risk?.ratio ?? analysis.computed_reward_risk?.ratio ?? null;
-  const meetsRR = rr == null ? null : rr >= 2.0;
+  const minRR = Number(state.investorProfile?.min_reward_risk) || 2.0;
+  const meetsRR = rr == null ? null : rr >= minRR;
 
   // Conviction-aware HOLD default: low-conviction stances shouldn't manufacture
   // ACT regardless of stance. BUT — the analysis often has an explicit
@@ -11526,6 +11563,26 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
       why: String(analysis?.action?.why || "").slice(0, 400),
       read: String(analysis?.read || "").slice(0, 320),
       key_risks: risks,
+      counter_argument: String(analysis?.counter_argument || "").slice(0, 320),
+      _source: "local",
+    };
+  }
+
+  if (confidence === "low" && stance !== "EXIT" && stance !== "AVOID") {
+    return {
+      verdict: "HOLD",
+      action_line: actionWhat || (isHeld ? "Low confidence — no add yet" : "Low confidence — keep on watch"),
+      severity: "low",
+      freshness: decay?.status || "fresh",
+      reasoning_short: analysis.headline || "The analysis confidence is low. Do not turn a weak read into an action.",
+      stance_echo: stance || null,
+      conviction: conviction || null,
+      key_signal: synthKeySignal(analysis),
+      fired_trigger: null,
+      missing_inputs: ["Confidence too low for action"],
+      why: String(analysis?.action?.why || "").slice(0, 400),
+      read: String(analysis?.read || "").slice(0, 320),
+      key_risks: (Array.isArray(analysis?.key_risks) ? analysis.key_risks : []).slice(0, 2),
       counter_argument: String(analysis?.counter_argument || "").slice(0, 320),
       _source: "local",
     };
@@ -11559,6 +11616,22 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
       });
     }
     if (stance === "ACCUMULATE") {
+      if (meetsRR === false) {
+        return verdictObj({
+          verdict: "HOLD", severity: "low",
+          action_line: `Do not add — R:R ${Number(rr).toFixed(1)}:1 is below ${minRR}:1`,
+          reasoning_short: analysis.reward_risk?.note || analysis.headline || "The setup fails the minimum reward/risk gate.",
+          stance, conviction, analysis, decay,
+        });
+      }
+      if (meetsRR === null) {
+        return verdictObj({
+          verdict: "HOLD", severity: "low",
+          action_line: "Do not add — reward/risk not defined",
+          reasoning_short: analysis.headline || "Missing clean target/stop levels. Wait until the trade can be sized.",
+          stance, conviction, analysis, decay,
+        });
+      }
       if (inZone === true) {
         return verdictObj({
           verdict: "ACT", severity: "medium",
@@ -11594,13 +11667,27 @@ function computeLocalVerdict(analysis, holding, opts = {}) {
     });
   }
   if (stance === "ACCUMULATE") {
+    if (meetsRR === false) {
+      return verdictObj({
+        verdict: "HOLD", severity: "low",
+        action_line: `Wait — R:R ${Number(rr).toFixed(1)}:1 is below ${minRR}:1`,
+        reasoning_short: analysis.reward_risk?.note || analysis.headline || "Good idea, bad entry. Let price improve or wait for resistance to break.",
+        stance, conviction, analysis, decay,
+      });
+    }
+    if (meetsRR === null) {
+      return verdictObj({
+        verdict: "HOLD", severity: "low",
+        action_line: "Wait — reward/risk not defined",
+        reasoning_short: analysis.headline || "No clean target/stop math yet. Watch, do not open.",
+        stance, conviction, analysis, decay,
+      });
+    }
     if (inZone === true) {
       return verdictObj({
         verdict: "ACT", severity: "medium",
         action_line: actionWhat || `Open position — price in entry zone (${priceZone})`,
-        reasoning_short: meetsRR === false
-          ? "Setup live but R:R below 2 — size cautiously."
-          : (analysis.headline || "Entry zone hit. Setup is live."),
+        reasoning_short: analysis.headline || "Entry zone hit and reward/risk clears the minimum gate.",
         stance, conviction, analysis, decay,
       });
     }
@@ -11790,6 +11877,36 @@ function priceInZone(price, zoneStr) {
   return null;
 }
 
+function analysisDecisionGate(symbol, analysis, isHeld) {
+  if (!analysis) return { status: "NEEDS ANALYSIS", tone: "watch", reason: "No current analysis exists." };
+  const stance = String(analysis.stance || analysis.signal || "").toUpperCase();
+  const confidence = String(analysis.confidence || "").toLowerCase();
+  const conviction = String(analysis.conviction || "").toLowerCase();
+  const rr = analysis.reward_risk?.ratio ?? analysis.computed_reward_risk?.ratio ?? null;
+  const minRR = Number(state.investorProfile?.min_reward_risk) || 2.0;
+  const price = state.prices?.[symbol]?.current_price ?? analysis.current_price ?? null;
+  const zone = analysis.action?.price_zone || "";
+  const inZone = priceInZone(price, zone);
+  const decayClass = state.holdings.find(h => h.symbol === symbol)?.asset_class
+    || state.watchlist.find(w => w.symbol === symbol)?.asset_class
+    || analysis.asset_class
+    || "us_stock";
+  const decay = convictionDecay(analysis, decayClass);
+
+  if (decay?.is_stale) return { status: "RE-ANALYZE", tone: "reject", reason: `Analysis is ${Math.round(decay.days_old)}d old; do not act on stale levels.` };
+  if (["EXIT", "AVOID"].includes(stance)) return { status: isHeld ? "EXIT GATE" : "AVOID", tone: "reject", reason: analysis.headline || "The stance is negative." };
+  if (confidence === "low") return { status: "WAIT", tone: "watch", reason: "Confidence is low; keep it on watch until evidence improves." };
+  if (conviction === "low") return { status: "WAIT", tone: "watch", reason: "Conviction is low; do not allocate fresh capital yet." };
+  if (stance === "ACCUMULATE") {
+    if (rr == null) return { status: "WAIT", tone: "watch", reason: "Reward/risk is not defined; no clean target and stop math." };
+    if (rr < minRR) return { status: "WAIT", tone: "watch", reason: `Reward/risk ${Number(rr).toFixed(1)}:1 is below your ${minRR}:1 minimum.` };
+    if (inZone === false) return { status: "WAIT FOR ZONE", tone: "watch", reason: zone ? `Good thesis, but price is not in the entry zone: ${zone}.` : "Good thesis, but no live entry zone." };
+    return { status: "PASS", tone: "pass", reason: "Stance, reward/risk, confidence, and entry zone line up." };
+  }
+  if (stance === "TRIM") return { status: isHeld ? "TRIM PLAN" : "NOT NEW MONEY", tone: "watch", reason: analysis.headline || "This is not a new-entry setup." };
+  return { status: "HOLD / WATCH", tone: "watch", reason: analysis.headline || "No fresh action gate is open." };
+}
+
 
 
 // ============================================================================
@@ -11854,6 +11971,7 @@ function renderAiCard(symbol, a) {
       <button class="btn btn-sm" data-act="run-analysis" data-symbol="${escAttr(symbol)}">Re-analyze</button>
     </div>
   ` : "";
+  const gate = analysisDecisionGate(symbol, a, !!heldRecord);
 
   return `<div class="ai-card ${decay?.is_stale ? "ai-card-stale" : ""}">
     ${decayBanner}
@@ -11878,6 +11996,13 @@ function renderAiCard(symbol, a) {
       <div class="rab-lbl">Action for today</div>
       <div class="rab-text">${escAttr(recommendedAction)}</div>
       ${inversion ? `<div class="rab-inv">Flip this view if: <strong>${escAttr(inversion)}</strong></div>` : ""}
+    </div>
+    <div class="decision-gate ${escAttr(gate.tone)}">
+      <div class="dg-top">
+        <span class="dg-label">Decision gate</span>
+        <span class="dg-status">${escAttr(gate.status)}</span>
+      </div>
+      <div class="dg-reason">${escAttr(gate.reason)}</div>
     </div>
     ${(action.price_zone || action.timeframe) ? `
     <div class="action-block" style="margin-top:0;">
@@ -13569,6 +13694,53 @@ function msSetupLabel(row) {
   return "General";
 }
 
+function msInvestmentGate(row, fit = null) {
+  const minRR = Number(state.investorProfile?.min_reward_risk) || 2.0;
+  const rr = msRiskReward(row);
+  const rsi = msNum(row.rsi14);
+  const day = msNum(row.day_change_pct);
+  const ret20 = msNum(row.return_20d);
+  const composite = msNum(row.composite) ?? 0;
+  const adv = msNum(row.avg_dollar_vol_20d);
+  const tags = msTags(row);
+  const held = state.holdings.some(h => h.symbol === row.symbol && h.asset_class !== "cash");
+  const watched = state.watchlist.some(w => w.symbol === row.symbol);
+  const actualFit = fit || msPortfolioFit(row, held, watched);
+  const checks = [];
+  let score = 0;
+
+  const add = (ok, weight, good, bad) => {
+    checks.push(ok ? good : bad);
+    if (ok) score += weight;
+  };
+
+  add(composite >= 55, 16, "score clears quality bar", "score is still early");
+  add(row.entry_state === "actionable" || row.entry_state === "building" || msIsActable(row, null), 18, "entry state is usable", "entry state is not usable");
+  add(rr != null && rr >= minRR, 18, `R:R ${rr != null ? rr.toFixed(1) : "—"}:1 meets ${minRR}:1`, rr == null ? "R:R needs clean levels" : `R:R ${rr.toFixed(1)}:1 below ${minRR}:1`);
+  add(row.trend === "above_200ma" || ret20 > 0 || row.optflow_bullish === true, 14, "trend/turn is constructive", "trend is not confirmed");
+  add(day == null || day > -3, 10, "not selling off today", "selling off today");
+  add(rsi == null || (rsi >= 35 && rsi < 72), 8, "RSI not stretched", "RSI is stretched/weak");
+  add(adv == null || adv >= 5_000_000, 8, "liquidity acceptable", "liquidity too thin");
+  add(actualFit.tone !== "warn", 8, "portfolio fit acceptable", "portfolio fit is crowded/held");
+
+  if (tags.includes("bullish-flow") || tags.includes("volume-surge") || tags.includes("rs-leader") || tags.includes("coiled")) score += 4;
+  if (row._soft) score -= 10;
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  let label = "REJECT", tone = "reject";
+  if (score >= 78) { label = "IC PASS"; tone = "pass"; }
+  else if (score >= 62) { label = "WORKUP"; tone = "workup"; }
+  else if (score >= 45) { label = "WATCH"; tone = "workup"; }
+
+  const blockers = checks.filter(x => /below|needs|not|selling|stretched|thin|crowded|early/.test(x)).slice(0, 2);
+  return {
+    score,
+    label,
+    tone,
+    primary: blockers[0] || checks[0] || "candidate passed core gate",
+  };
+}
+
 const MS_MEGA_SYMBOLS = new Set(["AAPL","MSFT","NVDA","AVGO","GOOGL","META","AMZN","TSLA","LLY","JPM","V","MA","UNH","XOM","COST","WMT","HD","PG","NFLX","ORCL","CRM"]);
 function msCapBucket(row) {
   const sym = String(row?.symbol || "").toUpperCase();
@@ -13625,10 +13797,17 @@ function renderMarketScannerCard() {
     if (activeLane === "actable") return msIsActable(r, reads[r.symbol]);
     return msRowMatchesLane(r, activeLane);
   });
+  laneResults = laneResults
+    .slice()
+    .sort((a, b) => {
+      const ga = msInvestmentGate(a);
+      const gb = msInvestmentGate(b);
+      return (gb.score - ga.score) || ((msNum(b.composite) ?? 0) - (msNum(a.composite) ?? 0));
+    });
   const visibleResults = laneResults.slice(0, 20);
   const softCount = results.filter(r => r._soft).length;
   const actableCount = results.filter(r => msIsActable(r, reads[r.symbol])).length;
-  const highCount = results.filter(r => !r._soft && (r.quality_grade === "A" || msNum(r.composite) >= 65)).length;
+  const highCount = results.filter(r => !r._soft && msInvestmentGate(r).score >= 78).length;
   const pullbackCount = results.filter(r => msRowMatchesLane(r, "pullback")).length;
   const catalystCount = results.filter(r => msRowMatchesLane(r, "catalyst")).length;
   const laneHtml = MARKET_SCAN_LANES.map(l => {
@@ -13682,6 +13861,8 @@ function renderMarketScannerCard() {
     const why = msWhyNot(r, rd);
     const grade = String(r.quality_grade || "").toUpperCase();
     const entryState = String(r.entry_state || "").replace(/_/g, " ");
+    const gate = msInvestmentGate(r, fit);
+    const adv = msNum(r.avg_dollar_vol_20d);
     const isAnalyzing = !!(state.analyzingSymbols && state.analyzingSymbols[r.symbol]);
     const of = r.options_flow;
     const earningsDate = r.earnings_date ? String(r.earnings_date) : "";
@@ -13707,9 +13888,11 @@ function renderMarketScannerCard() {
           <span class="ms-meta good">${escAttr(setupLabel)}</span>
           <span class="ms-meta">${escAttr(sector)}</span>
           <span class="ms-meta ${msCapBucket(r) === "mega" ? "warn" : "good"}">${escAttr(msCapBucket(r).replace(/_/g, " "))}</span>
+          <span class="ms-meta ${escAttr(gate.tone)}">${escAttr(gate.label)} ${gate.score}</span>
           ${grade ? `<span class="ms-meta ${grade === "A" || grade === "B" ? "good" : "warn"}">Grade ${escAttr(grade)}</span>` : ""}
           ${entryState ? `<span class="ms-meta ${r.entry_state === "actionable" ? "good" : r.entry_state === "bad_rr" || r.entry_state === "falling" ? "warn" : ""}">${escAttr(entryState)}</span>` : ""}
           ${rr != null ? `<span class="ms-meta ${rr >= 2 ? "good" : "warn"}">R:R ${rr.toFixed(1)}:1</span>` : ""}
+          ${adv != null ? `<span class="ms-meta ${adv >= 5_000_000 ? "good" : "bad"}">$Vol ${adv >= 1_000_000 ? `${(adv / 1_000_000).toFixed(0)}M` : `${(adv / 1_000).toFixed(0)}K`}</span>` : ""}
           ${r.rsi14 != null ? `<span class="ms-meta">RSI ${Number(r.rsi14).toFixed(0)}</span>` : ""}
           ${r.return_20d != null ? `<span class="ms-meta">${Number(r.return_20d) >= 0 ? "+" : ""}${Number(r.return_20d).toFixed(1)}% 20d</span>` : ""}
           ${earningsDate ? `<span class="ms-meta warn">earn ${escAttr(earningsDate)}</span>` : ""}
@@ -13718,6 +13901,7 @@ function renderMarketScannerCard() {
         ${tagHtml ? `<div class="ms-tags">${tagHtml}</div>` : ""}
         ${msPipelineHtml(r, rd, held, watched)}
         <div class="ms-fit">
+          <div class="ms-fit-box"><span class="ms-fit-k">Investment gate</span><span class="ms-fit-v ${escAttr(gate.tone === "pass" ? "good" : gate.tone === "reject" ? "bad" : "")}">${escAttr(gate.primary)}</span></div>
           <div class="ms-fit-box"><span class="ms-fit-k">Portfolio fit</span><span class="ms-fit-v ${escAttr(fit.tone)}">${escAttr(fit.label)}</span></div>
           <div class="ms-fit-box"><span class="ms-fit-k">Entry quality</span><span class="ms-fit-v">${escAttr(why)}</span></div>
         </div>
@@ -13774,7 +13958,7 @@ function renderMarketScannerCard() {
 
     <div class="ms-desk">
       <div class="ms-desk-cell"><span class="ms-desk-k">Actable</span><span class="ms-desk-v">${actableCount}</span></div>
-      <div class="ms-desk-cell"><span class="ms-desk-k">High quality</span><span class="ms-desk-v">${highCount}</span></div>
+      <div class="ms-desk-cell"><span class="ms-desk-k">IC pass</span><span class="ms-desk-v">${highCount}</span></div>
       <div class="ms-desk-cell"><span class="ms-desk-k">Pullbacks</span><span class="ms-desk-v">${pullbackCount}</span></div>
       <div class="ms-desk-cell"><span class="ms-desk-k">Flow/catalyst</span><span class="ms-desk-v">${catalystCount}</span></div>
     </div>
