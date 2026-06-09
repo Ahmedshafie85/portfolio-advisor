@@ -4202,7 +4202,7 @@ body {
 .collapsible-card.expanded .collapsible-body { display: block; }
 
 
-/* ===== MARKET SCANNER STYLES (v1.12) ===== */
+/* ===== MARKET SCANNER STYLES (v1.16) ===== */
 /* ============================================================================
    MARKET SCANNER CARD — styles (paste into the <style> block in index.html)
    Uses your existing CSS variables (--bg-card, --ink, --accent, etc.)
@@ -4458,7 +4458,7 @@ body {
   .ms-fit { grid-template-columns: 1fr; }
 }
 
-/* ===== DISCOVER TWO-PANEL LAYOUT (v1.12) ===== */
+/* ===== DISCOVER TWO-PANEL LAYOUT (v1.16) ===== */
 .discover-panel {
   background: var(--bg-card, #fffdf8);
   border: 1px solid var(--border, rgba(0,0,0,0.08));
@@ -5013,7 +5013,7 @@ const state = {
   prices: {},
   analyses: {},
   portfolioAnalysis: null,
-  // Market Scanner (v1.12) — POST /scan-market results + UI state.
+  // Market Scanner (v1.16) — POST /scan-market results + UI state.
   marketScan: null,
   marketScanLoading: false,
   marketScanRanAt: null,
@@ -5577,8 +5577,6 @@ async function loadInitialData() {
   renderCurrentView();
   // Background scan after first render
   setTimeout(() => runScan().catch(() => {}), 1500);
-  // Phase B — check fired triggers on first load. Debounced to 6h via state.triggersCheckedAt.
-  setTimeout(() => runTriggersCheck(false).catch(() => {}), 3500);
   // Phase C — unified verdict on first load. Debounced to 4h.
   setTimeout(() => runVerdict(false).catch(() => {}), 4500);
   // Phase R — paper-trade exit simulation on first load. Cooldown 6h via
@@ -9329,119 +9327,6 @@ function tagActionsWithRecency(actions) {
 // ============================================================================
 // MACRO REGIME CARD — DXY + 10Y yield → favored / headwind sectors for your book
 // ============================================================================
-function renderMacroRegimeCard() {
-  const macro = state.macro;
-  const loading = state.macroLoading;
-
-  if (!macro && !loading) {
-    return `
-      <div class="macro-card empty">
-        <div class="macro-head">
-          <div>
-            <h3>Macro Regime</h3>
-            <div class="macro-sub">Dollar + 10Y yield → favored vs headwind sectors</div>
-          </div>
-          <button class="btn btn-sm" data-act="refresh-macro">Load</button>
-        </div>
-        <div class="macro-empty-body">
-          Reads US Dollar Index (DXY) and 10-Year Treasury yield from Yahoo to classify which regime we're in. Cached for 6 hours (macro moves slowly).
-        </div>
-      </div>
-    `;
-  }
-
-  if (loading) {
-    return `
-      <div class="macro-card loading">
-        <div class="macro-head">
-          <div>
-            <h3>Macro Regime</h3>
-            <div class="macro-sub">Fetching DXY + 10Y yield…</div>
-          </div>
-          <button class="btn btn-sm" disabled><span class="spinner" style="width:12px;height:12px;border-width:1.5px;"></span></button>
-        </div>
-      </div>
-    `;
-  }
-
-  const c = macro.classified;
-  const dxy = c.dxy;
-  const tnx = c.tnx;
-  const verdict = userHoldingsMacroVerdict(c);
-
-  // Pick a color based on the regime's mood toward the user's actual book.
-  // More headwinds than favored = a "caution" tone. More favored = "tailwind" tone.
-  let toneClass = "neutral";
-  if (verdict.favored.length > verdict.headwind.length + 1) toneClass = "tailwind";
-  else if (verdict.headwind.length > verdict.favored.length + 1) toneClass = "headwind";
-
-  const dxySlopeArrow = dxy.slope_20d_pct == null ? "→" : (dxy.slope_20d_pct > 0.5 ? "↑" : dxy.slope_20d_pct < -0.5 ? "↓" : "→");
-  const dxySlopeClass = dxy.slope_20d_pct == null ? "" : (dxy.slope_20d_pct > 0.5 ? "neg" : dxy.slope_20d_pct < -0.5 ? "pos" : ""); // rising dollar is bad for risk in user's book
-  const tnxChangeArrow = tnx.change_50d_pp == null ? "→" : (tnx.change_50d_pp > 0.1 ? "↑" : tnx.change_50d_pp < -0.1 ? "↓" : "→");
-
-  return `
-    <div class="macro-card ${toneClass}">
-      <div class="macro-head">
-        <div>
-          <h3>Macro Regime</h3>
-          <div class="macro-sub">Updated ${fmtRel(macro.fetchedAt || new Date().toISOString())}</div>
-        </div>
-        <button class="btn btn-secondary btn-sm" data-act="refresh-macro">Refresh</button>
-      </div>
-
-      <div class="macro-regime-label">
-        <div class="mrl-cur">${escAttr(c.regimeLabel)}</div>
-        <div class="mrl-blurb">${escAttr(c.regimeBlurb)}</div>
-      </div>
-
-      <div class="macro-stats">
-        <div class="macro-stat">
-          <div class="macro-stat-lbl">DXY</div>
-          <div class="macro-stat-val">${dxy.current != null ? dxy.current.toFixed(2) : "—"}</div>
-          <div class="macro-stat-sub">
-            <span class="${dxySlopeClass}">${dxySlopeArrow} ${dxy.slope_20d_pct != null ? (dxy.slope_20d_pct >= 0 ? "+" : "") + dxy.slope_20d_pct.toFixed(2) + "% 20d" : ""}</span>
-            ${dxy.pctile_252d != null ? `<span class="muted"> · ${dxy.pctile_252d.toFixed(0)}th pctile</span>` : ""}
-          </div>
-        </div>
-        <div class="macro-stat">
-          <div class="macro-stat-lbl">10Y Yield</div>
-          <div class="macro-stat-val">${tnx.display_pct != null ? tnx.display_pct.toFixed(2) + "%" : "—"}</div>
-          <div class="macro-stat-sub">
-            <span>${tnxChangeArrow} ${tnx.change_50d_pp != null ? (tnx.change_50d_pp >= 0 ? "+" : "") + tnx.change_50d_pp.toFixed(2) + "pp 50d" : ""}</span>
-          </div>
-        </div>
-      </div>
-
-      ${verdict.favored.length > 0 || verdict.headwind.length > 0 ? `
-      <div class="macro-verdict">
-        ${verdict.favored.length > 0 ? `
-        <div class="mv-block favored">
-          <div class="mv-lbl">Your book: Tailwind</div>
-          <div class="mv-syms">${verdict.favored.map(s => `<span class="mv-chip favored">${escAttr(s)}</span>`).join("")}</div>
-        </div>` : ""}
-        ${verdict.headwind.length > 0 ? `
-        <div class="mv-block headwind">
-          <div class="mv-lbl">Your book: Headwind</div>
-          <div class="mv-syms">${verdict.headwind.map(s => `<span class="mv-chip headwind">${escAttr(s)}</span>`).join("")}</div>
-        </div>` : ""}
-      </div>` : ""}
-
-      <div class="macro-favors-grid">
-        <div class="macro-fg-col favors">
-          <div class="mfg-lbl">Regime Favors</div>
-          <ul>${c.favors.map(f => `<li>${escAttr(f)}</li>`).join("")}</ul>
-        </div>
-        ${c.against.length > 0 ? `
-        <div class="macro-fg-col against">
-          <div class="mfg-lbl">Regime Against</div>
-          <ul>${c.against.map(a => `<li>${escAttr(a)}</li>`).join("")}</ul>
-        </div>` : ""}
-      </div>
-
-      <div class="macro-footer">Heuristic regime mapping · DXY pctile vs 252d · 10Y yield change in % points · Refresh cached 6h · For orientation, not signal</div>
-    </div>
-  `;
-}
 
 async function refreshMacro() {
   if (state.macroLoading) return;
@@ -9689,76 +9574,6 @@ function computeEtfRotation() {
   return rows;
 }
 
-function renderEtfRotationStrip() {
-  const rows = computeEtfRotation();
-  if (!rows.length) return ""; // no SPY benchmark or no ETF data yet
-  // Group by category.
-  const byCat = {};
-  for (const r of rows) (byCat[r.category] = byCat[r.category] || []).push(r);
-
-  // Sort categories by their STRONGEST member's RS, so the hottest sectors sit
-  // first (read left-to-right / top-to-bottom = strongest to weakest rotation).
-  const catBest = {};
-  for (const c of Object.keys(byCat)) catBest[c] = Math.max(...byCat[c].map(r => r.rsBlend));
-  const cats = Object.keys(byCat).sort((a, b) => catBest[b] - catBest[a]);
-
-  // Heatmap cell: background intensity scales with RS magnitude. Strong green
-  // for leaders, strong red for laggards, faint for the middle.
-  const heatStyle = (v) => {
-    if (v == null) return "";
-    const mag = Math.min(1, Math.abs(v) / 20); // saturate at ±20% RS
-    const alpha = (0.10 + mag * 0.45).toFixed(2);
-    if (v >= 0) return `background: rgba(74, 122, 74, ${alpha});`;       // green
-    return `background: rgba(176, 61, 45, ${alpha});`;                    // red
-  };
-  const fmtRs = (v) => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}`;
-  const trendMark = (t) => t === true ? `<span class="rot-trend up" title="Above 200-day average">↑</span>`
-                        : t === false ? `<span class="rot-trend down" title="Below 200-day average">↓</span>`
-                        : ``; // unknown — show nothing rather than a misleading arrow
-
-  const catBlocks = cats.map(cat => {
-    const members = byCat[cat].slice(0, 6);
-    const best = catBest[cat];
-    const catHeat = best >= 8 ? "hot" : best >= 0 ? "warm" : "cold";
-    const rowsHtml = members.map(r => {
-      const onList = state.watchlist.some(w => w.symbol === r.symbol);
-      return `
-      <div class="rot-row" data-act="open-asset" data-symbol="${escAttr(r.symbol)}" style="${heatStyle(r.rsBlend)}">
-        <span class="rot-sym">${escAttr(r.symbol)}${r.durable ? `<span class="rot-star" title="Durable — positive 1-year relative strength">★</span>` : ""}</span>
-        <span class="rot-rs">${fmtRs(r.rsBlend)}<span class="rot-pct">%</span></span>
-        ${trendMark(r.aboveTrend)}
-        ${onList
-          ? `<span class="rot-watch on" title="On watchlist">✓</span>`
-          : `<button class="rot-watch" data-act="add-curated" data-symbol="${escAttr(r.symbol)}" data-name="${escAttr(r.name)}" title="Add ${escAttr(r.symbol)} to watchlist" onclick="event.stopPropagation()">+</button>`}
-      </div>`;
-    }).join("");
-    return `<div class="rot-cat">
-      <div class="rot-cat-head"><span class="rot-cat-dot ${catHeat}"></span>${escAttr(cat)}</div>
-      ${rowsHtml}
-    </div>`;
-  }).join("");
-
-  // A one-line plain-English read of the rotation, derived from the data.
-  const topCat = cats[0], botCat = cats[cats.length - 1];
-  const leadName = byCat[topCat]?.[0]?.symbol;
-  const readLine = (catBest[topCat] > 3)
-    ? `Money is rotating into <b>${escAttr(topCat)}</b> (${escAttr(leadName)} leads) and out of <b>${escAttr(botCat)}</b>.`
-    : `No strong rotation — leadership is flat across categories right now.`;
-
-  return `
-    <div class="presurge-card rotation-card">
-      <div class="presurge-head">
-        <div>
-          <h3>ETF Rotation</h3>
-          <div class="presurge-sub">Strength vs SPY · 1mo+3mo · ★ durable · greener = leading</div>
-        </div>
-        <button class="btn btn-sm" data-act="run-presurge">Rescan</button>
-      </div>
-      <div class="rot-read">${readLine}</div>
-      <div class="rotation-grid">${catBlocks}</div>
-      <div class="presurge-foot">Hottest categories first; leaders top each column. Tap any ETF to open it. Timing setups (oversold/breakout) appear in the Screener above.</div>
-    </div>`;
-}
 
 function renderScreenerCard() {
   // The screener reuses the Pre-Surge scan's fetched OHLCV. If no scan has run,
@@ -9881,276 +9696,6 @@ function renderScreenerCard() {
 //   • Accumulation (OBV slope positive while price flat, + up/down volume ratio)
 //   • Relative Strength (RS line slope vs SPY rising while price flat, + RS pctile)
 // ============================================================================
-function renderPreSurgeCard() {
-  const cached = state.preSurge;
-  const loading = state.preSurgeLoading;
-  const ranAt = state.preSurgeRanAt;
-
-  // First-time empty state
-  if (!cached && !loading) {
-    return `
-      <div class="presurge-card empty">
-        <div class="presurge-head">
-          <div>
-            <h3>Pre-Surge Scanner</h3>
-            <div class="presurge-sub">Squeeze · Accumulation · Relative Strength</div>
-          </div>
-          <button class="btn btn-sm" data-act="run-presurge">Scan</button>
-        </div>
-        <div class="presurge-empty-body">
-          Scans your watchlist, holdings, ETF universe, and a curated mid-cap universe (where pre-surge patterns actually show up) for three leading-indicator setups: Bollinger squeeze, OBV accumulation divergence, and relative-strength rotation. A <b>confirmed flag</b> needs a high composite <i>and</i> a direction — accumulation and RS both stepping in, not a squeeze on its own. Coils that score well but haven't confirmed appear under <b>Watching</b>. First scan downloads OHLCV histories — takes 30-60 seconds; later scans are instant.
-        </div>
-      </div>
-    `;
-  }
-
-  if (loading) {
-    const p = state.preSurgeProgress || { fetched: 0, total: 0 };
-    const pct = p.total > 0 ? Math.round((p.fetched / p.total) * 100) : 0;
-    return `
-      <div class="presurge-card loading">
-        <div class="presurge-head">
-          <div>
-            <h3>Pre-Surge Scanner</h3>
-            <div class="presurge-sub">${p.total > 0 ? `Fetching ${p.fetched}/${p.total} · ${pct}%` : "Computing scores…"}</div>
-          </div>
-          <button class="btn btn-sm" disabled><span class="spinner" style="width:12px;height:12px;border-width:1.5px;"></span> Scanning…</button>
-        </div>
-        <div class="presurge-progress"><div class="presurge-progress-bar" style="width:${pct}%;"></div></div>
-      </div>
-    `;
-  }
-
-  const flags = cached || [];
-  const allScored = state.preSurgeAllScored || [];
-  const debug = state.preSurgeDebug;
-  const recentHistory = getRecentPreSurgeFlags(3, 30, 5);
-
-  // Filter out dismissed entries (only applies to flagged view, not debug)
-  const visibleFlags = flags.filter(f => {
-    const key = recKeyFor(f.symbol, "presurge", "presurge");
-    return getRecStatus(key) !== "dismissed";
-  });
-
-  // Debug mode: render top 10 by composite score regardless of threshold.
-  // Use this to verify the math is working when zero flags shows up. If the
-  // top 10 are all in the 30-50 range, scoring is fine — market just isn't
-  // presenting strong setups today. If everything's <15, something's wrong.
-  if (debug) {
-    const top = allScored.slice(0, 10);
-    const stats = {
-      total: allScored.length,
-      max: top[0]?.composite || 0,
-      median: top.length ? top[Math.floor(top.length / 2)].composite : 0,
-      with_squeeze: allScored.filter(s => s.squeeze > 0).length,
-      with_accum: allScored.filter(s => s.accumulation > 0).length,
-      with_rs: allScored.filter(s => s.rs > 0).length,
-    };
-    return `
-      <div class="presurge-card debug">
-        <div class="presurge-head">
-          <div>
-            <h3>Pre-Surge · Debug View</h3>
-            <div class="presurge-sub">Top 10 by composite · threshold ignored · ${ranAt ? "scanned " + fmtRel(ranAt) : ""}</div>
-          </div>
-          <button class="btn btn-sm" data-act="toggle-presurge-debug">Exit Debug</button>
-        </div>
-        <div class="presurge-debug-stats">
-          <div class="pds-cell"><span class="pds-lbl">Scored</span><span class="pds-val">${stats.total}</span></div>
-          <div class="pds-cell"><span class="pds-lbl">Top</span><span class="pds-val">${stats.max}</span></div>
-          <div class="pds-cell"><span class="pds-lbl">Median</span><span class="pds-val">${stats.median}</span></div>
-          <div class="pds-cell"><span class="pds-lbl">w/ Squeeze</span><span class="pds-val">${stats.with_squeeze}</span></div>
-          <div class="pds-cell"><span class="pds-lbl">w/ Accum</span><span class="pds-val">${stats.with_accum}</span></div>
-          <div class="pds-cell"><span class="pds-lbl">w/ RS</span><span class="pds-val">${stats.with_rs}</span></div>
-        </div>
-        <div class="presurge-debug-hint">
-          ${stats.total === 0 ? "⚠ No symbols scored — OHLCV data missing. Run Rescan." :
-            stats.max < 20 ? "⚠ Top score very low — market may genuinely have no setups, or check your data freshness." :
-            stats.max >= 40 ? "✓ Scoring is firing normally. Top names just below the 70 threshold are worth a manual look." :
-            "Scoring works. The market just isn't presenting strong setups today — normal in trending markets."}
-        </div>
-        <div class="presurge-list">
-          ${top.length === 0 ? `<div class="presurge-empty-body">No symbols produced a score. Data probably didn't load. Try Rescan.</div>` :
-          top.map(f => {
-            const held = state.holdings.some(h => h.symbol === f.symbol && h.asset_class !== "cash");
-            const watched = state.watchlist.some(w => w.symbol === f.symbol);
-            const aboveThresh = f.composite >= PRESURGE_THRESHOLD;
-            return `
-            <div class="presurge-row ${aboveThresh ? 'over-thresh' : ''}" data-act="open-asset" data-symbol="${escAttr(f.symbol)}">
-              <div class="presurge-rank">${f.composite}</div>
-              <div class="presurge-mid">
-                <div class="presurge-sym-row">
-                  <span class="presurge-sym">${escAttr(f.symbol)}</span>
-                  ${aboveThresh ? `<span class="presurge-tag held" style="background:rgba(176,141,60,0.18);color:var(--gold);border-color:var(--gold);">FLAGGED</span>` : ""}
-                  ${held ? `<span class="presurge-tag held">held</span>` : ""}
-                  ${watched ? `<span class="presurge-tag watched">watched</span>` : ""}
-                  ${renderShortInterestBadge(f.symbol)}
-                  <span class="presurge-price">$${fmtUSD(f.current_price)}</span>
-                </div>
-                <div class="presurge-bars">
-                  ${renderPresurgeBar("Squeeze", f.squeeze, 40, "var(--gold)")}
-                  ${renderPresurgeBar("Accum",   f.accumulation, 30, "var(--green)")}
-                  ${renderPresurgeBar("RS",      f.rs, 30, "var(--ink-soft)")}
-                </div>
-                <div class="presurge-details">
-                  ${f.breakdown.map(b => `<span class="presurge-detail-chip">${escAttr(b.detail)}</span>`).join("")}
-                </div>
-              </div>
-            </div>
-          `;}).join("")}
-        </div>
-        <div class="presurge-footer">Debug mode · all scored symbols visible · normal threshold is composite ≥ 70</div>
-      </div>
-    `;
-  }
-
-  let body;
-  if (visibleFlags.length === 0) {
-    // Empty state — show a hint about debug mode and the median score
-    const topUnflagged = allScored[0];
-    const hint = topUnflagged
-      ? ` Highest scoring today: ${topUnflagged.symbol} at ${topUnflagged.composite}.`
-      : "";
-    body = `<div class="presurge-empty-body">
-      No setups above the threshold today.${hint} Tap <b>Debug</b> to see the top 10 scored symbols regardless of threshold — useful for verifying the scanner is working.
-    </div>`;
-  } else {
-    body = `
-      <div class="presurge-list">
-        ${visibleFlags.slice(0, 8).map(f => {
-          const recKey = recKeyFor(f.symbol, "presurge", "presurge");
-          const status = getRecStatus(recKey);
-          const isDone = status === "done";
-          const held = state.holdings.some(h => h.symbol === f.symbol && h.asset_class !== "cash");
-          const watched = state.watchlist.some(w => w.symbol === f.symbol);
-          return `
-          <div class="presurge-row ${isDone ? 'rec-done' : ''}" data-act="open-asset" data-symbol="${escAttr(f.symbol)}">
-            <div class="presurge-rank">${f.composite}</div>
-            <div class="presurge-mid">
-              <div class="presurge-sym-row">
-                <span class="presurge-sym">${escAttr(f.symbol)}</span>
-                ${held ? `<span class="presurge-tag held">held</span>` : ""}
-                ${watched ? `<span class="presurge-tag watched">watched</span>` : ""}
-                ${renderShortInterestBadge(f.symbol)}
-                <span class="presurge-price">$${fmtUSD(f.current_price)}</span>
-              </div>
-              <div class="presurge-bars">
-                ${renderPresurgeBar("Squeeze", f.squeeze, 40, "var(--gold)")}
-                ${renderPresurgeBar("Accum",   f.accumulation, 30, "var(--green)")}
-                ${renderPresurgeBar("RS",      f.rs, 30, "var(--ink-soft)")}
-              </div>
-              <div class="presurge-details">
-                ${f.breakdown.map(b => `<span class="presurge-detail-chip">${escAttr(b.detail)}</span>`).join("")}
-              </div>
-            </div>
-            <div class="presurge-actions">
-              <button class="presurge-del" data-act="dismiss-rec" data-rec-key="${escAttr(recKey)}" title="Hide">×</button>
-            </div>
-          </div>
-        `;}).join("")}
-      </div>
-    `;
-  }
-
-  // Watching band — coils that scored well but haven't confirmed direction.
-  // Rendered as a distinct, visually-quieter section so they read as "building"
-  // not "act now". This is the safe home for the lower-composite names that the
-  // old design would have mislabeled as flags if you'd just dropped the cutoff.
-  const watchingRaw = state.preSurgeWatching || [];
-  const watchingVisible = watchingRaw.filter(f => {
-    const key = recKeyFor(f.symbol, "presurge", "presurge");
-    return getRecStatus(key) !== "dismissed";
-  }).slice(0, 6);
-  let watchingBand = "";
-  if (watchingVisible.length > 0) {
-    watchingBand = `
-      <div class="presurge-watching">
-        <div class="presurge-watching-head">Watching · coiling, not yet confirmed</div>
-        <div class="presurge-list">
-          ${watchingVisible.map(f => {
-            const held = state.holdings.some(h => h.symbol === f.symbol && h.asset_class !== "cash");
-            const watched = state.watchlist.some(w => w.symbol === f.symbol);
-            // Why it hasn't confirmed — the missing leg(s).
-            const need = [];
-            if ((f.accumulation ?? 0) < PRESURGE_MIN_ACCUM) need.push("accum");
-            if ((f.rs ?? 0) < PRESURGE_MIN_RS) need.push("RS");
-            const needTxt = need.length ? `needs ${need.join(" + ")}` : "near confirm";
-            return `
-            <div class="presurge-row presurge-row-watching" data-act="open-asset" data-symbol="${escAttr(f.symbol)}">
-              <div class="presurge-rank presurge-rank-watching">${f.composite}</div>
-              <div class="presurge-mid">
-                <div class="presurge-sym-row">
-                  <span class="presurge-sym">${escAttr(f.symbol)}</span>
-                  ${held ? `<span class="presurge-tag held">held</span>` : ""}
-                  ${watched ? `<span class="presurge-tag watched">watched</span>` : ""}
-                  <span class="presurge-price">$${fmtUSD(f.current_price)}</span>
-                  <span class="presurge-tag presurge-tag-need">${needTxt}</span>
-                </div>
-                <div class="presurge-bars">
-                  ${renderPresurgeBar("Squeeze", f.squeeze, 40, "var(--gold)")}
-                  ${renderPresurgeBar("Accum",   f.accumulation, 30, "var(--green)")}
-                  ${renderPresurgeBar("RS",      f.rs, 30, "var(--ink-soft)")}
-                </div>
-              </div>
-            </div>
-          `;}).join("")}
-        </div>
-      </div>
-    `;
-  }
-
-  // Track record panel — flags from 3-30 days ago with their since-flag return.
-  // This is the scanner's self-audit: are flagged names actually moving up?
-  let trackRecord = "";
-  if (recentHistory.length > 0) {
-    const avg = recentHistory.reduce((s, h) => s + h.since_flag_pct, 0) / recentHistory.length;
-    const wins = recentHistory.filter(h => h.since_flag_pct > 0).length;
-    const avgCls = avg >= 0 ? "pos" : "neg";
-    trackRecord = `
-      <div class="presurge-track">
-        <div class="presurge-track-head">
-          <span>Recent Flags · Track Record</span>
-          <span class="presurge-track-stats">
-            ${wins}/${recentHistory.length} positive · avg <span class="${avgCls}">${avg >= 0 ? "+" : ""}${avg.toFixed(1)}%</span>
-          </span>
-        </div>
-        <div class="presurge-track-list">
-          ${recentHistory.map(h => {
-            const cls = h.since_flag_pct >= 0 ? "pos" : "neg";
-            const ageDisp = h.age_days < 1 ? "today" : `${Math.round(h.age_days)}d ago`;
-            return `
-              <div class="presurge-track-row" data-act="open-asset" data-symbol="${escAttr(h.symbol)}">
-                <span class="ptr-sym">${escAttr(h.symbol)}</span>
-                <span class="ptr-age">${ageDisp}</span>
-                <span class="ptr-score">cs ${h.composite}</span>
-                <span class="ptr-pnl ${cls}">${h.since_flag_pct >= 0 ? "+" : ""}${h.since_flag_pct.toFixed(1)}%</span>
-              </div>
-            `;
-          }).join("")}
-        </div>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="presurge-card">
-      <div class="presurge-head">
-        <div>
-          <h3>Pre-Surge Scanner</h3>
-          <div class="presurge-sub">${visibleFlags.length} confirmed${watchingVisible.length > 0 ? ` · ${watchingVisible.length} watching` : ""}${allScored.length > 0 ? ` · ${allScored.length} scored` : ""} · ${ranAt ? "Updated " + fmtRel(ranAt) : "Just now"}</div>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center;">
-          ${allScored.length > 0 ? `<button class="btn btn-secondary btn-sm" data-act="toggle-presurge-debug">Debug</button>` : ""}
-          <button class="btn btn-sm" data-act="run-presurge">Rescan</button>
-        </div>
-      </div>
-      ${body}
-      ${watchingBand}
-      ${trackRecord}
-      <div class="presurge-footer">Confirmed = composite ≥ ${PRESURGE_FLAG} AND accumulation + RS both contributing (direction). Watching = ≥ ${PRESURGE_WATCH}, not yet confirmed. Squeeze 40 + Accum 30 + RS 30.</div>
-    </div>
-  `;
-}
 
 function renderPresurgeBar(label, value, max, color) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
@@ -11421,125 +10966,6 @@ function setLeaderboardSort(sort) {
   renderCurrentView();
 }
 
-function renderEtfLeaderboard() {
-  const tf = state.etfLeaderboardTimeframe;
-  const tfLabel = tf === "3m" ? "3-month" : tf === "1y" ? "1-year" : "3-year";
-
-  if (state.etfLeaderboardLoading && !state.etfLeaderboard) {
-    return `
-      <div class="leaderboard-card">
-        <div class="leaderboard-head">
-          <h3>Top Performing ETFs</h3>
-          <div class="leaderboard-sub">Fetching ${tfLabel} returns across ${ETF_UNIVERSE.length} ETFs…</div>
-        </div>
-        <div style="padding: 30px 20px; text-align: center; color: var(--ink-muted);">
-          <span class="spinner"></span>
-        </div>
-      </div>
-    `;
-  }
-
-  const data = state.etfLeaderboard || [];
-  const valid = data.filter(d => !d.error && d.return_pct != null);
-
-  // Sort
-  let sorted;
-  if (state.etfLeaderboardSort === "drawdown") {
-    sorted = [...valid].sort((a, b) => (b.max_drawdown_pct || -999) - (a.max_drawdown_pct || -999)); // least negative first
-  } else if (state.etfLeaderboardSort === "trend") {
-    sorted = [...valid].sort((a, b) => {
-      const aAbove = a.trend_200ma === "above_200ma" ? 1 : 0;
-      const bAbove = b.trend_200ma === "above_200ma" ? 1 : 0;
-      if (aAbove !== bAbove) return bAbove - aAbove;
-      return b.return_pct - a.return_pct;
-    });
-  } else {
-    sorted = [...valid].sort((a, b) => b.return_pct - a.return_pct);
-  }
-  const top10 = sorted.slice(0, 10);
-
-  const held = new Set(state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol));
-  const watched = new Set(state.watchlist.map(w => w.symbol));
-
-  const tfPill = (key, label) => `<button class="lb-tf-pill ${tf === key ? 'active' : ''}" data-act="lb-tf" data-tf="${key}">${label}</button>`;
-  const sortPill = (key, label) => `<button class="lb-sort-pill ${state.etfLeaderboardSort === key ? 'active' : ''}" data-act="lb-sort" data-sort="${key}">${label}</button>`;
-
-  const ageLabel = state.etfLeaderboardFetchedAt
-    ? `Updated ${fmtRel(state.etfLeaderboardFetchedAt)}`
-    : "";
-
-  const rows = top10.length === 0
-    ? `<div style="padding: 24px 18px; text-align: center; color: var(--ink-muted); font-family: var(--mono); font-size: 12px;">No data loaded yet. Tap "Refresh leaderboard" to fetch performance for ${ETF_UNIVERSE.length} ETFs.</div>`
-    : top10.map((d, i) => {
-        const owned = held.has(d.symbol);
-        const onList = watched.has(d.symbol);
-        const retClass = d.return_pct >= 0 ? "pos" : "neg";
-        const ddClass = d.max_drawdown_pct <= -20 ? "warn" : d.max_drawdown_pct <= -10 ? "med" : "ok";
-        return `
-          <div class="lb-row-wrap">
-            <div class="lb-row">
-              <div class="lb-rank">${i + 1}</div>
-              <div class="lb-main">
-                <div class="lb-symline">
-                  <span class="lb-sym">${escAttr(d.symbol)}</span>
-                  <span class="lb-cat">${escAttr(d.category)}</span>
-                  ${owned ? `<span class="lb-tag held">held</span>` : ""}
-                  ${onList ? `<span class="lb-tag onlist">watched</span>` : ""}
-                </div>
-                <div class="lb-name">${escAttr(d.name)}</div>
-                <div class="lb-stats">
-                  <span class="lb-stat ${retClass}">${d.return_pct >= 0 ? "+" : ""}${d.return_pct.toFixed(1)}% ${tfLabel} return</span>
-                  <span class="lb-stat ${ddClass}">${d.max_drawdown_pct != null ? d.max_drawdown_pct.toFixed(1) + "% max DD" : ""}</span>
-                  ${d.trend_200ma ? `<span class="lb-stat ${d.trend_200ma === 'above_200ma' ? 'pos' : 'neg'}">${d.trend_200ma === 'above_200ma' ? '↑' : '↓'} 200MA</span>` : ""}
-                </div>
-              </div>
-              <div class="lb-actions">
-                <button class="btn btn-secondary btn-sm" data-act="preview-chart" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">Chart</button>
-                <button class="btn btn-sm" data-act="vrow-analyze" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">Analyze</button>
-                ${!owned && !onList ? `<button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">+ Watch</button>` : ""}
-              </div>
-            </div>
-            ${renderPreviewChartFor(d.symbol)}
-          </div>
-        `;
-      }).join("");
-
-  return `
-    <div class="leaderboard-card">
-      <div class="leaderboard-head">
-        <h3>Top Performing ETFs</h3>
-        <div class="leaderboard-sub">Ranked by ${tfLabel} return · ${valid.length}/${ETF_UNIVERSE.length} ETFs · ${ageLabel}</div>
-      </div>
-      <div class="lb-controls">
-        <div class="lb-control-row">
-          <span class="lb-control-label">Timeframe</span>
-          <div class="lb-pills">
-            ${tfPill("3m", "3M")}
-            ${tfPill("1y", "1Y")}
-            ${tfPill("3y", "3Y")}
-          </div>
-        </div>
-        <div class="lb-control-row">
-          <span class="lb-control-label">Rank by</span>
-          <div class="lb-pills">
-            ${sortPill("return", "Return")}
-            ${sortPill("drawdown", "Risk")}
-            ${sortPill("trend", "Trend")}
-          </div>
-        </div>
-        <div class="lb-actions-row">
-          <button class="btn btn-sm" data-act="refresh-leaderboard" ${state.etfLeaderboardLoading ? "disabled" : ""}>
-            ${state.etfLeaderboardLoading ? "Loading…" : (state.etfLeaderboard ? "Refresh leaderboard" : "Load leaderboard")}
-          </button>
-        </div>
-      </div>
-      <div class="lb-disclaimer">
-        <strong>Past performance ≠ future returns.</strong> Top performers tend to revert. Last year's #1 is rarely next year's #1. Use this for awareness of what's moved, not as a buy list.
-      </div>
-      ${rows}
-    </div>
-  `;
-}
 
 
 function marketScanRowFor(symbol) {
@@ -13037,14 +12463,6 @@ async function runPortfolioAnalysis() {
   }
 }
 
-// ============================================================================
-// PHASE B — TRIGGERS-FIRED DIGEST
-// Calls /triggers-check, which compares stored bull/bear trigger conditions
-// against live market data and returns the ones that have fired. Debounced to
-// once per 6h via localStorage so we don't burn AI tokens on every page open.
-// User can force a re-check via the banner's refresh button.
-// ============================================================================
-const TRIGGERS_CHECK_DEBOUNCE_MS = 6 * 60 * 60 * 1000;
 
 // ============================================================================
 // PHASE C — Unified Verdict runner.
@@ -13248,40 +12666,6 @@ async function inlineAnalyzeFromRow(symbol) {
   }
 }
 
-async function runTriggersCheck(force = false) {
-  if (!state.uid) return;
-  if (state.triggersLoading) return;
-
-  // Debounce: skip if a check ran within the last 6h, unless force is set.
-  if (!force && state.triggersCheckedAt) {
-    const age = Date.now() - new Date(state.triggersCheckedAt).getTime();
-    if (age < TRIGGERS_CHECK_DEBOUNCE_MS) return;
-  }
-
-  state.triggersLoading = true;
-  if (state.currentView === "portfolio") renderPortfolio();
-
-  try {
-    const idToken = await auth.currentUser.getIdToken();
-    const r = await fetch(`${WORKER_URL}/triggers-check`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid: state.uid, idToken }),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const j = await r.json();
-    state.triggersFired = Array.isArray(j.fired) ? j.fired : [];
-    state.triggersUnableToEvaluate = Array.isArray(j.unable_to_evaluate) ? j.unable_to_evaluate : [];
-    state.triggersCheckedAt = new Date().toISOString();
-    localStorage.setItem("triggersCheckedAt", state.triggersCheckedAt);
-  } catch (e) {
-    // Soft-fail: keep whatever's in state, don't toast on background runs.
-    if (force) errorToast("Trigger check", e);
-  } finally {
-    state.triggersLoading = false;
-    if (state.currentView === "portfolio") renderPortfolio();
-  }
-}
 
 // Mark a specific (symbol, trigger_text) pair as acknowledged. The pair is
 // added to the persisted ack set and the banner immediately hides it. The
@@ -13963,7 +13347,7 @@ async function runPaperSimulation({ force = false } = {}) {
 // ============================================================================
 
 // ============================================================================
-// MARKET SCANNER — FRONTEND (v1.12). Calls worker POST /scan-market.
+// MARKET SCANNER — FRONTEND (v1.16). Calls worker POST /scan-market.
 // Adapted to this file's helpers: uses escAttr() (not escapeHtml) and
 // renderCurrentView() for re-render. Self-contained timeAgo below.
 // ============================================================================
@@ -14467,7 +13851,7 @@ function renderDiscover() {
   body.id = "view";
   try {
     // ----------------------------------------------------------------------
-    // ONE-SCANNER Discover (v1.14):
+    // ONE-SCANNER Discover (v1.16):
     //   PANEL 1 "Watchlist" — collapsible panel ABOVE the scanner. Collapsed
     //     by default; tap the header to expand and see the saved list.
     //   PANEL 2 "Market Opportunities" — the single scanner. Sweeps the whole
@@ -16437,7 +15821,6 @@ document.addEventListener("click", (e) => {
         break;
       case "reset-pin":              resetPin(); break;
       case "submit-investor-profile": submitInvestorProfile(); break;
-      case "triggers-refresh":       runTriggersCheck(true); break;
       case "verdict-refresh":         runVerdict(true); break;
       case "analyze-all":             analyzeAllSymbols(); break;
       case "vrow-analyze":            inlineAnalyzeFromRow(symbol); break;
