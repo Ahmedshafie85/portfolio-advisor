@@ -4559,6 +4559,8 @@ body {
   font-size:16px;
   color:var(--ink);
 }
+.health-v.good { color:var(--green); }
+.health-v.bad { color:var(--red); }
 .health-cell.ok { border-color:rgba(74,122,74,.35); }
 .health-cell.warn { border-color:rgba(176,141,60,.55); }
 .health-cell.bad { border-color:rgba(161,61,45,.45); }
@@ -4571,6 +4573,7 @@ body {
   gap:8px;
 }
 .health-issue,
+.health-ok,
 .learning-source,
 .wp-row {
   border:1px solid var(--rule);
@@ -4579,6 +4582,10 @@ body {
   padding:9px 10px;
   font-size:12px;
   color:var(--ink-soft);
+}
+.health-ok {
+  border-color:rgba(74,122,74,.35);
+  color:var(--green);
 }
 .learning-source {
   display:flex;
@@ -5011,8 +5018,8 @@ const state = {
   marketScanLoading: false,
   marketScanRanAt: null,
   marketScanFocus: "",
-  marketScanLane: "actable",
-  marketScanHideSoft: true,
+  marketScanLane: "all",
+  marketScanHideSoft: false,
   marketScanCapFilter: "all",
   marketScanSetupFilter: "all",
   marketScanSectorFilter: "all",
@@ -5071,7 +5078,7 @@ const state = {
   // Phase Q — Telegram notifications profile. Hydrated from Firestore on
   // boot via loadNotifications(). { enabled: bool, telegram_chat_id: string }
   notifications: null,
-  howtoOpen: true,   // How-to-use card on Settings — open by default first time
+  howtoOpen: localStorage.getItem("howtoOpen_v1") === "1",
   breakoutPromptDismissed: localStorage.getItem("breakoutPromptDismissed") === "1",
   // News (big-opportunity filter) — hydrate from localStorage so opportunities
   // survive iOS tab unloading and page reloads (within TTL window)
@@ -12666,6 +12673,29 @@ async function loadSentiment(symbol) {
   }
 }
 
+function scannerContextFor(symbol) {
+  const sym = String(symbol || "").toUpperCase();
+  const row = (state.marketScan?.results || []).find(r => String(r.symbol || "").toUpperCase() === sym);
+  if (!row) return null;
+  return {
+    symbol: row.symbol,
+    rank: row.rank,
+    composite: row.composite,
+    quality_grade: row.quality_grade || null,
+    entry_state: row.entry_state || null,
+    reward_risk: row.reward_risk ?? msRiskReward(row),
+    day_change_pct: row.day_change_pct,
+    trend: row.trend,
+    rsi14: row.rsi14,
+    return_20d: row.return_20d,
+    nearest_support: row.nearest_support,
+    nearest_resistance: row.nearest_resistance,
+    tags: Array.isArray(row.tags) ? row.tags.slice(0, 8) : [],
+    market_cap_bucket: row.market_cap_bucket || null,
+    components: row.components || null,
+  };
+}
+
 async function runAnalysis(symbol, opts = {}) {
   const stayInline = !!opts.stayInline;
   const btn = $(`[data-act="run-analysis"][data-symbol="${symbol}"]`);
@@ -12717,6 +12747,9 @@ async function runAnalysis(symbol, opts = {}) {
         // Phase A: investor profile drives personalized sizing + R:R calibration.
         // Null when the user hasn't filled out the form yet — worker handles absence.
         investor_profile: state.investorProfile,
+        // If this came from Discover, give the worker the scanner evidence and
+        // entry gate so the AI analysis is stricter about bad R:R or extension.
+        scanner_context: scannerContextFor(symbol),
         idToken,
       }),
     });
@@ -14020,6 +14053,7 @@ function msTags(row) {
 }
 function msIsActable(row, read) {
   if (!row || row._soft) return false;
+  if (row.entry_state) return row.entry_state === "actionable";
   const composite = msNum(row.composite) ?? 0;
   const rr = msRiskReward(row);
   const rsi = msNum(row.rsi14);
@@ -14028,10 +14062,10 @@ function msIsActable(row, read) {
   const tags = msTags(row);
   const catalystOk = tags.includes("bullish-flow") || tags.includes("catalyst-near") || tags.includes("squeeze-fuel");
   const trendOk = row.trend === "above_200ma" || ret20 > 0 || row.optflow_bullish === true || (catalystOk && (ret20 == null || ret20 > -4));
-  const entryOk = rr == null || rr >= 2;
+  const entryOk = rr != null && rr >= 2;
   const notExtended = rsi == null || rsi < 72;
   const notSellingOff = day == null || day > -3;
-  return composite >= 45 && trendOk && entryOk && notExtended && notSellingOff && !!read;
+  return composite >= 55 && trendOk && entryOk && notExtended && notSellingOff;
 }
 function msLaneFor(row) {
   const tags = msTags(row);
@@ -14055,7 +14089,7 @@ function msLaneFor(row) {
   return "all";
 }
 function msRowMatchesLane(row, lane) {
-  if (lane === "actable") return msIsActable(row, null) || (!row?._soft && msNum(row.composite) >= 65);
+  if (lane === "actable") return msIsActable(row, null);
   if (!lane || lane === "all") return true;
   const primary = msLaneFor(row);
   if (primary === lane) return true;
@@ -14072,15 +14106,15 @@ function msRowMatchesLane(row, lane) {
 function msSector(symbol) {
   const s = String(symbol || "").toUpperCase();
   const groups = [
-    ["Technology", ["AAPL","MSFT","NVDA","AVGO","ORCL","CRM","AMD","NOW","PLTR","ADBE","CSCO","ACN","INTC","QCOM","TXN","MU","ANET","PANW","CRWD","SNPS","SMCI","MRVL","ON","ARM","DDOG","NET","SNOW","ZS","MDB","CFLT","HUBS","TEAM","WDAY","FTNT","CDNS","KLAC","LRCX","SMH","IGM","CIBR","CHAT","AIQ","BOTZ"]],
+    ["Technology", ["AAPL","MSFT","NVDA","AVGO","ORCL","CRM","AMD","NOW","PLTR","ADBE","CSCO","ACN","INTC","QCOM","TXN","MU","ANET","PANW","CRWD","SNPS","SMCI","MRVL","ON","ARM","DDOG","NET","SNOW","ZS","MDB","CFLT","HUBS","TEAM","WDAY","FTNT","CDNS","KLAC","LRCX","MPWR","ALGM","ACLS","CRDO","ALAB","COHR","LSCC","RMBS","SITM","AMKR","ONTO","FORM","UCTT","ICHR","AEHR","CAMT","VECO","DIOD","POWI","AMBA","OKTA","TWLO","GTLB","S","FROG","BRZE","ESTC","PCOR","APPF","BL","PD","MNDY","DOCN","BILL","IOT","TENB","RBRK","PATH","NCNO","ASAN","BASE","AI","SMH","IGM","CIBR","CHAT","AIQ","BOTZ"]],
     ["Communication", ["GOOGL","META","NFLX","DIS","TMUS","CMCSA","RBLX","SPOT","PINS","TTD","RDDT"]],
-    ["Discretionary", ["AMZN","TSLA","HD","MCD","NKE","BKNG","LOW","SBUX","TJX","CMG","ABNB","DKNG","CAVA","RCL","DECK","WSM"]],
+    ["Discretionary", ["AMZN","TSLA","HD","MCD","NKE","BKNG","LOW","SBUX","TJX","CMG","ABNB","DKNG","CAVA","RCL","DECK","WSM","ELF","WING","TXRH","CROX","RH","CHWY","BOOT","ONON","BIRK","SHAK","DUOL","NCLH","CCL","W"]],
     ["Staples", ["WMT","COST","PG","KO","PEP","MDLZ","CL","CELH","MNST","DG"]],
-    ["Financials", ["JPM","BAC","V","MA","GS","BRK.B","WFC","MS","AXP","SCHW","BLK","HOOD","COIN","SOFI","AFRM","XYZ"]],
-    ["Health Care", ["UNH","LLY","JNJ","ABBV","MRK","ISRG","TMO","ABT","AMGN","VRTX","DXCM","HIMS","NVO"]],
-    ["Industrials", ["GE","CAT","BA","UBER","HON","RTX","UNP","DE","LMT","AXON","PWR","BLDR","ITA","SHLD"]],
-    ["Energy", ["XOM","CVX","COP","SLB","EOG","FANG","LNG","XLE","KMI"]],
-    ["Materials", ["LIN","FCX","NEM","SHW","ALB","GLD","SLV","SIL","SLVR","GDX","GDXJ","PPLT","GUNR","URA","SMRF"]],
+    ["Financials", ["JPM","BAC","V","MA","GS","BRK.B","WFC","MS","AXP","SCHW","BLK","HOOD","COIN","SOFI","AFRM","XYZ","TOST","FOUR","NU","DLO","STNE","UPST","PAYO","MQ","SEZL","LMND","OPEN","RKT","ROOT","ARES","OWL","KKR","BX","TPG","RITM","CBOE","CME","IBKR","PGR","WRB","RLI","KNSL","ALLY","CMA","WAL"]],
+    ["Health Care", ["UNH","LLY","JNJ","ABBV","MRK","ISRG","TMO","ABT","AMGN","VRTX","DXCM","HIMS","NVO","VKTX","CYTK","MDGL","RXRX","TEM","HALO","EXEL","NTRA","TNDM","INSP","PCVX","CRNX","ARWR","IONS","ROIV","ALKS","IMVT","JANX","CGON","ACLX","BEAM","CRSP","VERA","SWTX","ITCI","AXSM"]],
+    ["Industrials", ["GE","CAT","BA","UBER","HON","RTX","UNP","DE","LMT","AXON","PWR","BLDR","ITA","SHLD","BWXT","HEI","FIX","PRIM","STRL","FLR","IESC","EME","GVA","MOD","ATKR","HUBB","APG","TMDX","JOBY","ACHR","RKLB","OSK","WCC"]],
+    ["Energy", ["XOM","CVX","COP","SLB","EOG","FANG","LNG","XLE","KMI","RRC","AR","SM","MTDR","CIVI","CRC","VIST","PR","NOG","TALO"]],
+    ["Materials", ["LIN","FCX","NEM","SHW","ALB","GLD","SLV","SIL","SLVR","GDX","GDXJ","PPLT","GUNR","URA","SMRF","UEC","CCJ","MP","LAC","SQM","CLF","ATI","AA","STLD"]],
     ["Utilities", ["NEE","SO","DUK","VST","CEG","XLU","GRID","ELFY","ACES"]],
     ["Real Estate", ["PLD","AMT","EQIX"]],
     ["International", ["SWRD","EIMI","LVMUY","ARGT","VEA","EFA","EWJ","EEM"]],
@@ -14112,6 +14146,8 @@ function msPortfolioFit(row, held, watched) {
   return { label: `Fit: balanced ${sector}`, tone: "" };
 }
 function msRiskReward(row) {
+  const provided = msNum(row?.reward_risk);
+  if (provided != null) return provided;
   const price = msNum(row.current_price);
   const support = msNum(row.nearest_support);
   const resistance = msNum(row.nearest_resistance);
@@ -14127,11 +14163,16 @@ function msWhyNot(row, read) {
   const day = msNum(row.day_change_pct);
   const ret20 = msNum(row.return_20d);
   if (msIsActable(row, read)) return "Actable research setup: confirm levels, size small, and respect invalidation.";
-  if (row._soft) return "Watch only: softer fallback. Wait for a stronger signal.";
+  if (row.entry_state === "building") return "Building setup: good candidate, but wait for confirmation before sizing.";
+  if (row.entry_state === "needs_levels") return "Research only: support/resistance is not clean enough to size yet.";
+  if (row.entry_state === "bad_rr") return "Not actable yet: reward/risk is below 2:1 from here.";
+  if (row.entry_state === "extended") return "Not actable yet: extended. Prefer pullback or breakout retest.";
+  if (row.entry_state === "falling") return "Not actable yet: today is a selloff. Let price stabilize first.";
   if (day != null && day <= -3) return "Not actable yet: today is a selloff. Let price stabilize first.";
   if (row.trend !== "above_200ma" && (ret20 == null || ret20 <= 0)) return "Not actable yet: trend is not confirmed.";
   if (rsi != null && rsi >= 72) return "Not actable yet: extended. Prefer pullback or breakout retest.";
   if (rr != null && rr < 2) return "Not actable yet: reward/risk is below 2:1 from here.";
+  if (row._soft) return "Watch only: softer fallback. Wait for a stronger signal.";
   if (!read) return "Research step: run Analyze before turning this screen into a trade.";
   return "Next step: watch confirmation, entry zone, and invalidation before sizing.";
 }
@@ -14200,15 +14241,10 @@ function renderMarketScannerCard() {
     if (activeLane === "actable") return msIsActable(r, reads[r.symbol]);
     return msRowMatchesLane(r, activeLane);
   });
-  if (activeLane === "actable" && laneResults.length === 0) {
-    laneResults = baseResults
-      .filter(r => msNum(r.composite) >= 55 && (msNum(r.day_change_pct) == null || msNum(r.day_change_pct) > -3))
-      .slice(0, 8);
-  }
   const visibleResults = laneResults.slice(0, 20);
   const softCount = results.filter(r => r._soft).length;
   const actableCount = results.filter(r => msIsActable(r, reads[r.symbol])).length;
-  const highCount = results.filter(r => !r._soft && msNum(r.composite) >= 65).length;
+  const highCount = results.filter(r => !r._soft && (r.quality_grade === "A" || msNum(r.composite) >= 65)).length;
   const pullbackCount = results.filter(r => msRowMatchesLane(r, "pullback")).length;
   const catalystCount = results.filter(r => msRowMatchesLane(r, "catalyst")).length;
   const laneHtml = MARKET_SCAN_LANES.map(l => {
@@ -14260,6 +14296,8 @@ function renderMarketScannerCard() {
     const setupLabel = msSetupLabel(r);
     const sector = msSector(r.symbol);
     const why = msWhyNot(r, rd);
+    const grade = String(r.quality_grade || "").toUpperCase();
+    const entryState = String(r.entry_state || "").replace(/_/g, " ");
     const isAnalyzing = !!(state.analyzingSymbols && state.analyzingSymbols[r.symbol]);
     const of = r.options_flow;
     const earningsDate = r.earnings_date ? String(r.earnings_date) : "";
@@ -14285,6 +14323,8 @@ function renderMarketScannerCard() {
           <span class="ms-meta good">${escAttr(setupLabel)}</span>
           <span class="ms-meta">${escAttr(sector)}</span>
           <span class="ms-meta ${msCapBucket(r) === "mega" ? "warn" : "good"}">${escAttr(msCapBucket(r).replace(/_/g, " "))}</span>
+          ${grade ? `<span class="ms-meta ${grade === "A" || grade === "B" ? "good" : "warn"}">Grade ${escAttr(grade)}</span>` : ""}
+          ${entryState ? `<span class="ms-meta ${r.entry_state === "actionable" ? "good" : r.entry_state === "bad_rr" || r.entry_state === "falling" ? "warn" : ""}">${escAttr(entryState)}</span>` : ""}
           ${rr != null ? `<span class="ms-meta ${rr >= 2 ? "good" : "warn"}">R:R ${rr.toFixed(1)}:1</span>` : ""}
           ${r.rsi14 != null ? `<span class="ms-meta">RSI ${Number(r.rsi14).toFixed(0)}</span>` : ""}
           ${r.return_20d != null ? `<span class="ms-meta">${Number(r.return_20d) >= 0 ? "+" : ""}${Number(r.return_20d).toFixed(1)}% 20d</span>` : ""}
@@ -14307,6 +14347,8 @@ function renderMarketScannerCard() {
               <div><span class="ms-read-k">Watch</span> ${escAttr(rd.watch_level)}</div>
               <div><span class="ms-read-k">Confirm</span> ${escAttr(rd.confirmation)}</div>
               <div><span class="ms-read-k">Invalid</span> ${escAttr(rd.invalidation)}</div>
+              ${rd.next_step ? `<div><span class="ms-read-k">Next</span> ${escAttr(rd.next_step)}</div>` : ""}
+              ${rd.risk_note ? `<div><span class="ms-read-k">Risk</span> ${escAttr(rd.risk_note)}</div>` : ""}
               <div><span class="ms-conv ms-conv-${escAttr(rd.conviction)}">${escAttr(rd.conviction)} conviction</span></div>
             </div>
           </div>` : ""}
@@ -14669,6 +14711,36 @@ function renderSignalLearningSection() {
     </div>`;
 }
 
+function renderSettingsQualitySection() {
+  const user = auth.currentUser;
+  const notif = state.notifications || {};
+  const nonCash = (state.holdings || []).filter(h => h.asset_class !== "cash").length;
+  const watch = (state.watchlist || []).length;
+  const checks = [
+    { label: "Signed account", ok: !!user && !user.isAnonymous, fix: "Sign in so portfolio data survives device/browser changes." },
+    { label: "Investor profile", ok: !!state.investorProfile, fix: "Fill Investor Profile so sizing and R:R rules are calibrated." },
+    { label: "Telegram alerts", ok: !!notif.enabled && !!notif.telegram_chat_id, fix: "Enable Telegram and use Test Telegram before relying on alerts." },
+    { label: "Portfolio loaded", ok: nonCash > 0, fix: "Add holdings so Discover can judge portfolio fit and concentration." },
+    { label: "Watchlist pipeline", ok: watch > 0, fix: "Add best Discover names to Watch so alerts have something to monitor." },
+  ];
+  const okCount = checks.filter(c => c.ok).length;
+  return `
+    <div class="settings-group">
+      <div class="section-head" style="padding: 0 4px 8px;">
+        <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Setup Quality</h3>
+      </div>
+      <div class="health-grid">
+        <div class="health-cell ${okCount >= 4 ? "ok" : okCount >= 2 ? "warn" : "bad"}"><span class="health-k">Ready</span><span class="health-v">${okCount}/5</span></div>
+        <div class="health-cell"><span class="health-k">Holdings</span><span class="health-v">${nonCash}</span></div>
+        <div class="health-cell"><span class="health-k">Watchlist</span><span class="health-v">${watch}</span></div>
+        <div class="health-cell ${notif.enabled ? "ok" : "warn"}"><span class="health-k">Telegram</span><span class="health-v">${notif.enabled ? "On" : "Off"}</span></div>
+      </div>
+      <div class="health-issues">
+        ${checks.map(c => `<div class="${c.ok ? "health-ok" : "health-issue"}">${escAttr(c.ok ? `${c.label}: ready` : `${c.label}: ${c.fix}`)}</div>`).join("")}
+      </div>
+    </div>`;
+}
+
 function renderSettings() {
   $("#topbarTitle").textContent = "Settings";
   const view = $("#view");
@@ -14731,9 +14803,10 @@ function renderSettings() {
         <div><div class="lbl">Worker</div><div class="sub" style="font-family:var(--mono);font-size:10.5px;">portfolio-advisor.workers.dev</div></div>
       </div>
       <div class="setting-row">
-        <div><div class="lbl">Version</div><div class="sub">1.4.0</div></div>
+        <div><div class="lbl">Version</div><div class="sub">1.15.0 discovery logic</div></div>
       </div>
     </div>
+    ${renderSettingsQualitySection()}
     ${renderAppHealthSection()}
     ${renderSignalLearningSection()}
     ${renderInvestorProfileSection()}
@@ -14779,11 +14852,57 @@ function renderSettings() {
 // Performance panel. These previously lived inside Settings; promoted to
 // their own tab so the audit surface is a first-class destination.
 // ============================================================================
+function renderJournalQuality(trades) {
+  const list = Array.isArray(trades) ? trades : [];
+  const total = list.length;
+  const paper = list.filter(t => t.is_paper === true).length;
+  const real = total - paper;
+  const withContext = list.filter(t => t.verdict_snapshot || t.local_verdict_snapshot || t.presurge_snapshot).length;
+  const missingContext = total - withContext;
+  const closed = list.filter(t => t.outcome_status === "final" || ["closed_target", "closed_stop", "timeout"].includes(String(t.outcome || ""))).length;
+  const moves = list.map(t => {
+    const outcomes = Array.isArray(t.outcomes) ? t.outcomes : [];
+    const last = outcomes.length ? outcomes[outcomes.length - 1] : null;
+    const v = last?.thesis_move_pct ?? t.thesis_move_pct;
+    return Number.isFinite(Number(v)) ? Number(v) : null;
+  }).filter(v => v != null);
+  const avgMove = moves.length ? moves.reduce((a, b) => a + b, 0) / moves.length : null;
+  const contextPct = total ? Math.round(withContext / total * 100) : 0;
+  const issues = [];
+  if (!total) issues.push("No trades logged yet, so the app cannot learn from your decisions.");
+  if (missingContext > 0) issues.push(`${missingContext} trade${missingContext === 1 ? "" : "s"} missing verdict context. Log from ACT rows when possible.`);
+  if (paper === 0) issues.push("No paper trades yet. Paper-log strong Discover names before risking cash.");
+  if (closed < 5) issues.push("Fewer than 5 closed outcomes. Treat signal performance as early and noisy.");
+  if (!issues.length) issues.push("Journal quality is usable: trades have context and enough outcomes to start judging signals.");
+
+  return `
+    <div class="settings-group">
+      <div class="section-head" style="padding: 0 4px 8px;">
+        <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Journal Quality</h3>
+      </div>
+      <div class="health-grid">
+        <div class="health-cell"><span class="health-k">Logged</span><span class="health-v">${total}</span></div>
+        <div class="health-cell"><span class="health-k">Paper / Real</span><span class="health-v">${paper} / ${real}</span></div>
+        <div class="health-cell"><span class="health-k">With Context</span><span class="health-v">${contextPct}%</span></div>
+        <div class="health-cell"><span class="health-k">Closed</span><span class="health-v">${closed}</span></div>
+        <div class="health-cell"><span class="health-k">Avg Move</span><span class="health-v ${avgMove != null && avgMove >= 0 ? "good" : avgMove != null ? "bad" : ""}">${avgMove == null ? "—" : `${avgMove >= 0 ? "+" : ""}${avgMove.toFixed(1)}%`}</span></div>
+      </div>
+      <div class="health-issues">
+        ${issues.map(x => `<div class="${x.includes("usable") ? "health-ok" : "health-issue"}">${escAttr(x)}</div>`).join("")}
+      </div>
+    </div>`;
+}
+
 function renderJournal() {
   const view = $("#view");
   if (!view) return;
   view.innerHTML = `
     <div class="section-head" style="padding: 20px 20px 0;"><h2>Journal</h2></div>
+    <div id="journalQualitySlot">
+      <div class="settings-group">
+        <div class="setting-row" style="color:var(--ink-muted);font-size:12px;">Loading journal quality…</div>
+      </div>
+    </div>
     <div class="settings-group" id="tradeLogSection">
       <div class="section-head" style="padding: 0 4px 8px; display:flex; justify-content:space-between; align-items:baseline;">
         <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Trade Log</h3>
@@ -14817,8 +14936,10 @@ function renderJournal() {
 async function populateTradeLogList() {
   const slot = $("#tradeLogList");
   if (!slot) return;
+  const qualitySlot = $("#journalQualitySlot");
   try {
     const trades = await loadTrades(100);
+    if (qualitySlot) qualitySlot.innerHTML = renderJournalQuality(trades);
     if (trades.length === 0) {
       slot.innerHTML = `<div class="setting-row" style="color:var(--ink-muted);font-size:12px;">No trades logged yet. Tap "Log Trade" on any ACT row or asset detail page.</div>`;
       return;
@@ -14901,6 +15022,7 @@ async function populateTradeLogList() {
         </div>`;
     }).join("");
   } catch (e) {
+    if (qualitySlot) qualitySlot.innerHTML = renderJournalQuality([]);
     slot.innerHTML = `<div class="setting-row" style="color:var(--red);font-size:12px;">Failed to load trades: ${escAttr(e.message || e)}</div>`;
   }
 }
@@ -16247,7 +16369,11 @@ document.addEventListener("click", (e) => {
       case "delete-holding":         confirmDeleteHolding(symbol); break;
       case "save-notifications":     saveNotifications(); break;
       case "test-notification":      sendTestNotification(); break;
-      case "toggle-howto":           state.howtoOpen = !state.howtoOpen; renderSettings(); break;
+      case "toggle-howto":
+        state.howtoOpen = !state.howtoOpen;
+        try { localStorage.setItem("howtoOpen_v1", state.howtoOpen ? "1" : "0"); } catch (e) {}
+        renderSettings();
+        break;
       case "app-health-refresh":     loadAppHealth(true); break;
       case "signal-learning-refresh": loadSignalLearning(true); break;
       case "notif-toggle": {
