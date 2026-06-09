@@ -4965,12 +4965,6 @@ const state = {
   previewChart: { symbol: null, name: null, range: "3M", loading: false, data: null },
   // Per-day per-recommendation "done" or "dismissed" tracking (localStorage-persisted)
   recStatus: loadRecStatus(),
-  // Discover Ideas runtime state
-  discoverDynamic: null,        // array of {symbol, name, theme, source, date, thesis} from live refresh
-  discoverDynamicFetchedAt: null,
-  discoverRefreshing: false,
-  discoverSearch: "",            // user's filter text
-  discoverThemeFilter: null,     // selected theme, or null for "all"
   // ETF Leaderboard state — performance-ranked ETFs
   etfLeaderboard: null,          // array of {symbol, name, category, return3m, return1y, return3y, maxDD1y, trend200ma}
   etfLeaderboardFetchedAt: null,
@@ -7222,16 +7216,13 @@ function preSurgeConfirmed(r) {
 }
 
 function getPreSurgeUniverse() {
-  // Deduped union of: watchlist + non-cash holdings + ETF universe + SCAN_UNIVERSE
-  // + Discover Ideas (CURATED_PICKS). This is the SINGLE universe behind the one
-  // scored list — every name the app knows about gets scored together, so the
-  // Screener is the only discovery surface (no separate ETF/Ideas sections).
+  // Deduped union of: watchlist + non-cash holdings + ETF universe + SCAN_UNIVERSE.
+  // Stale static idea lists are deliberately excluded; live scanner data is the source of truth.
   const set = new Set();
   for (const w of state.watchlist) set.add(w.symbol);
   for (const h of state.holdings) if (h.asset_class !== "cash") set.add(h.symbol);
   for (const e of (typeof ETF_UNIVERSE !== "undefined" ? ETF_UNIVERSE : [])) set.add(e.symbol);
   for (const s of SCAN_UNIVERSE) set.add(s);
-  for (const p of (typeof CURATED_PICKS !== "undefined" ? CURATED_PICKS : [])) set.add(p.symbol);
   return Array.from(set);
 }
 
@@ -8520,22 +8511,9 @@ function buildOpportunityPlan(opp) {
   return plan;
 }
 
-// Helper for opportunity scoring: find symbol in static curated + dynamic ideas
-function findInDiscoverIdeas(symbol) {
-  if (typeof CURATED_PICKS !== "undefined") {
-    const c = CURATED_PICKS.find(p => p.symbol === symbol);
-    if (c) return { source: `${c.source.split(",")[0]}`, thesis: c.thesis };
-  }
-  if (state.discoverDynamic) {
-    const d = state.discoverDynamic.find(p => p.symbol === symbol);
-    if (d) return { source: d.source || "Live idea", thesis: d.thesis };
-  }
-  return null;
-}
-
 // Returns ranked list of all candidate opportunity symbols (not currently held)
-// from: Pre-Surge flags, Pre-Surge near-threshold, watchlist (non-held), news,
-// curated, and ETF leaderboard momentum (Round 1.5 addition).
+// from: Pre-Surge flags, Pre-Surge near-threshold, watchlist triggers, news,
+// and ETF leaderboard momentum. Stale static idea lists are excluded.
 function getOpportunityUniverse() {
   const held = new Set(state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol));
   const candidates = new Set();
@@ -8554,20 +8532,6 @@ function getOpportunityUniverse() {
   // News long-opportunities with a real symbol
   for (const n of (state.newsItems || [])) {
     if (n.symbol && n.direction === "long") candidates.add(n.symbol);
-  }
-  // Curated ideas (static, hardcoded list)
-  if (typeof CURATED_PICKS !== "undefined") {
-    for (const p of CURATED_PICKS) candidates.add(p.symbol);
-  }
-  // Dynamic Discover Ideas (refreshed via the "Refresh ideas" button)
-  // Bug fix: previously only static CURATED_PICKS were added to the universe,
-  // so dynamic picks could only vote if some OTHER signal (Pre-Surge, News,
-  // Watchlist) independently surfaced the same symbol. Now they're proper
-  // candidates in their own right, with the same 0.5 vote weight as static.
-  if (state.discoverDynamic) {
-    for (const p of state.discoverDynamic) {
-      if (p.symbol) candidates.add(p.symbol);
-    }
   }
   // ETF Leaderboard — Round 1.5: ETFs with strong momentum become candidates.
   // The opportunity scorer will filter further by trend/drawdown/return strength.
@@ -11026,258 +10990,6 @@ function openWatchItem(symbol) {
 }
 
 // ============================================================================
-// DISCOVER IDEAS — surface CURATED_PICKS, group by theme. Single-tap to add.
-// Static picks + optional live-refreshed dynamic picks via worker.
-// ============================================================================
-function renderDiscoverIdeas() {
-  const expanded = !!state.expandedAnalyses["discover"];
-  const inWatchlist = new Set(state.watchlist.map(w => w.symbol));
-  const held = new Set(state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol));
-
-  // Merge static + dynamic ideas, dedupe by symbol (dynamic wins — usually fresher)
-  const merged = [];
-  const seenSymbols = new Set();
-  const dynamicPicks = state.discoverDynamic || [];
-  for (const p of dynamicPicks) {
-    if (seenSymbols.has(p.symbol)) continue;
-    seenSymbols.add(p.symbol);
-    merged.push({ ...p, _dynamic: true });
-  }
-  for (const p of CURATED_PICKS) {
-    if (seenSymbols.has(p.symbol)) continue;
-    seenSymbols.add(p.symbol);
-    merged.push(p);
-  }
-
-  // Group by theme (BEFORE filter — themes list is the full universe of themes)
-  const byThemeAll = {};
-  for (const p of merged) {
-    if (!byThemeAll[p.theme]) byThemeAll[p.theme] = [];
-    byThemeAll[p.theme].push(p);
-  }
-  const allThemes = Object.keys(byThemeAll).sort((a, b) => byThemeAll[b].length - byThemeAll[a].length);
-
-  // Apply search + theme filter
-  const search = (state.discoverSearch || "").trim().toLowerCase();
-  const themeFilter = state.discoverThemeFilter;
-  const filtered = merged.filter(p => {
-    if (themeFilter && p.theme !== themeFilter) return false;
-    if (!search) return true;
-    return (
-      p.symbol.toLowerCase().includes(search) ||
-      (p.name || "").toLowerCase().includes(search) ||
-      (p.thesis || "").toLowerCase().includes(search) ||
-      (p.theme || "").toLowerCase().includes(search) ||
-      (p.source || "").toLowerCase().includes(search)
-    );
-  });
-
-  // Group filtered results by theme for display
-  const byTheme = {};
-  for (const p of filtered) {
-    if (!byTheme[p.theme]) byTheme[p.theme] = [];
-    byTheme[p.theme].push(p);
-  }
-  const themes = Object.keys(byTheme).sort((a, b) => byTheme[b].length - byTheme[a].length);
-
-  const freshLabel = state.discoverDynamicFetchedAt
-    ? `Fresh: ${fmtRel(state.discoverDynamicFetchedAt)}`
-    : "Static snapshot (Dec 2025 – May 2026)";
-
-  // Summary shows filter context if any filter is active
-  const filterActive = !!(search || themeFilter);
-  const summary = filterActive
-    ? `${filtered.length} of ${merged.length} ideas · ${freshLabel}`
-    : `${merged.length} ideas · ${allThemes.length} themes · ${freshLabel}`;
-
-  if (!expanded) {
-    return `
-      <div class="discover-card collapsed" data-act="toggle-analysis" data-key="discover">
-        <div class="discover-head">
-          <div>
-            <h3>Discover Ideas</h3>
-            <div class="discover-sub">${summary}</div>
-          </div>
-          <div class="collapsible-chev">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  const refreshBtnLabel = state.discoverRefreshing ? "Refreshing..." : "Refresh ideas";
-
-  const themeBlocks = themes.map(theme => {
-    const picks = byTheme[theme];
-    const items = picks.map(p => {
-      const onList = inWatchlist.has(p.symbol);
-      const owned = held.has(p.symbol);
-      const dynamicBadge = p._dynamic ? `<span class="discover-fresh-badge">new</span>` : "";
-      // Action buttons: always show Analyze + Chart; Watch only if not held/listed
-      let actionButtons;
-      if (owned) {
-        actionButtons = `
-          <div class="discover-actions-row">
-            <span class="discover-tag held">Held</span>
-            <button class="btn btn-secondary btn-sm" data-act="preview-chart" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Chart</button>
-            <button class="btn btn-secondary btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Analyze</button>
-          </div>`;
-      } else if (onList) {
-        actionButtons = `
-          <div class="discover-actions-row">
-            <span class="discover-tag onlist">On Watchlist</span>
-            <button class="btn btn-secondary btn-sm" data-act="preview-chart" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Chart</button>
-            <button class="btn btn-secondary btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Analyze</button>
-          </div>`;
-      } else {
-        actionButtons = `
-          <div class="discover-actions-row">
-            <button class="btn btn-sm" data-act="add-curated" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">+ Watch</button>
-            <button class="btn btn-secondary btn-sm" data-act="preview-chart" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Chart</button>
-            <button class="btn btn-secondary btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(p.symbol)}" data-name="${escAttr(p.name)}">Analyze</button>
-          </div>`;
-      }
-      return `
-        <div class="discover-item">
-          <div class="discover-item-head">
-            <div>
-              <span class="discover-sym">${escAttr(p.symbol)}</span>
-              <span class="discover-name">${escAttr(p.name)}</span>
-              ${dynamicBadge}
-            </div>
-            ${actionButtons}
-          </div>
-          <div class="discover-thesis">${escAttr(p.thesis)}</div>
-          <div class="discover-source">
-            <span class="discover-src">${escAttr(p.source)}</span>
-            <span class="discover-date">${escAttr(p.date)}</span>
-          </div>
-          ${renderPreviewChartFor(p.symbol)}
-        </div>
-      `;
-    }).join("");
-    return `
-      <div class="discover-theme-block">
-        <div class="discover-theme-head">${escAttr(theme)}</div>
-        ${items}
-      </div>
-    `;
-  }).join("");
-
-  // Build theme filter pills (always show ALL themes, current selection highlighted)
-  const themePills = allThemes.map(t => {
-    const isActive = themeFilter === t;
-    return `<button class="discover-theme-pill ${isActive ? 'active' : ''}" data-act="filter-theme" data-theme="${escAttr(t)}">${escAttr(t)} <span class="theme-pill-count">${byThemeAll[t].length}</span></button>`;
-  }).join("");
-
-  // Empty-state if filters return nothing
-  const noResults = filtered.length === 0 && (search || themeFilter);
-
-  return `
-    <div class="discover-card expanded">
-      <div class="discover-head" data-act="toggle-analysis" data-key="discover" style="cursor:pointer;">
-        <div>
-          <h3>Discover Ideas</h3>
-          <div class="discover-sub">${summary}</div>
-        </div>
-        <div class="collapsible-chev" style="transform:rotate(180deg);">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-      </div>
-      <div class="discover-actions">
-        <button class="btn btn-sm" data-act="refresh-discover" ${state.discoverRefreshing ? "disabled" : ""}>${refreshBtnLabel}</button>
-        ${state.discoverDynamicFetchedAt ? `<button class="btn btn-secondary btn-sm" data-act="clear-discover">Reset to static</button>` : ""}
-      </div>
-      <div class="discover-search-bar">
-        <input type="text" id="discoverSearch" placeholder="Search symbol, name, thesis, source..." value="${escAttr(search)}" autocomplete="off" />
-        ${(search || themeFilter) ? `<button class="discover-clear-btn" data-act="clear-discover-filters">Clear filters</button>` : ""}
-      </div>
-      <div class="discover-theme-pills">
-        ${themePills}
-      </div>
-      <div class="discover-disclaimer">Research from credible sources. Not advice — you decide. Tap Refresh to fetch fresh ideas via AI (requires worker support).</div>
-      ${noResults
-        ? `<div class="discover-no-results">No ideas match your search${themeFilter ? ` in <strong>${escAttr(themeFilter)}</strong>` : ""}. Try a different keyword or clear the filter.</div>`
-        : themeBlocks}
-    </div>
-  `;
-}
-
-async function refreshDiscover() {
-  if (state.discoverRefreshing) return;
-  state.discoverRefreshing = true;
-  renderCurrentView();
-  try {
-    const res = await fetch(`${WORKER_URL}/discover-ideas`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        held_symbols: state.holdings.filter(h => h.asset_class !== "cash").map(h => h.symbol),
-        watchlist_symbols: state.watchlist.map(w => w.symbol),
-      }),
-    });
-    if (!res.ok) {
-      if (res.status === 404) {
-        toast("Worker doesn't support /discover-ideas yet — using static picks", 4000, "error");
-      } else {
-        toast(`Refresh failed: ${res.status}`, 3000, "error");
-      }
-      state.discoverRefreshing = false;
-      renderCurrentView();
-      return;
-    }
-    const j = await res.json();
-    if (!Array.isArray(j.ideas)) {
-      toast("Worker returned malformed response", 3000, "error");
-      state.discoverRefreshing = false;
-      renderCurrentView();
-      return;
-    }
-    // Sanitize: ensure all entries have required fields
-    const sanitized = j.ideas
-      .filter(p => p && typeof p.symbol === "string")
-      .map(p => ({
-        symbol: String(p.symbol).toUpperCase().slice(0, 12),
-        name: String(p.name || p.symbol),
-        theme: String(p.theme || "Other"),
-        source: String(p.source || "AI Refresh"),
-        date: String(p.date || new Date().toISOString().slice(0, 10)),
-        thesis: String(p.thesis || "").slice(0, 500),
-      }));
-    state.discoverDynamic = sanitized;
-    state.discoverDynamicFetchedAt = new Date().toISOString();
-    toast(`Refreshed ${sanitized.length} ideas`);
-  } catch (e) {
-    toast(`Refresh failed: ${e.message || e}`, 3000, "error");
-  }
-  state.discoverRefreshing = false;
-  renderCurrentView();
-}
-
-function clearDiscoverDynamic() {
-  state.discoverDynamic = null;
-  state.discoverDynamicFetchedAt = null;
-  renderCurrentView();
-}
-
-function toggleDiscoverThemeFilter(theme) {
-  // Tap the active theme to clear it; tap a different theme to switch
-  if (state.discoverThemeFilter === theme) {
-    state.discoverThemeFilter = null;
-  } else {
-    state.discoverThemeFilter = theme;
-  }
-  renderCurrentView();
-}
-
-function clearDiscoverFilters() {
-  state.discoverSearch = "";
-  state.discoverThemeFilter = null;
-  renderCurrentView();
-}
-
-// ============================================================================
 // ETF LEADERBOARD
 // Fetches batch performance metrics from worker, ranks ETFs by return over
 // the selected timeframe. Renders alongside (not inside) Discover Ideas.
@@ -11290,74 +11002,6 @@ function clearDiscoverFilters() {
 // renderer and the Pre-Surge scanner. It used to live inside the Bot subsystem
 // (which we cut) but the leaderboard + scanner are still alive in Discover and
 // in Today's Opportunities scoring.
-// Restored after Phase I cleanup: CURATED_PICKS feeds the Discover Ideas
-// surface inside the Watchlist tab. Same data as before the cleanup.
-const CURATED_PICKS = [
-  // === HIGH-CONVICTION INDIVIDUAL STOCKS ===
-  { symbol: "BN",    name: "Brookfield Corp",         theme: "AI Infrastructure",                source: "Motley Fool",     date: "Jan 2026", thesis: "AI infrastructure fund (up to $100B AUM target), wealth solutions growth, real estate recovery. 25% est. annual earnings growth over 5 years." },
-  { symbol: "META",  name: "Meta Platforms",          theme: "AI Applications",                  source: "Motley Fool",     date: "Jan 2026", thesis: "Personal AI superintelligence vision, billions of daily AI chatbot users, growing AI glasses demand. Reinvesting heavily in moat." },
-  { symbol: "NEE",   name: "NextEra Energy",          theme: "AI Power Demand",                  source: "Motley Fool",     date: "Jan 2026", thesis: "Partner of choice for AI data center power deals (Meta, Google). Clean energy + grid build-out beneficiary." },
-  { symbol: "KMI",   name: "Kinder Morgan",           theme: "Natural Gas for AI",               source: "Motley Fool",     date: "Jan 2026", thesis: "$20B+ in gas infra capex, 28 bcf/day gas demand growth by 2030 (~25%). 4%+ dividend with growth runway." },
-  { symbol: "AMZN",  name: "Amazon",                  theme: "AI Cloud + AWS",                   source: "RBC Capital",     date: "Jan 2026", thesis: "Best-in-class AWS AI ROIC, compelling product/capacity acceleration cycle. AWS growth expected to accelerate." },
-  { symbol: "MSFT",  name: "Microsoft",               theme: "Large-cap Software/AI",            source: "Morgan Stanley",  date: "Jan 2026", thesis: "Robust mid-teens top-line growth, room for margin expansion. $650 PT. Top pick in large-cap software." },
-  { symbol: "MU",    name: "Micron",                  theme: "Semiconductors",                   source: "TipRanks/RBC",    date: "Jan 2026", thesis: "DRAM + NAND bit shipments +20% in 2026 from AI demand. Stock trades at <6x next-12mo EPS." },
-  { symbol: "MRK",   name: "Merck",                   theme: "Healthcare Value",                 source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Attractive valuation + clinical catalysts. Safe haven from expensive tech multiples." },
-  { symbol: "VRTX",  name: "Vertex Pharma",           theme: "Healthcare Value",                 source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Attractive valuation, clinical catalysts. Defensive healthcare with growth visibility." },
-  { symbol: "CEG",   name: "Constellation Energy",    theme: "Nuclear Power for AI",             source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Pure-play nuclear utility, AI data-center power contracts. Multi-decade visibility from hyperscaler deals." },
-  { symbol: "BA",    name: "Boeing",                  theme: "Industrial Recovery",              source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Production stability catalyst, recovery from 2024-25 issues. Balanced barbell to high-growth tech." },
-  { symbol: "SPOT",  name: "Spotify",                 theme: "Quality Growth",                   source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Audio platform monetization curve, pricing power, healthy free cash flow trajectory." },
-  { symbol: "DG",    name: "Dollar General",          theme: "K-shaped Consumer",                source: "BofA Q1 2026",    date: "Jan 2026", thesis: "Higher-than-expected tax refund cycle as tailwind for lower-income shoppers." },
-  { symbol: "NKE",   name: "Nike",                    theme: "Recovery Story",                   source: "BTIG",            date: "Jan 2026", thesis: "$100 PT (~57% upside from Dec 2025). Product pipeline, 2026 World Cup catalyst, insider buying." },
-  { symbol: "XYZ",   name: "Block (Square)",          theme: "Fintech Growth",                   source: "BTIG",            date: "Jan 2026", thesis: "$90 PT (~38% upside). Most compelling large-cap fintech, profitable mid-teens growth Cash App + Square." },
-  { symbol: "LVMUY", name: "LVMH (ADR)",              theme: "International / Europe",           source: "Kiplinger",       date: "Dec 2025", thesis: "French luxury conglomerate, 75 elite brands (Dior, Tiffany, Dom Perignon). International rotation play." },
-  { symbol: "ROP",   name: "Roper Technologies",      theme: "Niche Software",                   source: "Truist/Kiplinger",date: "Dec 2025", thesis: "Diversified niche software (education, transport, healthcare). Off March highs — re-entry zone." },
-
-  // === ETFs: AI / TECH / SEMIS ===
-  { symbol: "SMH",   name: "VanEck Semiconductors",       theme: "Semiconductors",               source: "WalletInvestor",  date: "Feb 2026", thesis: "Premier semi vehicle. TSMC + chip designers as 'picks and shovels' of AI revolution." },
-  { symbol: "BAI",   name: "BlackRock AI ETF",            theme: "AI Infrastructure",            source: "etf.com",         date: "Feb 2026", thesis: "Largest thematic ETF ($13.7B AUM), 38% 3-month return. Actively managed AI infra exposure." },
-  { symbol: "CHAT",  name: "Roundhill Generative AI",     theme: "AI Applications",              source: "Roundhill",       date: "Feb 2026", thesis: "Actively managed, proprietary AI exposure scoring. 0.75% ER. Targeted gen-AI play." },
-  { symbol: "BOTZ",  name: "Global X Robotics & AI",      theme: "AI Applications",              source: "Investing.com",   date: "Feb 2026", thesis: "40+ robotics/AI innovators (NVDA, ABB, Intuitive Surgical). $2.5B+ AUM, broad robotics exposure." },
-  { symbol: "AIQ",   name: "Global X AI & Tech",          theme: "AI Applications",              source: "etf.com",         date: "Feb 2026", thesis: "Developed-markets AI exposure across applications, hardware, services. 20.5% 3-mo return." },
-  { symbol: "IGM",   name: "iShares Expanded Tech",       theme: "Broad Tech",                   source: "etf.com",         date: "Feb 2026", thesis: "Cost-effective ($9.71B AUM, 0.39% ER) diversified NA tech beyond S&P 500 tech." },
-  { symbol: "CIBR",  name: "First Trust Cybersec",        theme: "Cybersecurity",                source: "etf.com",         date: "Feb 2026", thesis: "$11B+ AUM cyber leader. CrowdStrike, Broadcom holdings. Beneficiary of AI-driven threat landscape." },
-
-  // === ETFs: ENERGY / NUCLEAR / GRID ===
-  { symbol: "URA",   name: "Global X Uranium",            theme: "Nuclear Power for AI",         source: "Global X",        date: "Feb 2026", thesis: "Dominant nuclear ETF as corporates pivot to clean firm power. 6+ GW corporate clean firm announcements in 2025." },
-  { symbol: "SMRF",  name: "VettaFi Small Modular Reactor", theme: "Nuclear Power for AI",       source: "ALPS",            date: "Feb 2026", thesis: "Pure-play on SMR + uranium cycle. Top holdings: Oklo, Energy Fuels, NexGen. Heavy nuclear-cycle weight." },
-  { symbol: "XLU",   name: "Utilities Sector SPDR",       theme: "AI Power Demand",              source: "WalletInvestor",  date: "Feb 2026", thesis: "Defensive growth + AI power play. Multi-year up-cycle from data center electricity demand." },
-  { symbol: "GRID",  name: "First Trust Grid Infra",      theme: "Electrification",              source: "etf.com",         date: "Feb 2026", thesis: "16.8% quarterly return. Grid modernization for AI data centers + electrification transition." },
-  { symbol: "ELFY",  name: "ALPS Electrification Infra",  theme: "Electrification",              source: "ALPS",            date: "Feb 2026", thesis: "27.3% YTD return. 18 electrification sub-industries building/upgrading power grid across sectors." },
-  { symbol: "ACES",  name: "ALPS Clean Energy",           theme: "Clean Energy",                 source: "ALPS",            date: "Feb 2026", thesis: "12.3% YTD return. Pure-play renewables for AI + electrification. Plug Power, First Solar holdings." },
-  { symbol: "XLE",   name: "Energy Sector SPDR",          theme: "Energy",                       source: "Bankrate",        date: "Feb 2026", thesis: "Outperformed early 2026 due to geopolitical tensions. Broad energy sector hedge against tech concentration." },
-
-  // === ETFs: PRECIOUS METALS / COMMODITIES (NEW — addresses silver miss) ===
-  { symbol: "GLD",   name: "SPDR Gold Trust",             theme: "Precious Metals",              source: "Motley Fool",     date: "May 2026", thesis: "Largest gold ETF ($154B AUM). Most liquid gold proxy. Central bank demand strong; de-dollarization tailwind." },
-  { symbol: "SLV",   name: "iShares Silver Trust",        theme: "Precious Metals",              source: "USNews",          date: "Feb 2026", thesis: "Physical silver. Industrial demand from solar/electrification (~55% of consumption) + safe-haven flows. Highly volatile." },
-  { symbol: "SIL",   name: "Global X Silver Miners",      theme: "Precious Metals",              source: "USNews",          date: "Apr 2026", thesis: "Leveraged play on silver: miners benefit from fixed costs when prices rise. $5.7B AUM, 38 holdings, materials sector." },
-  { symbol: "SLVR",  name: "Sprott Silver Miners + PSLV", theme: "Precious Metals",              source: "USNews",          date: "Apr 2026", thesis: "Silver miners + direct physical silver allocation via PSLV in one ETF. Sprott commodities expertise." },
-  { symbol: "GDX",   name: "VanEck Gold Miners",          theme: "Precious Metals",              source: "Motley Fool",     date: "May 2026", thesis: "Gold miners outperformed bullion in 2026 (15% vs 6% bullion YTD). Operational leverage to rising gold prices." },
-  { symbol: "GDXJ",  name: "VanEck Junior Gold Miners",   theme: "Precious Metals",              source: "Motley Fool",     date: "May 2026", thesis: "$8.5B AUM, 120 smaller miners. Higher beta to gold price than majors. Reasonable 0.52% ER." },
-  { symbol: "PPLT",  name: "abrdn Physical Platinum",     theme: "Precious Metals",              source: "Motley Fool",     date: "May 2026", thesis: "Direct platinum exposure. Lower correlation with gold/silver — diversifies precious metals basket." },
-  { symbol: "GUNR",  name: "FlexShares Global Resources", theme: "Commodities",                  source: "etf.com",         date: "Feb 2026", thesis: "Diversified natural resources (energy, metals, ag, timber). Inflation hedge + infrastructure demand." },
-
-  // === ETFs: DIVIDEND / DEFENSIVE (NEW) ===
-  { symbol: "SCHD",  name: "Schwab US Dividend Equity",   theme: "Dividend / Defensive",         source: "Morningstar",     date: "May 2026", thesis: "Top-rated dividend ETF. Quality dividend payers with low fees. Defensive in tech selloffs, steady income." },
-  { symbol: "VYM",   name: "Vanguard High Dividend",      theme: "Dividend / Defensive",         source: "WalletInvestor",  date: "Feb 2026", thesis: "Cushion in current expensive S&P. Lower relative valuations + 3%+ yield. Value rotation beneficiary." },
-  { symbol: "TDVG",  name: "T. Rowe Price Dividend Growth", theme: "Dividend / Defensive",       source: "Morningstar",     date: "Mar 2026", thesis: "Top-rated dividend-growth ETF. Financially healthy companies that consistently raise dividends." },
-  { symbol: "VIG",   name: "Vanguard Dividend Appreciation", theme: "Dividend / Defensive",      source: "Bankrate",        date: "Nov 2025", thesis: "Dividend growth focus — companies with 10+ years of consecutive increases. Low ER, large-cap quality bias." },
-
-  // === ETFs: DEFENSE (NEW) ===
-  { symbol: "ITA",   name: "iShares US Aerospace & Defense", theme: "Defense",                   source: "USNews",          date: "Feb 2026", thesis: "Geopolitical conflict tailwind. Defense ETF exposure to reliable + emerging leaders in conflict-driven spend." },
-  { symbol: "SHLD",  name: "Global X Defense Tech",       theme: "Defense",                      source: "Global X",        date: "Jan 2026", thesis: "Modern defense tech exposure — drones, cyber, autonomous systems. Different angle vs traditional ITA primes." },
-
-  // === ETFs: INTERNATIONAL ROTATION (NEW) ===
-  { symbol: "ARGT",  name: "Global X Argentina",          theme: "Emerging Markets",             source: "Kiplinger",       date: "Dec 2025", thesis: "Diversified play on Milei's reforms post-midterm victory. Riskier but contrarian EM exposure." },
-  { symbol: "VEA",   name: "Vanguard FTSE Developed Markets", theme: "International / Europe",  source: "WalletInvestor",  date: "Feb 2026", thesis: "Japan/Eurozone earnings gap with US has narrowed — rotation candidate. Cheap valuations + currency diversification." },
-  { symbol: "EFA",   name: "iShares MSCI EAFE",           theme: "International / Europe",       source: "WalletInvestor",  date: "Feb 2026", thesis: "Broad developed ex-US. Trades at large valuation discount to S&P 500. Stimulus + reform stories." },
-  { symbol: "EWJ",   name: "iShares MSCI Japan",          theme: "International / Europe",       source: "WalletInvestor",  date: "Feb 2026", thesis: "Japan corporate reform, yen weakness benefiting exporters. Cheap relative to historical multiples." },
-  { symbol: "EEM",   name: "iShares MSCI Emerging Markets", theme: "Emerging Markets",           source: "USNews",          date: "Feb 2026", thesis: "Stretched US valuations driving capital into EM ETFs. Broad EM exposure (India, Brazil, EM-Asia)." },
-];
-
 const ETF_UNIVERSE = [
   // US broad market
   { symbol: "VTI",   name: "Vanguard Total Stock Market",       category: "US Broad" },
@@ -11588,7 +11232,7 @@ function renderEtfLeaderboard() {
               </div>
               <div class="lb-actions">
                 <button class="btn btn-secondary btn-sm" data-act="preview-chart" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">Chart</button>
-                <button class="btn btn-sm" data-act="analyze-from-discover" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">Analyze</button>
+                <button class="btn btn-sm" data-act="vrow-analyze" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">Analyze</button>
                 ${!owned && !onList ? `<button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(d.symbol)}" data-name="${escAttr(d.name)}">+ Watch</button>` : ""}
               </div>
             </div>
@@ -11635,32 +11279,49 @@ function renderEtfLeaderboard() {
 }
 
 
-// Hooked up after every renderCurrentView via an input event listener on body (delegation).
-// Debounced so we don't re-render on every keystroke.
-let _discoverSearchTimer = null;
-document.addEventListener("input", e => {
-  if (e.target && e.target.id === "discoverSearch") {
-    clearTimeout(_discoverSearchTimer);
-    _discoverSearchTimer = setTimeout(() => {
-      state.discoverSearch = e.target.value;
-      // Re-render but keep focus on input
-      renderCurrentView();
-      const newInput = document.getElementById("discoverSearch");
-      if (newInput) {
-        newInput.focus();
-        // Move cursor to end
-        const len = newInput.value.length;
-        newInput.setSelectionRange(len, len);
-      }
-    }, 220);
+function marketScanRowFor(symbol) {
+  const sym = String(symbol || "").toUpperCase();
+  return (state.marketScan?.results || []).find(r => String(r.symbol || "").toUpperCase() === sym) || null;
+}
+
+function opportunityConditionsFor(symbol, assetClass) {
+  const base = defaultConditionsFor(symbol, assetClass);
+  const row = marketScanRowFor(symbol);
+  if (!row) return base;
+
+  const s = String(symbol || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const price = Number(row.current_price);
+  const resistance = Number(row.nearest_resistance);
+  const support = Number(row.nearest_support);
+  const tags = row.tags || [];
+  const extra = [];
+
+  if (price > 0 && resistance > price && resistance / price <= 1.18) {
+    extra.push({ id: `${s}_confirm`, type: "price_above", threshold: Number(resistance.toFixed(2)) });
   }
-});
+  if (price > 0 && support > 0 && support < price && price / support <= 1.25) {
+    extra.push({ id: `${s}_invalid`, type: "price_below", threshold: Number(support.toFixed(2)) });
+  }
+  if (tags.includes("coiled")) {
+    extra.push({ id: `${s}_coil_break`, type: "breakout_high", period: 20 });
+  }
+  if (tags.includes("rs-leader") || Number(row.return_20d) >= 7) {
+    extra.push({ id: `${s}_mom`, type: "momentum_above", months: 1, threshold_pct: 8 });
+  }
+
+  const seen = new Set();
+  return [...extra, ...base].filter(c => {
+    const key = `${c.type}:${c.threshold ?? c.threshold_pct ?? c.period ?? c.months ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 6);
+}
 
 async function addCuratedToWatchlist(symbol, name) {
   if (!symbol) return;
   const cls = guessAssetClass(symbol);
-  // Same auto-armed defaults as manual add — oversold, pullback, breakout.
-  const conditions = defaultConditionsFor(symbol, cls);
+  const conditions = opportunityConditionsFor(symbol, cls);
   try {
     await db.collection("users").doc(state.uid).collection("watchlist").doc(symbol).set({
       symbol,
@@ -11670,30 +11331,11 @@ async function addCuratedToWatchlist(symbol, name) {
       added_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
     await loadWatchlist();
-    toast(`${symbol} added · alerts armed`);
+    toast(`${symbol} added · ${conditions.length} alerts armed`);
     renderCurrentView();
   } catch (e) {
     toast(`Failed to add: ${e.message || e}`, 3000, "error");
   }
-}
-
-// Analyze a Discover Ideas pick directly without adding to watchlist.
-// Navigates to the asset detail view and kicks off analysis.
-async function analyzeFromDiscover(symbol, name) {
-  if (!symbol) return;
-  toast(`Loading ${symbol}…`, 1500);
-  // Switch to Discover (markets sub-tab), then render asset detail.
-  state.currentView = "discover";
-  state.discoverTab = "markets";
-  state.selectedSymbol = symbol;
-  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === "discover"));
-  await renderAssetDetail(symbol);
-  // After view is rendered, trigger the analysis (with sanity check)
-  setTimeout(() => {
-    runAnalysis(symbol).catch(e => {
-      errorToast("Analysis", e);
-    });
-  }, 300);
 }
 function cryptoRandomId() {
   return "c" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -14125,7 +13767,9 @@ function msIsActable(row, read) {
   const rsi = msNum(row.rsi14);
   const day = msNum(row.day_change_pct);
   const ret20 = msNum(row.return_20d);
-  const trendOk = row.trend === "above_200ma" || ret20 > 0 || row.optflow_bullish === true;
+  const tags = msTags(row);
+  const catalystOk = tags.includes("bullish-flow") || tags.includes("catalyst-near") || tags.includes("squeeze-fuel");
+  const trendOk = row.trend === "above_200ma" || ret20 > 0 || row.optflow_bullish === true || (catalystOk && (ret20 == null || ret20 > -4));
   const entryOk = rr == null || rr >= 2;
   const notExtended = rsi == null || rsi < 72;
   const notSellingOff = day == null || day > -3;
@@ -14141,7 +13785,7 @@ function msLaneFor(row) {
   const optScore = msComponent(row, "optflow");
   const coilScore = msComponent(row, "compression");
 
-  if (tags.includes("bullish-flow") || optScore >= 12 || volScore >= 15) return "catalyst";
+  if (tags.includes("bullish-flow") || tags.includes("catalyst-near") || tags.includes("squeeze-fuel") || optScore >= 12 || volScore >= 15) return "catalyst";
   if (
     row.trend === "above_200ma" &&
     fromHigh != null && fromHigh <= -3 && fromHigh >= -22 &&
@@ -14163,7 +13807,7 @@ function msRowMatchesLane(row, lane) {
     const rsi = msNum(row.rsi14);
     return row.trend === "above_200ma" && fromHigh != null && fromHigh < -2 && (rsi == null || rsi < 66);
   }
-  if (lane === "catalyst") return msComponent(row, "optflow") >= 8 || msComponent(row, "volume") >= 12;
+  if (lane === "catalyst") return msTags(row).some(t => ["bullish-flow", "catalyst-near", "squeeze-fuel"].includes(t)) || msComponent(row, "optflow") >= 8 || msComponent(row, "volume") >= 12;
   if (lane === "rotation") return msTags(row).includes("coiled") || (msComponent(row, "compression") >= 7 && msComponent(row, "momentum") >= 7);
   return false;
 }
@@ -14314,6 +13958,8 @@ function renderMarketScannerCard() {
     const why = msWhyNot(r, rd);
     const isAnalyzing = !!(state.analyzingSymbols && state.analyzingSymbols[r.symbol]);
     const of = r.options_flow;
+    const earningsDate = r.earnings_date ? String(r.earnings_date) : "";
+    const dtc = r.short_interest && r.short_interest.dtc != null ? Number(r.short_interest.dtc) : null;
     const ofHtml = of && (of.cp_vol_ratio != null || of.call_vol_oi != null)
       ? `<div class="ms-flow">Options: ${of.cp_vol_ratio != null ? `C/P ${of.cp_vol_ratio}` : ""}${of.cp_vol_ratio != null && of.call_vol_oi != null ? " · " : ""}${of.call_vol_oi != null ? `CallVol/OI ${of.call_vol_oi}` : ""}${of.expiry ? ` · exp ${escAttr(of.expiry)}` : ""}</div>`
       : "";
@@ -14337,6 +13983,8 @@ function renderMarketScannerCard() {
           ${rr != null ? `<span class="ms-meta ${rr >= 2 ? "good" : "warn"}">R:R ${rr.toFixed(1)}:1</span>` : ""}
           ${r.rsi14 != null ? `<span class="ms-meta">RSI ${Number(r.rsi14).toFixed(0)}</span>` : ""}
           ${r.return_20d != null ? `<span class="ms-meta">${Number(r.return_20d) >= 0 ? "+" : ""}${Number(r.return_20d).toFixed(1)}% 20d</span>` : ""}
+          ${earningsDate ? `<span class="ms-meta warn">earn ${escAttr(earningsDate)}</span>` : ""}
+          ${Number.isFinite(dtc) ? `<span class="ms-meta warn">DTC ${dtc.toFixed(1)}</span>` : ""}
         </div>
         ${tagHtml ? `<div class="ms-tags">${tagHtml}</div>` : ""}
         <div class="ms-fit">
@@ -15257,7 +14905,7 @@ function renderNotificationsSection() {
       <div class="setting-row">
         <div>
           <div class="lbl">Telegram alerts</div>
-          <div class="sub">${enabled ? "On — bull/bear trigger fires push to Telegram." : "Off — no push alerts. The cron still records fires for the app to show later."}</div>
+          <div class="sub">${enabled ? "On — watchlist and holding triggers push to Telegram when Cloudflare Cron runs." : "Off — no push alerts. Turn on, save, then send a test."}</div>
         </div>
         <label class="lt-toggle">
           <input id="notif_enabled" type="checkbox" ${enabled ? "checked" : ""} data-act="notif-toggle" />
@@ -15277,7 +14925,7 @@ function renderNotificationsSection() {
         <button class="btn btn-secondary btn-sm" data-act="test-notification">Send Test Message</button>
       </div>
       <div class="setting-row" style="color:var(--ink-muted);font-size:11px;line-height:1.5;">
-        Setup: message <b>@BotFather</b> on Telegram to create a bot, then <b>@userinfobot</b> to get your chat ID. Make sure to <b>tap Start</b> on your bot first or Telegram won't let it message you.
+        Setup: message <b>@BotFather</b> to create a bot, add <b>TELEGRAM_BOT_TOKEN</b> in Cloudflare secrets, then get your numeric chat ID from <b>@userinfobot</b>. Tap <b>Start</b> on your bot first. Automatic alerts require a Cloudflare Cron Trigger. For manual debugging, add <b>CRON_DEBUG_KEY</b>, then open <b>/cron-debug?key=YOUR_KEY</b> and <b>/cron-run?key=YOUR_KEY</b> on your Worker URL.
       </div>
     </div>
   `;
@@ -15337,13 +14985,13 @@ async function sendTestNotification() {
     const r = await fetch(`${WORKER_URL}/telegram-test`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId }),
+      body: JSON.stringify({ uid: state.uid, chat_id: chatId }),
     });
+    const j = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const j = await r.json().catch(() => ({}));
       throw new Error(j.error || `HTTP ${r.status}`);
     }
-    toast("Test sent — check your Telegram");
+    toast(`Test sent — ${j.profile_enabled ? "alerts profile on" : "check Telegram"}`);
   } catch (e) {
     errorToast("Test message", e);
   }
@@ -16238,11 +15886,6 @@ document.addEventListener("click", (e) => {
       case "auth-migrate-no":        handleMigrate(false); break;
       case "sign-out":               signOutUser(); break;
       case "add-curated":            addCuratedToWatchlist(target.dataset.symbol, target.dataset.name); break;
-      case "analyze-from-discover":  analyzeFromDiscover(target.dataset.symbol, target.dataset.name); break;
-      case "refresh-discover":       refreshDiscover(); break;
-      case "clear-discover":         clearDiscoverDynamic(); break;
-      case "filter-theme":           toggleDiscoverThemeFilter(target.dataset.theme); break;
-      case "clear-discover-filters": clearDiscoverFilters(); break;
       case "refresh-leaderboard":    fetchEtfLeaderboard(true); break;
       case "lb-tf":                  setLeaderboardTimeframe(target.dataset.tf); break;
       case "lb-sort":                setLeaderboardSort(target.dataset.sort); break;
