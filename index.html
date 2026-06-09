@@ -3280,7 +3280,7 @@ body {
   cursor: default;
 }
 
-/* ===== INLINE CHART PREVIEW (Ideas + ETF Leaderboard) ===== */
+/* ===== INLINE CHART PREVIEW (ETF Leaderboard) ===== */
 .preview-chart-wrap {
   margin: 8px 0 4px;
   padding: 10px 12px 12px;
@@ -4961,7 +4961,7 @@ const state = {
   // resets on reload, which is correct because the underlying verdict can change
   // and a stale expanded state would be misleading.
   tradePlanExpanded: {},
-  // Inline chart preview state for Ideas/ETF sections (no analysis call)
+  // Inline chart preview state for ETF sections (no analysis call)
   previewChart: { symbol: null, name: null, range: "3M", loading: false, data: null },
   // Per-day per-recommendation "done" or "dismissed" tracking (localStorage-persisted)
   recStatus: loadRecStatus(),
@@ -8391,16 +8391,6 @@ function computeOpportunityVerdict(symbol, assetClassGuess) {
     }
   }
 
-  // --- DISCOVER IDEAS (curated/dynamic) ---
-  // Reduced from weight 1 → 0.5 in Round 1: a curated-list mention alone shouldn't
-  // be enough to flag something as a WATCH opportunity. Now needs to combine
-  // with another signal (Pre-Surge near-threshold, watchlist firing, news,
-  // ETF momentum, or macro tailwind) to clear the threshold.
-  const ideaSrc = findInDiscoverIdeas(symbol);
-  if (ideaSrc) {
-    votes.push({ signal: "Idea", dir: "buy", weight: 0.5, note: ideaSrc.source });
-  }
-
   // --- MACRO tilt ---
   const macroV = macroVerdictFor(symbol, assetClassGuess || guessAssetClass(symbol));
   if (macroV === "favored") {
@@ -8566,7 +8556,7 @@ function renderTodaysOpportunitiesCard() {
         <div class="opps-head">
           <div>
             <h3>Today's Opportunities · New Entries</h3>
-            <div class="opps-sub">Synthesizes Pre-Surge + Watchlist + News + Ideas + Macro</div>
+            <div class="opps-sub">Synthesizes Pre-Surge + Watchlist + News + Macro</div>
           </div>
           ${needsScan ? `<button class="btn btn-sm" data-act="run-presurge">Run Pre-Surge</button>` : ""}
         </div>
@@ -8627,7 +8617,7 @@ function renderTodaysOpportunitiesCard() {
       <div class="opps-list">
         ${top5.map(o => renderOpportunityItem(o)).join("")}
       </div>
-      <div class="opps-footer">Top 5 by conviction · Pre-Surge + Watchlist + News + ETF Momentum + Ideas + Macro + Timing + Vol</div>
+      <div class="opps-footer">Top 5 by conviction · Pre-Surge + Watchlist + News + ETF Momentum + Macro + Timing + Vol</div>
     </div>
   `;
 }
@@ -10272,9 +10262,26 @@ function renderVerdictZones() {
       };
     }
     if (!v) {
-      // No server verdict yet: synthesize a WATCH row that prompts an analysis.
       const a = state.analyses[h.symbol];
       const decay = a ? convictionDecay(a, h.asset_class) : null;
+      if (a && !(decay && decay.is_stale)) {
+        const local = computeLocalVerdict(a, h, {
+          isHeld: true,
+          currentPrice: state.prices?.[h.symbol]?.current_price ?? null,
+          decay,
+        });
+        return {
+          symbol: h.symbol, name: h.name, asset_class: h.asset_class,
+          verdict: local.verdict, action_line: local.action_line, severity: local.severity,
+          freshness: local.freshness, reasoning_short: local.reasoning_short,
+          missing_inputs: local.missing_inputs || [], fired_trigger: local.fired_trigger,
+          stance_echo: local.stance_echo || null, conviction: local.conviction || null,
+          key_signal: local.key_signal || "",
+          value: hm.value, pnl_pct: hm.pnlPct, day_change_pct: null,
+          is_placeholder: true, is_cash: false,
+        };
+      }
+      // No usable server/local verdict yet: synthesize a WATCH row that prompts analysis.
       let action_line, missing;
       if (!a) {
         action_line = "Run analyze for full read";
@@ -10992,7 +10999,7 @@ function openWatchItem(symbol) {
 // ============================================================================
 // ETF LEADERBOARD
 // Fetches batch performance metrics from worker, ranks ETFs by return over
-// the selected timeframe. Renders alongside (not inside) Discover Ideas.
+// the selected timeframe.
 // CRITICAL FRAMING: this list shows what HAS done well, not what WILL. Past
 // performance shows momentum; mean reversion is the dominant long-term force.
 // We deliberately show drawdown next to return so risk is visible, and we
@@ -11342,7 +11349,7 @@ function cryptoRandomId() {
 }
 
 // ============================================================================
-// INLINE CHART PREVIEW (Ideas + ETF Leaderboard)
+// INLINE CHART PREVIEW (ETF Leaderboard)
 // Lets you peek at a chart without adding to watchlist or spending AI tokens.
 // One preview at a time — re-tapping closes; tapping a different row swaps.
 // ============================================================================
@@ -12777,7 +12784,9 @@ async function runVerdict(force = false) {
 
   if (!force && state.verdictsAt) {
     const age = Date.now() - new Date(state.verdictsAt).getTime();
-    if (age < VERDICT_DEBOUNCE_MS) return;
+    const nonCashCount = state.holdings.filter(h => h.asset_class !== "cash").length;
+    const hasUsableCachedVerdicts = Array.isArray(state.verdicts) && (state.verdicts.length > 0 || nonCashCount === 0);
+    if (age < VERDICT_DEBOUNCE_MS && hasUsableCachedVerdicts) return;
   }
 
   state.verdictsLoading = true;
