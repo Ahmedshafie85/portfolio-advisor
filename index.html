@@ -4524,6 +4524,156 @@ body {
 /* Inside the collapsible panel the watchlist already has its own header/scan
    bar, so trim the duplicate top section heading's gap. */
 .watchlist-panel-body .scan-bar { margin-top: 4px; }
+.cockpit-grid,
+.health-grid,
+.learning-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:8px;
+  padding:0 20px 14px;
+}
+.cockpit-cell,
+.health-cell,
+.learning-cell {
+  border:1px solid var(--rule);
+  border-radius:8px;
+  background:var(--bg-elev);
+  padding:10px 12px;
+}
+.cockpit-k,
+.health-k,
+.learning-k {
+  display:block;
+  font-family:var(--mono);
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:var(--ink-muted);
+  margin-bottom:4px;
+}
+.cockpit-v,
+.health-v,
+.learning-v {
+  display:block;
+  font-family:var(--mono);
+  font-size:16px;
+  color:var(--ink);
+}
+.health-cell.ok { border-color:rgba(74,122,74,.35); }
+.health-cell.warn { border-color:rgba(176,141,60,.55); }
+.health-cell.bad { border-color:rgba(161,61,45,.45); }
+.health-issues,
+.learning-sources,
+.watch-pipeline {
+  padding:0 20px 16px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.health-issue,
+.learning-source,
+.wp-row {
+  border:1px solid var(--rule);
+  border-radius:8px;
+  background:rgba(255,255,255,.35);
+  padding:9px 10px;
+  font-size:12px;
+  color:var(--ink-soft);
+}
+.learning-source {
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  font-family:var(--mono);
+}
+.learning-source strong { color:var(--ink); font-family:var(--body); }
+.vrow-audit {
+  margin-top:8px;
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.audit-chip {
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--ink-muted);
+  border:1px solid var(--rule);
+  border-radius:999px;
+  padding:3px 7px;
+  background:rgba(255,255,255,.45);
+}
+.audit-chip.warn { color:var(--gold); border-color:rgba(176,141,60,.45); }
+.audit-chip.bad { color:var(--red); border-color:rgba(161,61,45,.35); }
+.wp-row {
+  display:grid;
+  grid-template-columns:minmax(70px,110px) 1fr auto;
+  align-items:center;
+  gap:10px;
+}
+.wp-sym { font-family:var(--mono); font-weight:700; color:var(--ink); }
+.wp-stage {
+  font-family:var(--mono);
+  font-size:10px;
+  text-transform:uppercase;
+  color:var(--ink-muted);
+}
+.ms-filters {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:12px 0 0;
+}
+.ms-filter-group {
+  display:flex;
+  gap:4px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.ms-filter-label {
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--ink-muted);
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  padding:7px 2px;
+}
+.ms-filter {
+  border:1px solid var(--rule);
+  border-radius:999px;
+  background:var(--bg);
+  color:var(--ink-muted);
+  font-family:var(--mono);
+  font-size:11px;
+  padding:6px 9px;
+  cursor:pointer;
+}
+.ms-filter.active {
+  background:var(--ink);
+  color:var(--bg);
+  border-color:var(--ink);
+}
+.ms-pipeline {
+  display:flex;
+  gap:5px;
+  flex-wrap:wrap;
+  margin:8px 0 2px;
+}
+.ms-stage {
+  font-family:var(--mono);
+  font-size:9.5px;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  color:var(--ink-muted);
+  border:1px solid var(--rule);
+  border-radius:999px;
+  padding:3px 6px;
+  background:rgba(255,255,255,.35);
+}
+.ms-stage.active {
+  color:var(--green);
+  border-color:rgba(74,122,74,.4);
+}
 /* ===== END MARKET SCANNER STYLES ===== */
 </style>
 </head>
@@ -4863,6 +5013,15 @@ const state = {
   marketScanFocus: "",
   marketScanLane: "actable",
   marketScanHideSoft: true,
+  marketScanCapFilter: "all",
+  marketScanSetupFilter: "all",
+  marketScanSectorFilter: "all",
+  appHealth: null,
+  appHealthLoading: false,
+  appHealthFetchedAt: null,
+  signalLearning: null,
+  signalLearningLoading: false,
+  signalLearningFetchedAt: null,
   // Discover: Watchlist shown as a collapsible panel above the scanner.
   // Collapsed by default; tapping its header expands it.
   watchlistPanelOpen: false,
@@ -10168,6 +10327,73 @@ function renderDailyScan() {
 // (Watchouts feature removed. Will be replaced by Risk Triage in Session B.)
 // ============================================================================
 
+function renderPortfolioCockpit(m) {
+  if (!state.appHealth && !state.appHealthLoading && state.uid) setTimeout(() => loadAppHealth(false), 0);
+  const nonCash = state.holdings.filter(h => h.asset_class !== "cash");
+  const cash = state.holdings.filter(h => h.asset_class === "cash").reduce((s, h) => s + (Number(h.quantity) || 0), 0);
+  const missing = nonCash.filter(h => !state.analyses[h.symbol]).length;
+  const stale = nonCash.filter(h => {
+    const a = state.analyses[h.symbol];
+    return a && convictionDecay(a, h.asset_class).is_stale;
+  }).length;
+  const acts = (state.verdicts || []).filter(v => v.verdict === "ACT").length;
+  const healthIssues = state.appHealth?.issues?.length || 0;
+  const cell = (k, v) => `<div class="cockpit-cell"><span class="cockpit-k">${escAttr(k)}</span><span class="cockpit-v">${escAttr(v)}</span></div>`;
+  return `
+    <div class="settings-group" style="margin-top:14px;">
+      <div class="section-head" style="padding:0 20px 10px;">
+        <h3 style="font-family:var(--display);font-size:18px;font-weight:500;">Portfolio Cockpit</h3>
+      </div>
+      <div class="cockpit-grid">
+        ${cell("Owned", `${nonCash.length} positions`)}
+        ${cell("Cash", `$${fmtUSD(cash, 0)}`)}
+        ${cell("Watchlist", `${state.watchlist.length} names`)}
+        ${cell("Actions", `${acts} today`)}
+        ${cell("Missing reads", `${missing + stale}`)}
+        ${cell("Health flags", `${healthIssues}`)}
+      </div>
+    </div>`;
+}
+
+function watchPipelineStage(symbol) {
+  const watched = state.watchlist.some(w => w.symbol === symbol);
+  const analyzed = !!state.analyses[symbol];
+  const snap = state.watchlistSnapshot[symbol];
+  const firing = snap?.triggers?.length > 0;
+  if (firing) return "trigger fired";
+  if (analyzed && watched) return "analyzed + armed";
+  if (watched) return "alert armed";
+  if (analyzed) return "analyzed";
+  return "watching";
+}
+
+function renderPortfolioWatchlistPipeline() {
+  if (!state.watchlist.length) return "";
+  const rows = state.watchlist.slice()
+    .sort((a, b) => (screenerScoreFor(b.symbol)?.score || 0) - (screenerScoreFor(a.symbol)?.score || 0))
+    .slice(0, 6)
+    .map(w => {
+      const price = state.prices?.[w.symbol]?.current_price ?? state.watchlistSnapshot?.[w.symbol]?.current_price ?? null;
+      return `
+        <div class="wp-row" data-act="open-asset-from-watch" data-symbol="${escAttr(w.symbol)}">
+          <div>
+            <div class="wp-sym">${escAttr(w.symbol)}</div>
+            <div class="wp-stage">${escAttr(watchPipelineStage(w.symbol))}</div>
+          </div>
+          <div>${renderUnifiedAction(w.symbol, price, false)}</div>
+          <button class="btn-ghost-sm" data-act="vrow-analyze" data-symbol="${escAttr(w.symbol)}">${state.analyses[w.symbol] ? "Refresh" : "Analyze"}</button>
+        </div>`;
+    }).join("");
+  return `
+    <div class="settings-group">
+      <div class="section-head" style="padding:0 20px 10px;display:flex;justify-content:space-between;align-items:baseline;">
+        <h3 style="font-family:var(--display);font-size:18px;font-weight:500;">Watchlist Pipeline</h3>
+        <span class="sub" style="font-family:var(--mono);font-size:10.5px;">${state.watchlist.length} armed</span>
+      </div>
+      <div class="watch-pipeline">${rows}</div>
+    </div>`;
+}
+
 function renderPortfolio() {
   const m = portfolioMetrics();
   const view = $("#view");
@@ -10224,7 +10450,11 @@ function renderPortfolio() {
 
     ${renderDrawdownGauge()}
 
+    ${renderPortfolioCockpit(m)}
+
     ${renderVerdictZones()}
+
+    ${renderPortfolioWatchlistPipeline()}
 
     ${renderTodaysOpportunitiesCard()}
   `;
@@ -10257,6 +10487,7 @@ function renderVerdictZones() {
         verdict: "HOLD", action_line: `${((hm.value || 0) / Math.max(m_safe(), 1) * 100).toFixed(1)}% of portfolio`,
         severity: "low", freshness: "fresh", reasoning_short: "",
         missing_inputs: [], fired_trigger: null,
+        source: "cash",
         value: hm.value, pnl_pct: 0, day_change_pct: 0,
         is_placeholder: false, is_cash: true,
       };
@@ -10277,6 +10508,7 @@ function renderVerdictZones() {
           missing_inputs: local.missing_inputs || [], fired_trigger: local.fired_trigger,
           stance_echo: local.stance_echo || null, conviction: local.conviction || null,
           key_signal: local.key_signal || "",
+          source: "local",
           value: hm.value, pnl_pct: hm.pnlPct, day_change_pct: null,
           is_placeholder: true, is_cash: false,
         };
@@ -10300,6 +10532,7 @@ function renderVerdictZones() {
         reasoning_short: a?.headline || "", missing_inputs: missing, fired_trigger: null,
         stance_echo: a?.stance || null, conviction: a?.conviction || null,
         key_signal: "",
+        source: "pending",
         value: hm.value, pnl_pct: hm.pnlPct, day_change_pct: null,
         is_placeholder: true, is_cash: false,
       };
@@ -10311,6 +10544,8 @@ function renderVerdictZones() {
       missing_inputs: v.missing_inputs || [], fired_trigger: v.fired_trigger,
       stance_echo: v.stance_echo || null, conviction: v.conviction || null,
       key_signal: v.key_signal || "",
+      source: (v._fallback_reason || v.fallback_reason) ? "fallback" : "server",
+      source_reason: v._fallback_reason || v.fallback_reason || "",
       value: hm.value, pnl_pct: hm.pnlPct, day_change_pct: v.day_change_pct,
       is_placeholder: false, is_cash: false,
     };
@@ -10640,6 +10875,18 @@ function renderDirectiveLine(d) {
   return `<div class="vrow-directive ${d.isAlarm ? "vrow-directive-alarm" : ""}">${parts.join('<span class="dir-dot">·</span>')}</div>${noteHtml}`;
 }
 
+function renderVerdictAudit(r) {
+  if (r.is_cash) return "";
+  const chips = [];
+  const source = r.source || "server";
+  chips.push(`<span class="audit-chip ${source === "fallback" ? "warn" : source === "pending" ? "bad" : ""}">source ${escAttr(source)}</span>`);
+  if (r.freshness) chips.push(`<span class="audit-chip ${["stale","very_stale","missing"].includes(r.freshness) ? "warn" : ""}">read ${escAttr(r.freshness)}</span>`);
+  if (r.key_signal) chips.push(`<span class="audit-chip">signal ${escAttr(r.key_signal)}</span>`);
+  if (r.missing_inputs?.length) chips.push(`<span class="audit-chip bad">${r.missing_inputs.length} missing</span>`);
+  if (r.source_reason) chips.push(`<span class="audit-chip warn">${escAttr(r.source_reason)}</span>`);
+  return `<div class="vrow-audit">${chips.join("")}</div>`;
+}
+
 function renderVerdictRow(r) {
   const verdictClass = `vrow-${r.verdict.toLowerCase()}`;
   const sevClass = r.verdict === "ACT" ? `vrow-sev-${r.severity}` : "";
@@ -10759,6 +11006,7 @@ function renderVerdictRow(r) {
         ${analyzeBtn}
       </div>
       ${directive}
+      ${renderVerdictAudit(r)}
       ${keySignal}
       ${r.reasoning_short ? `<div class="vrow-reasoning">${escAttr(r.reasoning_short)}</div>` : ""}
       ${firedBlock}
@@ -10781,6 +11029,7 @@ function renderVerdictRow(r) {
       ${analyzeBtn}
     </div>
     ${directive2}
+    ${renderVerdictAudit(r)}
     ${keySignal}
     ${r.reasoning_short ? `<div class="vrow-reasoning">${escAttr(r.reasoning_short)}</div>` : ""}
   </div>`;
@@ -13895,6 +14144,41 @@ function msSetupLabel(row) {
   return "General";
 }
 
+const MS_MEGA_SYMBOLS = new Set(["AAPL","MSFT","NVDA","AVGO","GOOGL","META","AMZN","TSLA","LLY","JPM","V","MA","UNH","XOM","COST","WMT","HD","PG","NFLX","ORCL","CRM"]);
+function msCapBucket(row) {
+  const sym = String(row?.symbol || "").toUpperCase();
+  if (row?.market_cap_bucket) return row.market_cap_bucket;
+  if (msTags(row).includes("less-obvious")) return "less_obvious";
+  if (msTags(row).includes("mega-cap-demoted") || MS_MEGA_SYMBOLS.has(sym)) return "mega";
+  return "large_mid";
+}
+function msMatchesDeskFilters(row) {
+  const cap = state.marketScanCapFilter || "all";
+  const setup = state.marketScanSetupFilter || "all";
+  const sector = state.marketScanSectorFilter || "all";
+  const bucket = msCapBucket(row);
+  if (cap === "no_mega" && bucket === "mega") return false;
+  if (cap === "less_obvious" && bucket !== "less_obvious") return false;
+  if (cap === "mega" && bucket !== "mega") return false;
+  if (setup !== "all" && !msRowMatchesLane(row, setup)) return false;
+  if (sector !== "all" && msSector(row.symbol) !== sector) return false;
+  return true;
+}
+function msPipelineHtml(row, read, held, watched) {
+  const analyzed = !!state.analyses?.[row.symbol] || !!read;
+  const qualified = !row._soft && (msNum(row.composite) ?? 0) >= 55;
+  const stages = [
+    ["Discovered", true],
+    ["Qualified", qualified],
+    ["Analyzed", analyzed],
+    ["Watched", watched || held],
+    ["Alert armed", watched],
+  ];
+  return `<div class="ms-pipeline">${stages.map(([label, on]) =>
+    `<span class="ms-stage ${on ? "active" : ""}">${escAttr(label)}</span>`
+  ).join("")}</div>`;
+}
+
 function renderMarketScannerCard() {
   const scan = state.marketScan;
   const loading = state.marketScanLoading;
@@ -13910,7 +14194,8 @@ function renderMarketScannerCard() {
 
   const activeLane = state.marketScanLane || "all";
   const hideSoft = !!state.marketScanHideSoft;
-  const baseResults = hideSoft ? results.filter(r => !r._soft) : results;
+  const preFilterResults = hideSoft ? results.filter(r => !r._soft) : results;
+  const baseResults = preFilterResults.filter(msMatchesDeskFilters);
   let laneResults = baseResults.filter(r => {
     if (activeLane === "actable") return msIsActable(r, reads[r.symbol]);
     return msRowMatchesLane(r, activeLane);
@@ -13936,6 +14221,16 @@ function renderMarketScannerCard() {
       ${escAttr(l.label)} <span class="ms-lane-count">${count}</span>
     </button>`;
   }).join("");
+  const capPill = (id, label) => `<button class="ms-filter ${state.marketScanCapFilter === id ? "active" : ""}" data-act="set-ms-cap-filter" data-filter="${escAttr(id)}">${escAttr(label)}</button>`;
+  const setupPill = (id, label) => `<button class="ms-filter ${state.marketScanSetupFilter === id ? "active" : ""}" data-act="set-ms-setup-filter" data-filter="${escAttr(id)}">${escAttr(label)}</button>`;
+  const sectors = ["all", ...Array.from(new Set(preFilterResults.map(r => msSector(r.symbol)).filter(Boolean))).sort()];
+  const sectorPill = s => `<button class="ms-filter ${state.marketScanSectorFilter === s ? "active" : ""}" data-act="set-ms-sector-filter" data-filter="${escAttr(s)}">${escAttr(s === "all" ? "All sectors" : s)}</button>`;
+  const filterHtml = `
+    <div class="ms-filters">
+      <div class="ms-filter-group"><span class="ms-filter-label">Market</span>${capPill("all","All")}${capPill("no_mega","No mega")}${capPill("less_obvious","Less obvious")}${capPill("mega","Mega")}</div>
+      <div class="ms-filter-group"><span class="ms-filter-label">Setup</span>${setupPill("all","Any")}${setupPill("momentum","Momentum")}${setupPill("pullback","Pullback")}${setupPill("catalyst","Catalyst")}${setupPill("rotation","Rotation")}</div>
+      <div class="ms-filter-group"><span class="ms-filter-label">Sector</span>${sectors.slice(0, 12).map(sectorPill).join("")}</div>
+    </div>`;
 
   const rows = visibleResults.map(r => {
     const rd = reads[r.symbol];
@@ -13989,6 +14284,7 @@ function renderMarketScannerCard() {
         <div class="ms-meta-row">
           <span class="ms-meta good">${escAttr(setupLabel)}</span>
           <span class="ms-meta">${escAttr(sector)}</span>
+          <span class="ms-meta ${msCapBucket(r) === "mega" ? "warn" : "good"}">${escAttr(msCapBucket(r).replace(/_/g, " "))}</span>
           ${rr != null ? `<span class="ms-meta ${rr >= 2 ? "good" : "warn"}">R:R ${rr.toFixed(1)}:1</span>` : ""}
           ${r.rsi14 != null ? `<span class="ms-meta">RSI ${Number(r.rsi14).toFixed(0)}</span>` : ""}
           ${r.return_20d != null ? `<span class="ms-meta">${Number(r.return_20d) >= 0 ? "+" : ""}${Number(r.return_20d).toFixed(1)}% 20d</span>` : ""}
@@ -13996,6 +14292,7 @@ function renderMarketScannerCard() {
           ${Number.isFinite(dtc) ? `<span class="ms-meta warn">DTC ${dtc.toFixed(1)}</span>` : ""}
         </div>
         ${tagHtml ? `<div class="ms-tags">${tagHtml}</div>` : ""}
+        ${msPipelineHtml(r, rd, held, watched)}
         <div class="ms-fit">
           <div class="ms-fit-box"><span class="ms-fit-k">Portfolio fit</span><span class="ms-fit-v ${escAttr(fit.tone)}">${escAttr(fit.label)}</span></div>
           <div class="ms-fit-box"><span class="ms-fit-k">Entry quality</span><span class="ms-fit-v">${escAttr(why)}</span></div>
@@ -14057,6 +14354,7 @@ function renderMarketScannerCard() {
     </div>
 
     <div class="ms-lanes">${laneHtml}</div>
+    ${filterHtml}
     <div class="ms-toggle-row">
       <span class="ms-sub" style="margin:0;">${activeLane === "all" ? "Showing strong setups across every lane" : `Showing ${escAttr(MARKET_SCAN_LANES.find(l => l.id === activeLane)?.label || activeLane)}`}</span>
       <button class="ms-toggle ${hideSoft ? "active" : ""}" data-act="toggle-ms-soft">${hideSoft ? `Strong only (${softCount} hidden)` : "Hide softer"}</button>
@@ -14252,6 +14550,125 @@ function toggleAnalysis(key) {
   }
 }
 
+async function loadAppHealth(force = false) {
+  if (!state.uid || !auth.currentUser) return;
+  if (state.appHealthLoading) return;
+  if (!force && state.appHealth && state.appHealthFetchedAt && Date.now() - new Date(state.appHealthFetchedAt).getTime() < 120000) return;
+  state.appHealthLoading = true;
+  if (state.currentView === "settings") renderSettings();
+  try {
+    const idToken = await auth.currentUser.getIdToken();
+    const r = await fetch(`${WORKER_URL}/app-health`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: state.uid, idToken }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    state.appHealth = await r.json();
+    state.appHealthFetchedAt = new Date().toISOString();
+  } catch (e) {
+    state.appHealth = { ok: false, issues: [String(e.message || e)], generated_at: new Date().toISOString() };
+  } finally {
+    state.appHealthLoading = false;
+    if (state.currentView === "settings") renderSettings();
+    if (state.currentView === "portfolio") renderPortfolio();
+  }
+}
+
+async function loadSignalLearning(force = false) {
+  if (!state.uid || !auth.currentUser) return;
+  if (state.signalLearningLoading) return;
+  if (!force && state.signalLearning && state.signalLearningFetchedAt && Date.now() - new Date(state.signalLearningFetchedAt).getTime() < 180000) return;
+  state.signalLearningLoading = true;
+  if (state.currentView === "settings") renderSettings();
+  try {
+    const idToken = await auth.currentUser.getIdToken();
+    const r = await fetch(`${WORKER_URL}/signal-performance`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid: state.uid, idToken }),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    state.signalLearning = await r.json();
+    state.signalLearningFetchedAt = new Date().toISOString();
+  } catch (e) {
+    state.signalLearning = { error: String(e.message || e), generated_at: new Date().toISOString() };
+  } finally {
+    state.signalLearningLoading = false;
+    if (state.currentView === "settings") renderSettings();
+  }
+}
+
+function renderAppHealthSection() {
+  if (!state.appHealth && !state.appHealthLoading) setTimeout(() => loadAppHealth(false), 0);
+  const h = state.appHealth || {};
+  const ready = h.readiness || {};
+  const secret = h.secrets_present || {};
+  const latest = h.latest || {};
+  const notif = h.notifications || {};
+  const cell = (label, value, tone = "ok") => `
+    <div class="health-cell ${escAttr(tone)}">
+      <span class="health-k">${escAttr(label)}</span>
+      <span class="health-v">${escAttr(value)}</span>
+    </div>`;
+  const tone = ok => ok ? "ok" : "bad";
+  const issues = Array.isArray(h.issues) ? h.issues.slice(0, 5) : [];
+  return `
+    <div class="settings-group">
+      <div class="section-head" style="padding: 0 4px 8px; display:flex; justify-content:space-between; align-items:baseline;">
+        <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">App Health</h3>
+        <button class="btn-ghost-sm" data-act="app-health-refresh" ${state.appHealthLoading ? "disabled" : ""}>${state.appHealthLoading ? "Checking…" : "Check"}</button>
+      </div>
+      <div class="health-grid">
+        ${cell("Worker", h.worker?.ok ? "OK" : "Check", tone(h.worker?.ok))}
+        ${cell("Firebase", ready.firebase_ready ? "OK" : "Issue", tone(ready.firebase_ready))}
+        ${cell("AI key", secret.gemini ? "OK" : "Missing", tone(secret.gemini))}
+        ${cell("Telegram", ready.telegram_ready ? "Ready" : "Setup", ready.telegram_ready ? "ok" : "warn")}
+        ${cell("Verdicts", ready.verdict_ready ? `${latest.verdict_count} rows` : "Missing", ready.verdict_ready ? "ok" : "warn")}
+        ${cell("Scan", latest.market_scan_at ? fmtRel(latest.market_scan_at) : "Missing", latest.market_scan_at ? "ok" : "warn")}
+      </div>
+      <div class="health-issues">
+        ${issues.length ? issues.map(i => `<div class="health-issue">${escAttr(i)}</div>`).join("") : `<div class="health-issue">No blocking issues reported.</div>`}
+        <div class="health-issue">Holdings ${h.counts?.non_cash_holdings ?? "—"} · Watchlist ${h.counts?.watchlist ?? "—"} · Alerts fired ${h.counts?.cron_fires ?? "—"} · Notifications ${notif.enabled ? "on" : "off"}</div>
+      </div>
+    </div>`;
+}
+
+function renderSignalLearningSection() {
+  if (!state.signalLearning && !state.signalLearningLoading) setTimeout(() => loadSignalLearning(false), 0);
+  const s = state.signalLearning || {};
+  const t = s.trades || {};
+  const a = s.alerts || {};
+  const cell = (label, value) => `
+    <div class="learning-cell">
+      <span class="learning-k">${escAttr(label)}</span>
+      <span class="learning-v">${escAttr(value)}</span>
+    </div>`;
+  const sources = Array.isArray(s.by_source) ? s.by_source.slice(0, 5) : [];
+  return `
+    <div class="settings-group">
+      <div class="section-head" style="padding: 0 4px 8px; display:flex; justify-content:space-between; align-items:baseline;">
+        <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Signal Learning</h3>
+        <button class="btn-ghost-sm" data-act="signal-learning-refresh" ${state.signalLearningLoading ? "disabled" : ""}>${state.signalLearningLoading ? "Reading…" : "Refresh"}</button>
+      </div>
+      <div class="learning-grid">
+        ${cell("Paper closed", t.closed_paper ?? "—")}
+        ${cell("Win rate", t.win_rate != null ? `${t.win_rate}%` : "—")}
+        ${cell("Avg P/L", t.avg_pnl_pct != null ? `${t.avg_pnl_pct}%` : "—")}
+        ${cell("Alerts", a.total ?? "—")}
+        ${cell("Last alert", a.last_at ? `${a.last_symbol || ""} ${fmtRel(a.last_at)}` : "—")}
+      </div>
+      <div class="learning-sources">
+        ${s.error ? `<div class="health-issue">${escAttr(s.error)}</div>` : ""}
+        ${sources.length ? sources.map(x => `
+          <div class="learning-source">
+            <strong>${escAttr(x.source)}</strong>
+            <span>${x.trades} trades · ${x.win_rate ?? "—"}% win · ${x.avg_pnl_pct ?? "—"}% avg</span>
+          </div>`).join("") : `<div class="health-issue">No closed paper trades yet. Log paper trades from ACT rows to start learning which signals work.</div>`}
+      </div>
+    </div>`;
+}
+
 function renderSettings() {
   $("#topbarTitle").textContent = "Settings";
   const view = $("#view");
@@ -14317,6 +14734,8 @@ function renderSettings() {
         <div><div class="lbl">Version</div><div class="sub">1.4.0</div></div>
       </div>
     </div>
+    ${renderAppHealthSection()}
+    ${renderSignalLearningSection()}
     ${renderInvestorProfileSection()}
     ${renderRiskSettings()}
     ${renderNotificationsSection()}
@@ -15784,6 +16203,18 @@ document.addEventListener("click", (e) => {
         state.marketScanHideSoft = !state.marketScanHideSoft;
         renderCurrentView();
         break;
+      case "set-ms-cap-filter":
+        state.marketScanCapFilter = target.dataset.filter || "all";
+        renderCurrentView();
+        break;
+      case "set-ms-setup-filter":
+        state.marketScanSetupFilter = target.dataset.filter || "all";
+        renderCurrentView();
+        break;
+      case "set-ms-sector-filter":
+        state.marketScanSectorFilter = target.dataset.filter || "all";
+        renderCurrentView();
+        break;
       case "open-asset-from-watch":  openAsset(symbol, "watchlist"); break;
       case "open-watch":             openWatchItem(symbol); break;
       case "back-watch":             backToWatchlist(); break;
@@ -15817,6 +16248,8 @@ document.addEventListener("click", (e) => {
       case "save-notifications":     saveNotifications(); break;
       case "test-notification":      sendTestNotification(); break;
       case "toggle-howto":           state.howtoOpen = !state.howtoOpen; renderSettings(); break;
+      case "app-health-refresh":     loadAppHealth(true); break;
+      case "signal-learning-refresh": loadSignalLearning(true); break;
       case "notif-toggle": {
         // Live-update the label text on the toggle without re-rendering.
         const span = target.parentElement?.querySelector("span");
