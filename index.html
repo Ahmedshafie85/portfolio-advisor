@@ -5888,6 +5888,45 @@ async function loadPortfolioAnalysis() {
   } catch (e) { state.portfolioAnalysis = null; }
 }
 
+// ============================================================================
+// v1.17 — CENTRAL PRICE FETCHER with crypto fallback.
+// WHY: BTC/ETH started returning no price ("— · —" in Settings), and because
+// holdingMetrics() returns value=null when there's no price, portfolioMetrics
+// silently EXCLUDED them from Total Value and the allocation strip — the
+// total no longer matched the book and nothing on screen said why.
+// The worker /price endpoint resolves equities/ETFs fine, but bare crypto
+// tickers can fail upstream (Yahoo quotes crypto as BTC-USD, not BTC).
+// Fix: if the plain symbol yields no usable price AND the symbol is crypto
+// (per holdings/watchlist asset_class, or the known-crypto list), retry as
+// SYM-USD and store the result under the ORIGINAL symbol so the rest of the
+// app is untouched.
+// ============================================================================
+function isCryptoSymbol(sym) {
+  const s = String(sym || "").toUpperCase();
+  if (state.holdings.some(h => h.symbol === s && h.asset_class === "crypto")) return true;
+  if (state.watchlist.some(w => w.symbol === s && w.asset_class === "crypto")) return true;
+  return ["BTC", "ETH", "SOL", "ADA", "DOT", "MATIC", "LINK", "AVAX", "DOGE", "XRP"].includes(s);
+}
+function isUsablePrice(p) {
+  return !!p && (p.current_price != null || (Array.isArray(p.ohlcv) && p.ohlcv.length > 0));
+}
+async function fetchPriceFor(symbol) {
+  const tryFetch = async (sym) => {
+    try {
+      const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(sym)}`);
+      if (!r.ok) return null;
+      const p = await r.json();
+      return isUsablePrice(p) ? p : null;
+    } catch (e) { return null; }
+  };
+  let p = await tryFetch(symbol);
+  if (!p && isCryptoSymbol(symbol) && !/-USD$/i.test(symbol)) {
+    p = await tryFetch(`${symbol}-USD`);
+  }
+  if (p) state.prices[symbol] = p;
+  return p;
+}
+
 async function refreshAllPrices() {
   // Build full price-fetch set:
   //   - All non-cash holdings
@@ -5900,10 +5939,7 @@ async function refreshAllPrices() {
   for (const w of state.watchlist) symbols.add(w.symbol);
   symbols.add("SPY"); // benchmark
   const promises = Array.from(symbols).map(sym =>
-    fetch(`${WORKER_URL}/price/${encodeURIComponent(sym)}`)
-      .then(r => r.json())
-      .then(p => { state.prices[sym] = p; })
-      .catch(e => console.warn("price fetch failed:", sym, e))
+    fetchPriceFor(sym).catch(e => console.warn("price fetch failed:", sym, e))
   );
   await Promise.all(promises);
 }
@@ -5933,11 +5969,7 @@ async function ensurePreSurgeData(onProgress) {
       const sym = work.shift();
       if (!sym) break;
       try {
-        const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(sym)}`);
-        if (r.ok) {
-          const p = await r.json();
-          state.prices[sym] = p;
-        }
+        await fetchPriceFor(sym); // v1.17 — crypto-aware fetch, stores into state.prices
       } catch (e) { /* tolerate failures */ }
       fetched++;
       if (onProgress) onProgress(fetched, missing.length);
@@ -6041,10 +6073,8 @@ async function getOhlcv(symbol) {
   if (state.prices[symbol] && state.prices[symbol].ohlcv) {
     data = state.prices[symbol];
   } else {
-    const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(symbol)}`);
-    if (!r.ok) throw new Error(`price fetch ${r.status}`);
-    data = await r.json();
-    state.prices[symbol] = data;
+    data = await fetchPriceFor(symbol); // v1.17 — crypto-aware fetch
+    if (!data) throw new Error("price fetch failed");
   }
   state.ohlcvCache[symbol] = { data, fetched_at: Date.now() };
   return data;
@@ -10045,6 +10075,20 @@ function renderPortfolio() {
 
     ${emptyStateHtml}
 
+    ${(() => {
+      // v1.17 — never silently drop holdings from the total. Any non-cash
+      // holding with no usable price is excluded from Total Value by
+      // portfolioMetrics; before this banner, that exclusion was invisible
+      // (the BTC/ETH incident: total quietly understated by their value).
+      const unpriced = state.holdings.filter(h =>
+        h.asset_class !== "cash" && holdingMetrics(h).value == null);
+      if (!unpriced.length) return "";
+      return `<div class="price-anomaly-banner">
+        ⚠ No live price for ${unpriced.map(h => escAttr(h.symbol)).join(", ")} — excluded from Total Value and allocation until a price loads.
+        <button class="btn-ghost-sm" data-act="retry-prices" style="margin-left:8px;">Retry prices</button>
+      </div>`;
+    })()}
+
     ${m.anomalyCount > 0 ? `<div class="price-anomaly-banner">
       ⚠ Price feed anomaly on ${m.anomalyCount} holding${m.anomalyCount === 1 ? '' : 's'} — today's portfolio change excludes them. Look for the ⚠ PRICE flag on affected rows. Verify those prices on your broker.
     </div>` : ""}
@@ -11098,10 +11142,8 @@ async function togglePreviewChart(symbol, name) {
     // Use cached price if we have it, else fetch
     let priceData = state.prices[symbol];
     if (!priceData || !priceData.ohlcv) {
-      const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(symbol)}`);
-      if (!r.ok) throw new Error(`fetch_${r.status}`);
-      priceData = await r.json();
-      state.prices[symbol] = priceData;
+      priceData = await fetchPriceFor(symbol); // v1.17 — crypto-aware fetch
+      if (!priceData) throw new Error("fetch_failed");
     }
     state.previewChart.data = priceData;
     state.previewChart.loading = false;
@@ -11352,9 +11394,8 @@ async function renderAssetDetail(symbol) {
       <div class="empty-state"><span class="spinner"></span><p style="margin-top:14px;">Loading data…</p></div>
     `;
     try {
-      const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(symbol)}`);
-      if (!r.ok) throw new Error(await r.text());
-      state.prices[symbol] = await r.json();
+      const p = await fetchPriceFor(symbol); // v1.17 — crypto-aware fetch
+      if (!p) throw new Error("No price data for this symbol");
       renderAssetDetail(symbol);
     } catch (e) {
       view.innerHTML = `
@@ -12274,9 +12315,8 @@ async function runAnalysis(symbol, opts = {}) {
     // legitimate but data-flaky assets (e.g. URNU.L showing 114% phantom gap).
     let preCheck = null;
     try {
-      const priceR = await fetch(`${WORKER_URL}/price/${encodeURIComponent(symbol)}`);
-      if (priceR.ok) {
-        const priceData = await priceR.json();
+      const priceData = await fetchPriceFor(symbol); // v1.17 — crypto-aware fetch
+      if (priceData) {
         preCheck = await runDataSanityCheck(symbol, priceData);
       }
     } catch (e) { /* sanity check is best-effort; if it fails we just proceed */ }
@@ -13424,9 +13464,8 @@ async function runPaperSimulation({ force = false } = {}) {
     // Fetch daily OHLC history for this symbol.
     let series = [];
     try {
-      const r = await fetch(`${WORKER_URL}/price/${encodeURIComponent(symbol)}`);
-      if (r.ok) {
-        const j = await r.json();
+      const j = await fetchPriceFor(symbol); // v1.17 — crypto-aware fetch
+      if (j) {
         // ohlcv is [{t, o, h, l, c, v}] — t is a unix-seconds timestamp.
         series = (j.ohlcv || []).map(bar => ({
           date: new Date(bar.t * 1000).toISOString().slice(0, 10),
@@ -15956,6 +15995,11 @@ document.addEventListener("click", (e) => {
         renderCurrentView();
         break;
       case "open-asset-from-watch":  openAsset(symbol, "watchlist"); break;
+      case "retry-prices":
+        // v1.17 — manual retry for symbols whose price feed failed.
+        target.disabled = true;
+        refreshAllPrices().then(() => renderCurrentView());
+        break;
       case "open-watch":             openWatchItem(symbol); break;
       case "back-watch":             backToWatchlist(); break;
       case "back-markets":           backToMarkets(); break;
