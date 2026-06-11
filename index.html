@@ -4376,6 +4376,19 @@ body {
   color: var(--accent); background: rgba(161,61,45,0.08);
   padding: 1px 8px; border-radius: 999px;
 }
+/* v1.17 — composite tier colors so the number reads at a glance */
+.ms-composite { font-size: 0.8rem; letter-spacing: .02em; white-space: nowrap; }
+.ms-composite-strong { color:#4a7a4a; background:rgba(74,122,74,0.12); }
+.ms-composite-good   { color:#b08d3c; background:rgba(176,141,60,0.12); }
+.ms-composite-early  { color:#6b7a9b; background:rgba(107,122,155,0.12); }
+.ms-composite-weak   { color:var(--ink-muted); background:rgba(120,120,120,0.10); }
+.ms-score-legend {
+  font-family:var(--mono); font-size:10px; color:var(--ink-muted);
+  margin:8px 0 0; letter-spacing:.02em;
+}
+.ms-score-legend .msl-strong { color:#4a7a4a; }
+.ms-score-legend .msl-good   { color:#b08d3c; }
+.ms-score-legend .msl-early  { color:#6b7a9b; }
 .ms-dc { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; }
 .ms-dc.pos { color: var(--green); }
 .ms-dc.neg { color: var(--red); }
@@ -4680,20 +4693,21 @@ body {
   letter-spacing:.06em;
   padding:7px 2px;
 }
-.ms-filter {
+.ms-filter-select {
   border:1px solid var(--rule);
-  border-radius:999px;
+  border-radius:8px;
   background:var(--bg);
-  color:var(--ink-muted);
+  color:var(--ink);
   font-family:var(--mono);
   font-size:11px;
-  padding:6px 9px;
+  padding:6px 24px 6px 9px;
   cursor:pointer;
-}
-.ms-filter.active {
-  background:var(--ink);
-  color:var(--bg);
-  border-color:var(--ink);
+  appearance:none;
+  -webkit-appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5'><path d='M0 0l4 5 4-5z' fill='%23999'/></svg>");
+  background-repeat:no-repeat;
+  background-position:right 8px center;
+  max-width:160px;
 }
 .ms-pipeline {
   display:flex;
@@ -13553,6 +13567,17 @@ function msComponent(row, key) {
   const score = Number(c?.score);
   return Number.isFinite(score) ? score : 0;
 }
+// v1.17 — composite tier labels. The raw 0–100 composite meant nothing on its
+// own. Bands align with the code's own gates: 55 is the quality bar used by
+// msIsActable / msInvestmentGate; ≥70 is where confirmed, high-quality setups
+// live; <40 is noise.
+function msScoreTier(score) {
+  const s = Number(score) || 0;
+  if (s >= 70) return { label: "STRONG", cls: "strong" };
+  if (s >= 55) return { label: "GOOD",   cls: "good" };
+  if (s >= 40) return { label: "EARLY",  cls: "early" };
+  return { label: "WEAK", cls: "weak" };
+}
 function msNum(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
@@ -13749,6 +13774,14 @@ function msCapBucket(row) {
   if (msTags(row).includes("mega-cap-demoted") || MS_MEGA_SYMBOLS.has(sym)) return "mega";
   return "large_mid";
 }
+// v1.17 — dropdown change handler for the desk filters (replaces pill taps).
+// Called inline from the <select onchange> so it must stay global.
+function msSetDeskFilter(which, value) {
+  if (which === "cap")    state.marketScanCapFilter    = value || "all";
+  if (which === "setup")  state.marketScanSetupFilter  = value || "all";
+  if (which === "sector") state.marketScanSectorFilter = value || "all";
+  renderCurrentView();
+}
 function msMatchesDeskFilters(row) {
   const cap = state.marketScanCapFilter || "all";
   const setup = state.marketScanSetupFilter || "all";
@@ -13820,15 +13853,18 @@ function renderMarketScannerCard() {
       ${escAttr(l.label)} <span class="ms-lane-count">${count}</span>
     </button>`;
   }).join("");
-  const capPill = (id, label) => `<button class="ms-filter ${state.marketScanCapFilter === id ? "active" : ""}" data-act="set-ms-cap-filter" data-filter="${escAttr(id)}">${escAttr(label)}</button>`;
-  const setupPill = (id, label) => `<button class="ms-filter ${state.marketScanSetupFilter === id ? "active" : ""}" data-act="set-ms-setup-filter" data-filter="${escAttr(id)}">${escAttr(label)}</button>`;
+  // v1.17 — desk filters are compact dropdowns. The old pill rows overflowed
+  // badly on mobile (Sector alone could spawn 12 buttons).
   const sectors = ["all", ...Array.from(new Set(preFilterResults.map(r => msSector(r.symbol)).filter(Boolean))).sort()];
-  const sectorPill = s => `<button class="ms-filter ${state.marketScanSectorFilter === s ? "active" : ""}" data-act="set-ms-sector-filter" data-filter="${escAttr(s)}">${escAttr(s === "all" ? "All sectors" : s)}</button>`;
+  const msSelect = (key, current, opts) => `
+    <select class="ms-filter-select" onchange="msSetDeskFilter('${key}', this.value)">
+      ${opts.map(([v, l]) => `<option value="${escAttr(v)}" ${current === v ? "selected" : ""}>${escAttr(l)}</option>`).join("")}
+    </select>`;
   const filterHtml = `
     <div class="ms-filters">
-      <div class="ms-filter-group"><span class="ms-filter-label">Market</span>${capPill("all","All")}${capPill("no_mega","No mega")}${capPill("less_obvious","Less obvious")}${capPill("mega","Mega")}</div>
-      <div class="ms-filter-group"><span class="ms-filter-label">Setup</span>${setupPill("all","Any")}${setupPill("momentum","Momentum")}${setupPill("pullback","Pullback")}${setupPill("catalyst","Catalyst")}${setupPill("rotation","Rotation")}</div>
-      <div class="ms-filter-group"><span class="ms-filter-label">Sector</span>${sectors.slice(0, 12).map(sectorPill).join("")}</div>
+      <div class="ms-filter-group"><span class="ms-filter-label">Market</span>${msSelect("cap", state.marketScanCapFilter || "all", [["all", "All"], ["no_mega", "No mega"], ["less_obvious", "Less obvious"], ["mega", "Mega"]])}</div>
+      <div class="ms-filter-group"><span class="ms-filter-label">Setup</span>${msSelect("setup", state.marketScanSetupFilter || "all", [["all", "Any"], ["momentum", "Momentum"], ["pullback", "Pullback"], ["catalyst", "Catalyst"], ["rotation", "Rotation"]])}</div>
+      <div class="ms-filter-group"><span class="ms-filter-label">Sector</span>${msSelect("sector", state.marketScanSectorFilter || "all", sectors.map(s => [s, s === "all" ? "All sectors" : s]))}</div>
     </div>`;
 
   const rows = visibleResults.map(r => {
@@ -13860,6 +13896,7 @@ function renderMarketScannerCard() {
     const sector = msSector(r.symbol);
     const why = msWhyNot(r, rd);
     const grade = String(r.quality_grade || "").toUpperCase();
+    const tier = msScoreTier(r.composite);
     const entryState = String(r.entry_state || "").replace(/_/g, " ");
     const gate = msInvestmentGate(r, fit);
     const adv = msNum(r.avg_dollar_vol_20d);
@@ -13877,7 +13914,7 @@ function renderMarketScannerCard() {
       <div class="ms-mid">
         <div class="ms-sym-row">
           <span class="ms-sym">${escAttr(r.symbol)}</span>
-          <span class="ms-composite">${Math.round(r.composite)}</span>
+          <span class="ms-composite ms-composite-${tier.cls}" title="Setup score out of 100 — ≥70 strong · 55–69 clears the quality bar · 40–54 early/building · <40 weak">${Math.round(r.composite)} ${tier.label}</span>
           ${dcHtml}
           ${held ? `<span class="presurge-tag held">held</span>` : ""}
           ${watched ? `<span class="presurge-tag watched">watched</span>` : ""}
@@ -13962,6 +13999,7 @@ function renderMarketScannerCard() {
       <div class="ms-desk-cell"><span class="ms-desk-k">Pullbacks</span><span class="ms-desk-v">${pullbackCount}</span></div>
       <div class="ms-desk-cell"><span class="ms-desk-k">Flow/catalyst</span><span class="ms-desk-v">${catalystCount}</span></div>
     </div>
+    <div class="ms-score-legend">Score /100 · <span class="msl-strong">≥70 strong</span> · <span class="msl-good">55–69 good</span> (clears quality bar) · <span class="msl-early">40–54 early</span> · &lt;40 weak</div>
 
     <div class="ms-lanes">${laneHtml}</div>
     ${filterHtml}
@@ -15251,6 +15289,30 @@ const debouncedSearchHold = debounce(async () => {
   } catch (e) { results.classList.add("hidden"); }
 }, 300);
 
+// ============================================================================
+// HOLDINGS ⇄ PORTFOLIO SYNC (v1.17)
+// Single path after ANY holdings mutation (add / edit / delete, from Settings
+// or asset detail). Previously each mutation did its own partial refresh:
+//   - edit jumped to renderAssetDetail() even when initiated from Settings,
+//     and never refreshed prices, so Portfolio kept stale values;
+//   - delete force-navigated to Portfolio, yanking the user out of Settings;
+//   - NONE of them touched the verdict layer, which is debounced 4 hours —
+//     so the Portfolio verdict zones (the main portfolio surface) kept
+//     showing the OLD book until the next app boot or a manual Refresh tap.
+// This helper reloads the book, refreshes prices, drops the verdict debounce,
+// repaints the CURRENT view (Settings stays Settings, asset detail stays put),
+// and force-runs the verdict in the background so Portfolio reflects the
+// change within seconds.
+// ============================================================================
+async function syncPortfolioAfterHoldingsChange() {
+  await loadHoldingsFromFirestore();
+  await refreshAllPrices();
+  state.verdictsAt = null;                  // kill the 4h debounce
+  localStorage.removeItem("verdictsAt_v2"); // and its persisted copy
+  renderCurrentView();                      // instant repaint with the new book
+  runVerdict(true).catch(() => {});         // fresh verdicts in the background
+}
+
 async function submitAddHolding() {
   const cls = $("#ah_class").value;
   if (cls === "cash") {
@@ -15271,9 +15333,7 @@ async function submitAddHolding() {
       toast("Cash added");
     }
     closeModal();
-    await loadHoldingsFromFirestore();
-    await refreshAllPrices();
-    renderCurrentView();
+    await syncPortfolioAfterHoldingsChange();
     return;
   }
   const symbol = $("#ah_symbol").value.trim().toUpperCase();
@@ -15289,9 +15349,7 @@ async function submitAddHolding() {
   }, { merge: true });
   toast("Holding added");
   closeModal();
-  await loadHoldingsFromFirestore();
-  await refreshAllPrices();
-  renderCurrentView();
+  await syncPortfolioAfterHoldingsChange();
 }
 
 // ============================================================================
@@ -15550,8 +15608,9 @@ async function submitEditHolding(symbol) {
   }
   toast("Updated");
   closeModal();
-  await loadHoldingsFromFirestore();
-  renderAssetDetail(symbol);
+  // v1.17 — was renderAssetDetail(symbol), which hijacked the screen when
+  // editing from Settings and skipped the price + verdict refresh entirely.
+  await syncPortfolioAfterHoldingsChange();
 }
 
 function confirmDeleteHolding(symbol) {
@@ -15562,9 +15621,12 @@ function confirmDeleteHolding(symbol) {
 async function deleteHolding(symbol) {
   await db.collection("users").doc(state.uid).collection("holdings").doc(symbol).delete();
   toast(`${symbol} removed`);
-  await loadHoldingsFromFirestore();
-  state.selectedSymbol = null;
-  setView("portfolio");
+  // v1.17 — stay where the user is (deleting from Settings keeps you in
+  // Settings). Only clear the selection if the asset detail page was showing
+  // the symbol that no longer exists; renderCurrentView() then falls back to
+  // the parent tab automatically.
+  if (state.selectedSymbol === symbol) state.selectedSymbol = null;
+  await syncPortfolioAfterHoldingsChange();
 }
 
 // Watchlist modals
@@ -15891,18 +15953,6 @@ document.addEventListener("click", (e) => {
         break;
       case "toggle-ms-soft":
         state.marketScanHideSoft = !state.marketScanHideSoft;
-        renderCurrentView();
-        break;
-      case "set-ms-cap-filter":
-        state.marketScanCapFilter = target.dataset.filter || "all";
-        renderCurrentView();
-        break;
-      case "set-ms-setup-filter":
-        state.marketScanSetupFilter = target.dataset.filter || "all";
-        renderCurrentView();
-        break;
-      case "set-ms-sector-filter":
-        state.marketScanSectorFilter = target.dataset.filter || "all";
         renderCurrentView();
         break;
       case "open-asset-from-watch":  openAsset(symbol, "watchlist"); break;
