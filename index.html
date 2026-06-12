@@ -5054,6 +5054,32 @@ function getRecStatus(recKey) {
   return state.recStatus[recKey]?.status || null;
 }
 
+const BAD_VERDICT_NOTE_RE = /AI verdict layer was unavailable|deterministic fallback|live price feeds did not respond|live price data missing|temporary rules-based/i;
+function verdictPayloadIsTransient(verdicts, note) {
+  const rows = Array.isArray(verdicts) ? verdicts : [];
+  return BAD_VERDICT_NOTE_RE.test(String(note || ""))
+    || rows.some(v => v && (v.fallback_reason || v._fallback_reason));
+}
+function clearVerdictCache() {
+  localStorage.removeItem("verdictsCache_v2");
+  localStorage.removeItem("portfolioNote_v2");
+  localStorage.removeItem("verdictsAt_v2");
+}
+function readVerdictCache() {
+  let verdicts = [];
+  let note = "";
+  let at = null;
+  try { verdicts = JSON.parse(localStorage.getItem("verdictsCache_v2") || "[]"); } catch (e) { verdicts = []; }
+  note = localStorage.getItem("portfolioNote_v2") || "";
+  at = localStorage.getItem("verdictsAt_v2") || null;
+  if (verdictPayloadIsTransient(verdicts, note)) {
+    clearVerdictCache();
+    return { verdicts: [], note: "", at: null };
+  }
+  return { verdicts, note, at };
+}
+const INITIAL_VERDICT_CACHE = readVerdictCache();
+
 const state = {
   uid: null,
   pinAttempts: 0,
@@ -5101,9 +5127,9 @@ const state = {
   // One verdict per holding (ACT/HOLD/WATCH) computed server-side from every
   // signal source. Cached in localStorage so the screen renders instantly on
   // app open; refreshed via /verdict on a 4h debounce.
-  verdicts: JSON.parse(localStorage.getItem("verdictsCache_v2") || "[]"),
-  portfolioNote: localStorage.getItem("portfolioNote_v2") || "",
-  verdictsAt: localStorage.getItem("verdictsAt_v2") || null,
+  verdicts: INITIAL_VERDICT_CACHE.verdicts,
+  portfolioNote: INITIAL_VERDICT_CACHE.note,
+  verdictsAt: INITIAL_VERDICT_CACHE.at,
   // Phase G — transient dict of verb changes per symbol from the most recent
   // /verdict call. Cleared 30s after the call returns. Used to highlight rows
   // whose verb shifted so the user notices fresh ACTs.
@@ -12662,10 +12688,17 @@ async function runVerdict(force = false) {
   }
 
   if (!force && state.verdictsAt) {
-    const age = Date.now() - new Date(state.verdictsAt).getTime();
-    const nonCashCount = state.holdings.filter(h => h.asset_class !== "cash").length;
-    const hasUsableCachedVerdicts = Array.isArray(state.verdicts) && (state.verdicts.length > 0 || nonCashCount === 0);
-    if (age < VERDICT_DEBOUNCE_MS && hasUsableCachedVerdicts) return;
+    if (verdictPayloadIsTransient(state.verdicts, state.portfolioNote)) {
+      state.verdicts = [];
+      state.portfolioNote = "";
+      state.verdictsAt = null;
+      clearVerdictCache();
+    } else {
+      const age = Date.now() - new Date(state.verdictsAt).getTime();
+      const nonCashCount = state.holdings.filter(h => h.asset_class !== "cash").length;
+      const hasUsableCachedVerdicts = Array.isArray(state.verdicts) && (state.verdicts.length > 0 || nonCashCount === 0);
+      if (age < VERDICT_DEBOUNCE_MS && hasUsableCachedVerdicts) return;
+    }
   }
 
   state.verdictsLoading = true;
@@ -12694,6 +12727,7 @@ async function runVerdict(force = false) {
     // doesn't linger past its usefulness.
     const prevBySym = new Map((state.verdicts || []).map(v => [v.symbol, v.verdict]));
     const newVerdicts = Array.isArray(j.verdicts) ? j.verdicts : [];
+    const transientVerdict = !!j._transient || !!j.fallback_reason || verdictPayloadIsTransient(newVerdicts, j.portfolio_note);
     state.verdictChanges = {};
     for (const v of newVerdicts) {
       const prev = prevBySym.get(v.symbol);
@@ -12713,10 +12747,14 @@ async function runVerdict(force = false) {
     }
     state.verdicts = newVerdicts;
     state.portfolioNote = String(j.portfolio_note || "");
-    state.verdictsAt = j.generated_at || new Date().toISOString();
-    localStorage.setItem("verdictsCache_v2", JSON.stringify(state.verdicts));
-    localStorage.setItem("portfolioNote_v2", state.portfolioNote);
-    localStorage.setItem("verdictsAt_v2", state.verdictsAt);
+    state.verdictsAt = transientVerdict ? null : (j.generated_at || new Date().toISOString());
+    if (transientVerdict) {
+      clearVerdictCache();
+    } else {
+      localStorage.setItem("verdictsCache_v2", JSON.stringify(state.verdicts));
+      localStorage.setItem("portfolioNote_v2", state.portfolioNote);
+      localStorage.setItem("verdictsAt_v2", state.verdictsAt);
+    }
   } catch (e) {
     if (force) errorToast("Verdict refresh", e);
   } finally {
@@ -13571,7 +13609,7 @@ async function runMarketScan(opts = {}) {
       exclude_symbols: [],
       focus_hint: state.marketScanFocus || undefined,
       discover_mode: opts.discover === true,
-      force: opts.discover === true || !state.marketScanFocus,
+      force: opts.force === true || opts.discover === true || !!state.marketScanFocus,
       write_reads: true,
     };
     const r = await fetch(`${WORKER_URL}/scan-market`, {
@@ -13869,6 +13907,10 @@ function renderMarketScannerCard() {
     if (activeLane === "actable") return msIsActable(r, reads[r.symbol]);
     return msRowMatchesLane(r, activeLane);
   });
+  const laneHadMatches = laneResults.length > 0;
+  if (!laneHadMatches && activeLane !== "all" && baseResults.length) {
+    laneResults = baseResults.slice();
+  }
   laneResults = laneResults
     .slice()
     .sort((a, b) => {
@@ -14016,8 +14058,8 @@ function renderMarketScannerCard() {
         <button class="ms-run secondary" onclick="runMarketScan({discover:true})" ${loading ? "disabled" : ""} title="Surface less obvious mid-cap names beyond the default list">
           ${loading ? "..." : "Deep discovery"}
         </button>
-        <button class="ms-run" onclick="runMarketScan()" ${loading ? "disabled" : ""}>
-          ${loading ? "Scanning..." : "Fresh scan"}
+        <button class="ms-run" onclick="runMarketScan()" ${loading ? "disabled" : ""} title="Load the stable prewarmed market scan">
+          ${loading ? "Loading..." : "Stable scan"}
         </button>
       </div>
     </div>
@@ -14048,20 +14090,21 @@ function renderMarketScannerCard() {
     </div>
 
     ${loading ? `
-      <div class="ms-loading">
-        <div class="ms-spinner"></div>
-        <span>Sweeping the market and scoring live data... (~40-70s)</span>
-      </div>` : ""}
+	      <div class="ms-loading">
+	        <div class="ms-spinner"></div>
+	        <span>${state.marketScanFocus || loading && state.marketScan === null ? "Sweeping the market and scoring live data... (~40-70s)" : "Loading the stable market scan..."}</span>
+	      </div>` : ""}
 
+    ${!loading && !laneHadMatches && activeLane !== "all" && baseResults.length ? `<div class="ms-note">No pure ${escAttr(MARKET_SCAN_LANES.find(l => l.id === activeLane)?.label || activeLane)} setups right now; showing the strongest watch candidates instead.</div>` : ""}
     ${!loading && scan?.scan_note ? `<div class="ms-note">${escAttr(scan.scan_note)}</div>` : ""}
 
     ${!loading && visibleResults.length ? `<div class="ms-list">${rows}</div>` : ""}
 
     ${!loading && scan && !visibleResults.length ? `
-      <div class="ms-empty">No clean setups in this lane. Try Momentum leaders, show softer rows, or run a focused scan for a theme you care about.</div>` : ""}
+      <div class="ms-empty">No candidates passed the current filters. Switch Market to All, show softer rows, or run a focused scan for a theme you care about.</div>` : ""}
 
     ${!loading && !scan ? `
-      <div class="ms-empty">Tap "Fresh scan" to sweep the market, or "Deep discovery" for less obvious mid-cap setups.</div>` : ""}
+      <div class="ms-empty">Tap "Stable scan" to load the prewarmed market sweep, or "Deep discovery" for less obvious mid-cap setups.</div>` : ""}
 
     ${ranAt && !loading ? `
       <div class="ms-footer">
