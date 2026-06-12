@@ -12747,10 +12747,13 @@ async function runVerdict(force = false) {
     }
     state.verdicts = newVerdicts;
     state.portfolioNote = String(j.portfolio_note || "");
-    state.verdictsAt = transientVerdict ? null : (j.generated_at || new Date().toISOString());
     if (transientVerdict) {
+      state.verdicts = [];
+      state.portfolioNote = "";
+      state.verdictsAt = null;
       clearVerdictCache();
     } else {
+      state.verdictsAt = j.generated_at || new Date().toISOString();
       localStorage.setItem("verdictsCache_v2", JSON.stringify(state.verdicts));
       localStorage.setItem("portfolioNote_v2", state.portfolioNote);
       localStorage.setItem("verdictsAt_v2", state.verdictsAt);
@@ -13650,14 +13653,20 @@ function msComponent(row, key) {
 // live; <40 is noise.
 function msScoreTier(score) {
   const s = Number(score) || 0;
-  if (s >= 70) return { label: "STRONG", cls: "strong" };
-  if (s >= 55) return { label: "GOOD",   cls: "good" };
-  if (s >= 40) return { label: "EARLY",  cls: "early" };
-  return { label: "WEAK", cls: "weak" };
+  if (s >= 75) return { label: "PRIME", cls: "strong" };
+  if (s >= 60) return { label: "PRE-SURGE", cls: "good" };
+  if (s >= 45) return { label: "WATCH", cls: "early" };
+  return { label: "EARLY", cls: "weak" };
 }
 function msNum(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+function msPrimaryScore(row) {
+  return msNum(row?.opportunity_score) ?? msNum(row?.composite) ?? 0;
+}
+function msActionabilityScore(row) {
+  return msNum(row?.actionability_score) ?? 0;
 }
 function msTags(row) {
   return Array.isArray(row?.tags) ? row.tags : [];
@@ -13665,7 +13674,8 @@ function msTags(row) {
 function msIsActable(row, read) {
   if (!row || row._soft) return false;
   if (row.entry_state) return row.entry_state === "actionable";
-  const composite = msNum(row.composite) ?? 0;
+  const composite = msPrimaryScore(row);
+  const actionability = msActionabilityScore(row);
   const rr = msRiskReward(row);
   const rsi = msNum(row.rsi14);
   const day = msNum(row.day_change_pct);
@@ -13676,7 +13686,7 @@ function msIsActable(row, read) {
   const entryOk = rr != null && rr >= 2;
   const notExtended = rsi == null || rsi < 72;
   const notSellingOff = day == null || day > -3;
-  return composite >= 55 && trendOk && entryOk && notExtended && notSellingOff;
+  return actionability >= 72 && composite >= 55 && trendOk && (entryOk || rr == null) && notExtended && notSellingOff;
 }
 function msLaneFor(row) {
   const tags = msTags(row);
@@ -13773,7 +13783,10 @@ function msWhyNot(row, read) {
   const rsi = msNum(row.rsi14);
   const day = msNum(row.day_change_pct);
   const ret20 = msNum(row.return_20d);
+  const stage = String(row.opportunity_stage || "");
   if (msIsActable(row, read)) return "Actable research setup: confirm levels, size small, and respect invalidation.";
+  if (stage === "pre_surge") return "Pre-surge footprint: worth workup now, but wait for entry confirmation before sizing.";
+  if (stage === "watch") return "Watch candidate: useful footprint, not enough entry quality yet.";
   if (row.entry_state === "building") return "Building setup: good candidate, but wait for confirmation before sizing.";
   if (row.entry_state === "needs_levels") return "Research only: support/resistance is not clean enough to size yet.";
   if (row.entry_state === "bad_rr") return "Not actable yet: reward/risk is below 2:1 from here.";
@@ -13783,7 +13796,7 @@ function msWhyNot(row, read) {
   if (row.trend !== "above_200ma" && (ret20 == null || ret20 <= 0)) return "Not actable yet: trend is not confirmed.";
   if (rsi != null && rsi >= 72) return "Not actable yet: extended. Prefer pullback or breakout retest.";
   if (rr != null && rr < 2) return "Not actable yet: reward/risk is below 2:1 from here.";
-  if (row._soft) return "Watch only: softer fallback. Wait for a stronger signal.";
+  if (row._soft) return "Early/soft: keep on radar, but require a stronger footprint.";
   if (!read) return "Research step: run Analyze before turning this screen into a trade.";
   return "Next step: watch confirmation, entry zone, and invalidation before sizing.";
 }
@@ -13802,7 +13815,8 @@ function msInvestmentGate(row, fit = null) {
   const rsi = msNum(row.rsi14);
   const day = msNum(row.day_change_pct);
   const ret20 = msNum(row.return_20d);
-  const composite = msNum(row.composite) ?? 0;
+  const composite = msPrimaryScore(row);
+  const actionability = msActionabilityScore(row);
   const adv = msNum(row.avg_dollar_vol_20d);
   const tags = msTags(row);
   const held = state.holdings.some(h => h.symbol === row.symbol && h.asset_class !== "cash");
@@ -13816,30 +13830,30 @@ function msInvestmentGate(row, fit = null) {
     if (ok) score += weight;
   };
 
-  add(composite >= 55, 16, "score clears quality bar", "score is still early");
-  add(row.entry_state === "actionable" || row.entry_state === "building" || msIsActable(row, null), 18, "entry state is usable", "entry state is not usable");
-  add(rr != null && rr >= minRR, 18, `R:R ${rr != null ? rr.toFixed(1) : "—"}:1 meets ${minRR}:1`, rr == null ? "R:R needs clean levels" : `R:R ${rr.toFixed(1)}:1 below ${minRR}:1`);
-  add(row.trend === "above_200ma" || ret20 > 0 || row.optflow_bullish === true, 14, "trend/turn is constructive", "trend is not confirmed");
+  add(composite >= 60, 22, "strong opportunity footprint", "opportunity footprint still early");
+  add(actionability >= 65 || row.entry_state === "actionable", 18, "entry quality is close", "entry still needs confirmation");
+  add(rr == null || rr >= Math.min(minRR, 1.5), 14, rr == null ? "levels need work, not rejection" : `R:R ${rr.toFixed(1)}:1 workable`, `R:R ${rr.toFixed(1)}:1 too poor`);
+  add(row.trend === "above_200ma" || ret20 > 0 || row.optflow_bullish === true, 16, "trend/turn is constructive", "trend is not confirmed");
   add(day == null || day > -3, 10, "not selling off today", "selling off today");
-  add(rsi == null || (rsi >= 35 && rsi < 72), 8, "RSI not stretched", "RSI is stretched/weak");
-  add(adv == null || adv >= 5_000_000, 8, "liquidity acceptable", "liquidity too thin");
-  add(actualFit.tone !== "warn", 8, "portfolio fit acceptable", "portfolio fit is crowded/held");
+  add(rsi == null || (rsi >= 35 && rsi < 72), 8, "RSI usable", "RSI is stretched/weak");
+  add(adv == null || adv >= 5_000_000, 6, "liquidity acceptable", "liquidity too thin");
+  add(actualFit.tone !== "warn", 6, "portfolio fit acceptable", "portfolio fit is crowded/held");
 
   if (tags.includes("bullish-flow") || tags.includes("volume-surge") || tags.includes("rs-leader") || tags.includes("coiled")) score += 4;
   if (row._soft) score -= 10;
   score = Math.max(0, Math.min(100, Math.round(score)));
 
-  let label = "REJECT", tone = "reject";
-  if (score >= 78) { label = "IC PASS"; tone = "pass"; }
-  else if (score >= 62) { label = "WORKUP"; tone = "workup"; }
-  else if (score >= 45) { label = "WATCH"; tone = "workup"; }
+  let label = "EARLY", tone = "reject";
+  if (score >= 76) { label = "READY"; tone = "pass"; }
+  else if (score >= 58) { label = "WORKUP"; tone = "workup"; }
+  else if (score >= 40) { label = "WATCH"; tone = "workup"; }
 
-  const blockers = checks.filter(x => /below|needs|not|selling|stretched|thin|crowded|early/.test(x)).slice(0, 2);
+  const blockers = checks.filter(x => /poor|needs|not|selling|stretched|thin|crowded|early|confirmation/.test(x)).slice(0, 2);
   return {
     score,
     label,
     tone,
-    primary: blockers[0] || checks[0] || "candidate passed core gate",
+    primary: row.score_reason || blockers[0] || checks[0] || "candidate passed core gate",
   };
 }
 
@@ -13911,17 +13925,17 @@ function renderMarketScannerCard() {
   if (!laneHadMatches && activeLane !== "all" && baseResults.length) {
     laneResults = baseResults.slice();
   }
-  laneResults = laneResults
-    .slice()
-    .sort((a, b) => {
-      const ga = msInvestmentGate(a);
-      const gb = msInvestmentGate(b);
-      return (gb.score - ga.score) || ((msNum(b.composite) ?? 0) - (msNum(a.composite) ?? 0));
-    });
+	  laneResults = laneResults
+	    .slice()
+	    .sort((a, b) => {
+	      const ga = msInvestmentGate(a);
+	      const gb = msInvestmentGate(b);
+	      return (msPrimaryScore(b) - msPrimaryScore(a)) || (gb.score - ga.score);
+	    });
   const visibleResults = laneResults.slice(0, 20);
   const softCount = results.filter(r => r._soft).length;
   const actableCount = results.filter(r => msIsActable(r, reads[r.symbol])).length;
-  const highCount = results.filter(r => !r._soft && msInvestmentGate(r).score >= 78).length;
+  const highCount = results.filter(r => !r._soft && msInvestmentGate(r).score >= 76).length;
   const pullbackCount = results.filter(r => msRowMatchesLane(r, "pullback")).length;
   const catalystCount = results.filter(r => msRowMatchesLane(r, "catalyst")).length;
   const laneHtml = MARKET_SCAN_LANES.map(l => {
@@ -13971,15 +13985,17 @@ function renderMarketScannerCard() {
       ? `<span class="ms-dc ${dc >= 0 ? "pos" : "neg"}">${dc >= 0 ? "+" : ""}${dc.toFixed(1)}%</span>` : "";
     const held = state.holdings.some(h => h.symbol === r.symbol && h.asset_class !== "cash");
     const watched = state.watchlist.some(w => w.symbol === r.symbol);
-    const fit = msPortfolioFit(r, held, watched);
-    const rr = msRiskReward(r);
-    const setupLabel = msSetupLabel(r);
-    const sector = msSector(r.symbol);
-    const why = msWhyNot(r, rd);
-    const grade = String(r.quality_grade || "").toUpperCase();
-    const tier = msScoreTier(r.composite);
-    const entryState = String(r.entry_state || "").replace(/_/g, " ");
-    const gate = msInvestmentGate(r, fit);
+	    const fit = msPortfolioFit(r, held, watched);
+	    const rr = msRiskReward(r);
+	    const setupLabel = msSetupLabel(r);
+	    const sector = msSector(r.symbol);
+	    const why = msWhyNot(r, rd);
+	    const grade = String(r.quality_grade || "").toUpperCase();
+	    const primaryScore = msPrimaryScore(r);
+	    const tier = msScoreTier(primaryScore);
+	    const entryState = String(r.entry_state || "").replace(/_/g, " ");
+	    const gate = msInvestmentGate(r, fit);
+	    const stage = String(r.opportunity_stage || "").replace(/_/g, " ");
     const adv = msNum(r.avg_dollar_vol_20d);
     const isAnalyzing = !!(state.analyzingSymbols && state.analyzingSymbols[r.symbol]);
     const of = r.options_flow;
@@ -13995,7 +14011,7 @@ function renderMarketScannerCard() {
       <div class="ms-mid">
         <div class="ms-sym-row">
           <span class="ms-sym">${escAttr(r.symbol)}</span>
-          <span class="ms-composite ms-composite-${tier.cls}" title="Setup score out of 100 — ≥70 strong · 55–69 clears the quality bar · 40–54 early/building · <40 weak">${Math.round(r.composite)} ${tier.label}</span>
+	          <span class="ms-composite ms-composite-${tier.cls}" title="Opportunity score: trend + footprint + entry quality">${Math.round(primaryScore)} ${tier.label}</span>
           ${dcHtml}
           ${held ? `<span class="presurge-tag held">held</span>` : ""}
           ${watched ? `<span class="presurge-tag watched">watched</span>` : ""}
@@ -14006,7 +14022,8 @@ function renderMarketScannerCard() {
           <span class="ms-meta good">${escAttr(setupLabel)}</span>
           <span class="ms-meta">${escAttr(sector)}</span>
           <span class="ms-meta ${msCapBucket(r) === "mega" ? "warn" : "good"}">${escAttr(msCapBucket(r).replace(/_/g, " "))}</span>
-          <span class="ms-meta ${escAttr(gate.tone)}">${escAttr(gate.label)} ${gate.score}</span>
+	          <span class="ms-meta ${escAttr(gate.tone)}">${escAttr(gate.label)} ${gate.score}</span>
+	          ${stage ? `<span class="ms-meta good">${escAttr(stage)}</span>` : ""}
           ${grade ? `<span class="ms-meta ${grade === "A" || grade === "B" ? "good" : "warn"}">Grade ${escAttr(grade)}</span>` : ""}
           ${entryState ? `<span class="ms-meta ${r.entry_state === "actionable" ? "good" : r.entry_state === "bad_rr" || r.entry_state === "falling" ? "warn" : ""}">${escAttr(entryState)}</span>` : ""}
           ${rr != null ? `<span class="ms-meta ${rr >= 2 ? "good" : "warn"}">R:R ${rr.toFixed(1)}:1</span>` : ""}
@@ -14019,7 +14036,7 @@ function renderMarketScannerCard() {
         ${tagHtml ? `<div class="ms-tags">${tagHtml}</div>` : ""}
         ${msPipelineHtml(r, rd, held, watched)}
         <div class="ms-fit">
-          <div class="ms-fit-box"><span class="ms-fit-k">Investment gate</span><span class="ms-fit-v ${escAttr(gate.tone === "pass" ? "good" : gate.tone === "reject" ? "bad" : "")}">${escAttr(gate.primary)}</span></div>
+	          <div class="ms-fit-box"><span class="ms-fit-k">Why surfaced</span><span class="ms-fit-v ${escAttr(gate.tone === "pass" ? "good" : gate.tone === "reject" ? "bad" : "")}">${escAttr(gate.primary)}</span></div>
           <div class="ms-fit-box"><span class="ms-fit-k">Portfolio fit</span><span class="ms-fit-v ${escAttr(fit.tone)}">${escAttr(fit.label)}</span></div>
           <div class="ms-fit-box"><span class="ms-fit-k">Entry quality</span><span class="ms-fit-v">${escAttr(why)}</span></div>
         </div>
@@ -14076,11 +14093,11 @@ function renderMarketScannerCard() {
 
     <div class="ms-desk">
       <div class="ms-desk-cell"><span class="ms-desk-k">Actable</span><span class="ms-desk-v">${actableCount}</span></div>
-      <div class="ms-desk-cell"><span class="ms-desk-k">IC pass</span><span class="ms-desk-v">${highCount}</span></div>
+	      <div class="ms-desk-cell"><span class="ms-desk-k">Ready</span><span class="ms-desk-v">${highCount}</span></div>
       <div class="ms-desk-cell"><span class="ms-desk-k">Pullbacks</span><span class="ms-desk-v">${pullbackCount}</span></div>
       <div class="ms-desk-cell"><span class="ms-desk-k">Flow/catalyst</span><span class="ms-desk-v">${catalystCount}</span></div>
     </div>
-    <div class="ms-score-legend">Score /100 · <span class="msl-strong">≥70 strong</span> · <span class="msl-good">55–69 good</span> (clears quality bar) · <span class="msl-early">40–54 early</span> · &lt;40 weak</div>
+	    <div class="ms-score-legend">Opportunity /100 · <span class="msl-strong">≥75 prime</span> · <span class="msl-good">60–74 pre-surge</span> · <span class="msl-early">45–59 watch</span> · &lt;45 early</div>
 
     <div class="ms-lanes">${laneHtml}</div>
     ${filterHtml}
