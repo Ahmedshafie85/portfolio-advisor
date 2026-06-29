@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#1a1814" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Portfolio" />
-<title>Portfolio Advisor</title>
+<meta name="apple-mobile-web-app-title" content="Opportunities" />
+<title>Opportunity Tester</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 
@@ -87,7 +87,7 @@ body {
 
 .tabs {
   position: fixed; bottom: 0; left: 0; right: 0;
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(3, 1fr);
   background: var(--bg);
   border-top: 1px solid var(--rule);
   padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
@@ -4317,7 +4317,7 @@ body {
 .ms-lane.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .ms-lane-count { font-family: var(--mono); opacity: 0.72; margin-left: 3px; }
 .ms-desk {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px; margin: 0 0 12px;
 }
 .ms-desk-cell {
@@ -4730,18 +4730,50 @@ body {
   color:var(--green);
   border-color:rgba(74,122,74,.4);
 }
+.ms-paper-plan {
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:6px;
+  margin:8px 0;
+}
+.ms-paper-cell {
+  border:1px solid var(--rule-soft);
+  border-radius:8px;
+  background:rgba(74,122,74,.06);
+  padding:7px 8px;
+  min-width:0;
+}
+.ms-paper-k {
+  display:block;
+  font-family:var(--mono);
+  font-size:9.5px;
+  color:var(--ink-muted);
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+.ms-paper-v {
+  display:block;
+  margin-top:2px;
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--ink);
+  white-space:nowrap;
+}
+@media (max-width: 560px) {
+  .ms-paper-plan { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 /* ===== END MARKET SCANNER STYLES ===== */
 </style>
 </head>
 <body>
 
 <div class="loader-screen" id="loader">
-  <div class="loader-logo">Portfolio</div>
+  <div class="loader-logo">Opportunity</div>
   <div class="loader-bar"></div>
 </div>
 
 <div class="pin-screen hidden" id="pinScreen">
-  <div class="pin-logo">Portfolio</div>
+  <div class="pin-logo">Opportunity</div>
   <div class="pin-tag">Advisor</div>
   <div class="pin-prompt" id="pinPrompt">Enter your 4-digit PIN</div>
   <div class="pin-dots" id="pinDots">
@@ -4754,7 +4786,7 @@ body {
 
 <div class="auth-screen hidden" id="authScreen">
   <div class="auth-card">
-    <div class="auth-logo">Portfolio</div>
+    <div class="auth-logo">Opportunity</div>
     <div class="auth-tag">Sign in to sync across devices</div>
     <div id="authMode" class="auth-tabs">
       <button class="auth-tab active" data-act="auth-tab" data-mode="signin">Sign In</button>
@@ -4789,7 +4821,7 @@ body {
 <div class="app hidden" id="app">
   <div class="topbar">
     <div>
-      <div class="topbar-title" id="topbarTitle">Portfolio</div>
+      <div class="topbar-title" id="topbarTitle">Discover</div>
       <div class="topbar-meta" id="topbarMeta">—</div>
     </div>
     <div class="topbar-icons">
@@ -4805,12 +4837,7 @@ body {
   <div class="view" id="view"></div>
 
   <div class="tabs" id="tabs">
-    <button class="tab active" data-view="portfolio">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
-      </svg>Portfolio
-    </button>
-    <button class="tab" data-view="discover">
+    <button class="tab active" data-view="discover">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
       </svg>Discover
@@ -4848,7 +4875,7 @@ function showBootError(msg) {
   const loader = document.getElementById("loader");
   if (loader) {
     loader.innerHTML = `
-      <div style="font-family: serif; font-size: 24px; margin-bottom: 18px;">Portfolio</div>
+      <div style="font-family: serif; font-size: 24px; margin-bottom: 18px;">Opportunity</div>
       <div style="font-family: monospace; font-size: 12px; color: #a13d2d; padding: 16px; max-width: 90%; word-break: break-word; line-height: 1.5; background: rgba(161,61,45,0.08); border-radius: 8px; margin: 0 20px;">
         <b>Boot error:</b><br>${String(msg).slice(0, 400)}
       </div>
@@ -5083,7 +5110,7 @@ const INITIAL_VERDICT_CACHE = readVerdictCache();
 const state = {
   uid: null,
   pinAttempts: 0,
-  currentView: "portfolio",
+  currentView: "discover",
   holdings: [],
   prices: {},
   analyses: {},
@@ -5640,20 +5667,14 @@ async function ensureAuth() {
 async function loadInitialData() {
   await ensureAuth();
   await loadHoldingsFromFirestore();
-  if (state.holdings.length === 0) await seedHoldings();
   await loadInvestorProfile();
   await loadAnalysesFromFirestore();
-  await loadPortfolioAnalysis();
   await loadWatchlist();
   if (state.watchlist.length === 0) await seedWatchlist();
-  await loadTriggers();
-  await loadNotifications();
   await refreshAllPrices();
   renderCurrentView();
   // Background scan after first render
   setTimeout(() => runScan().catch(() => {}), 1500);
-  // Phase C — unified verdict on first load. Debounced to 4h.
-  setTimeout(() => runVerdict(false).catch(() => {}), 4500);
   // Phase R — paper-trade exit simulation on first load. Cooldown 6h via
   // localStorage. Replays every open paper trade against its symbol's daily
   // OHLC history and closes any that hit target/stop/timeout.
@@ -5669,15 +5690,6 @@ async function loadInitialData() {
     }).catch(() => {});
   }, 5500);
 
-  // ROUND 1+1.5 AUTO-REFRESH:
-  // The verdict math depends on 5 signal sources — Daily Scan (always runs),
-  // AI Analyses (per-symbol manual), Macro, Pre-Surge, News, ETF momentum.
-  // The latter three previously only ran when the user pressed buttons, which
-  // meant the verdict was usually computed with 2-of-5 signals missing.
-  // Auto-run each one in the background after first render. Each fetcher has
-  // its own cache (Macro 6h, Pre-Surge 12h, News ~6h, ETF leaderboard ~24h)
-  // so this is cheap on repeat opens.
-  setTimeout(() => { autoRefreshSignals().catch(e => console.warn("auto-refresh:", e)); }, 2000);
 }
 
 // Background-fetch every signal the verdict depends on. Each individual
@@ -7925,15 +7937,14 @@ function computePortfolioRisk() {
 // VIEWS
 // ============================================================================
 // ----------------------------------------------------------------------------
-// Router — 3 top-level views:
-//   portfolio, discover, settings.
-// Legacy view names (markets, watchlist, signals, news, bot, journal, scans)
-// are remapped to current homes so old setView() calls and deep links keep
-// working. Discover holds Watchlist + Pre-Surge scanner (no sub-tabs).
+// Router — lean top-level views:
+//   discover, journal, settings.
+// Legacy/portfolio routes are remapped to Discover so the app stays focused on
+// opportunities and paper-test feedback.
 // ----------------------------------------------------------------------------
 function renderCurrentView() {
   const v = state.currentView;
-  if (v === "portfolio") return renderPortfolio();
+  if (v === "portfolio") { state.currentView = "discover"; return renderDiscover(); }
   if (v === "discover")  return renderDiscover();
   if (v === "journal")   return renderJournal();
   if (v === "settings")  return renderSettings();
@@ -7941,23 +7952,22 @@ function renderCurrentView() {
   // stale localStorage state doesn't break the app on first load.
   if (v === "markets" || v === "watchlist") { state.currentView = "discover"; return renderDiscover(); }
   if (v === "signals" || v === "news" || v === "bot" || v === "scans") {
-    state.currentView = "portfolio";
-    return renderPortfolio();
+    state.currentView = "discover";
+    return renderDiscover();
   }
-  state.currentView = "portfolio";
-  renderPortfolio();
+  state.currentView = "discover";
+  renderDiscover();
 }
 function setView(v) {
-  // Remap legacy view names to the new 3-tab structure (Portfolio, Discover,
-  // Settings). Anything that used to live under Signals now redirects to
-  // Portfolio — the verdict layer covers the same ground.
+  // Remap legacy view names to the lean 3-tab structure.
   const LEGACY_TO_NEW = {
     markets:   { view: "discover", sub: "watchlist" },
     watchlist: { view: "discover", sub: "watchlist" },
-    news:      { view: "portfolio" },
-    bot:       { view: "portfolio" },
-    signals:   { view: "portfolio" },
-    scans:     { view: "portfolio" },
+    portfolio: { view: "discover" },
+    news:      { view: "discover" },
+    bot:       { view: "discover" },
+    signals:   { view: "discover" },
+    scans:     { view: "discover" },
   };
   const mapped = LEGACY_TO_NEW[v];
   if (mapped) {
@@ -11451,7 +11461,7 @@ async function renderAssetDetail(symbol) {
         <div class="pos-row"><span class="lbl">${isCash ? 'Value' : 'Cost Basis'}</span><span class="val">$${fmtUSD(holding.avg_cost_total, 0)}</span></div>
         ${!isCash ? `<div class="pos-row"><span class="lbl">Current Value</span><span class="val">$${fmtUSD(hm.value, 0)}</span></div>
         <div class="pos-row"><span class="lbl">Unrealized P&L</span><span class="val ${hm.pnlAbs >= 0 ? 'pos' : 'neg'}">${hm.pnlAbs >= 0 ? '+' : ''}$${fmtUSD(Math.abs(hm.pnlAbs), 0)} · ${fmtPct(hm.pnlPct)}</span></div>
-        <div class="pos-row"><span class="lbl">% of Portfolio</span><span class="val">${pctOfPort != null ? pctOfPort.toFixed(1) + '%' : '—'}</span></div>` : ''}
+        <div class="pos-row"><span class="lbl">% of Holdings</span><span class="val">${pctOfPort != null ? pctOfPort.toFixed(1) + '%' : '—'}</span></div>` : ''}
         <div class="pos-actions">
           <button class="btn btn-secondary btn-sm" data-act="edit-holding" data-symbol="${escAttr(symbol)}">Edit</button>
           <button class="btn btn-danger btn-sm" data-act="delete-holding" data-symbol="${escAttr(symbol)}">Remove</button>
@@ -13451,7 +13461,16 @@ function closeEvent(status, exitPrice, exitDate, holdDays, entry, isBullish, rea
   };
 }
 
-
+function ohlcvDateString(t) {
+  const n = Number(t);
+  if (Number.isFinite(n)) {
+    const ms = n > 1e12 ? n : n * 1000;
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  }
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
 
 // ============================================================================
 // ORCHESTRATOR — runs the simulation across all open paper trades.
@@ -13507,11 +13526,11 @@ async function runPaperSimulation({ force = false } = {}) {
     try {
       const j = await fetchPriceFor(symbol); // v1.17 — crypto-aware fetch
       if (j) {
-        // ohlcv is [{t, o, h, l, c, v}] — t is a unix-seconds timestamp.
+        // Worker feeds can return either Unix seconds or milliseconds.
         series = (j.ohlcv || []).map(bar => ({
-          date: new Date(bar.t * 1000).toISOString().slice(0, 10),
+          date: ohlcvDateString(bar.t),
           high: bar.h, low: bar.l, close: bar.c,
-        })).filter(b => b.high != null && b.low != null);
+        })).filter(b => b.date && b.high != null && b.low != null);
       }
     } catch (e) {
       console.warn("paper-sim price fetch failed for", symbol, e);
@@ -13634,6 +13653,7 @@ async function runMarketScan(opts = {}) {
 }
 
 const MARKET_SCAN_LANES = [
+  { id: "paper", label: "Paper-ready" },
   { id: "actable", label: "Actable" },
   { id: "all", label: "All" },
   { id: "momentum", label: "Momentum leaders" },
@@ -13688,6 +13708,44 @@ function msIsActable(row, read) {
   const notSellingOff = day == null || day > -3;
   return actionability >= 72 && composite >= 55 && trendOk && (entryOk || rr == null) && notExtended && notSellingOff;
 }
+function msPaperTimeframe(row) {
+  const stage = String(row?.opportunity_stage || "");
+  if (stage === "actionable") return 30;
+  if (stage === "pre_surge") return 45;
+  return 30;
+}
+function msPaperTestPlan(row, gate = null) {
+  const actualGate = gate || msInvestmentGate(row);
+  const minRR = Number(state.investorProfile?.min_reward_risk) || 2.0;
+  const price = msNum(row?.current_price);
+  const support = msNum(row?.nearest_support);
+  const resistance = msNum(row?.nearest_resistance);
+  const rr = msRiskReward(row);
+  const day = msNum(row?.day_change_pct);
+  const rsi = msNum(row?.rsi14);
+
+  if (row?._soft) return { ok: false, reason: "soft candidate" };
+  if (actualGate.score < 76) return { ok: false, reason: "not Ready yet" };
+  if (row?.entry_state && row.entry_state !== "actionable") return { ok: false, reason: "entry not actionable" };
+  if (!(price > 0)) return { ok: false, reason: "missing live price" };
+  if (!(support > 0 && support < price)) return { ok: false, reason: "missing clean support" };
+  if (!(resistance > price)) return { ok: false, reason: "missing clean target" };
+  if (!(rr != null && rr >= minRR)) return { ok: false, reason: `R:R below ${minRR.toFixed(1)}:1` };
+  if (day != null && day <= -3) return { ok: false, reason: "selling off today" };
+  if (rsi != null && rsi >= 72) return { ok: false, reason: "extended" };
+
+  return {
+    ok: true,
+    entry: price,
+    target: resistance,
+    stop: support,
+    rr,
+    days: msPaperTimeframe(row),
+  };
+}
+function msIsPaperReady(row) {
+  return msPaperTestPlan(row).ok;
+}
 function msLaneFor(row) {
   const tags = msTags(row);
   const ret20 = msNum(row.return_20d);
@@ -13710,6 +13768,7 @@ function msLaneFor(row) {
   return "all";
 }
 function msRowMatchesLane(row, lane) {
+  if (lane === "paper") return msIsPaperReady(row);
   if (lane === "actable") return msIsActable(row, null);
   if (!lane || lane === "all") return true;
   const primary = msLaneFor(row);
@@ -13723,6 +13782,107 @@ function msRowMatchesLane(row, lane) {
   if (lane === "catalyst") return msTags(row).some(t => ["bullish-flow", "catalyst-near", "squeeze-fuel"].includes(t)) || msComponent(row, "optflow") >= 8 || msComponent(row, "volume") >= 12;
   if (lane === "rotation") return msTags(row).includes("coiled") || (msComponent(row, "compression") >= 7 && msComponent(row, "momentum") >= 7);
   return false;
+}
+function msScannerRowFor(symbol) {
+  const sym = String(symbol || "").toUpperCase();
+  return (state.marketScan?.results || []).find(r => String(r.symbol || "").toUpperCase() === sym) || null;
+}
+function msScannerReadFor(symbol) {
+  const sym = String(symbol || "").toUpperCase();
+  return (state.marketScan?.reads || []).find(r => String(r.symbol || "").toUpperCase() === sym) || null;
+}
+function msPriceRange(level) {
+  const n = Number(level);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const s = `$${n.toFixed(n >= 100 ? 2 : 3)}`;
+  return `${s}-${s}`;
+}
+function msScannerSnapshot(row, read, gate, plan) {
+  return {
+    source: "market_scanner",
+    symbol: row.symbol,
+    rank: row.rank ?? null,
+    opportunity_score: msPrimaryScore(row),
+    actionability_score: msActionabilityScore(row),
+    gate_score: gate.score,
+    gate_label: gate.label,
+    entry_state: row.entry_state || null,
+    opportunity_stage: row.opportunity_stage || null,
+    quality_grade: row.quality_grade || null,
+    reward_risk: plan.rr,
+    entry: plan.entry,
+    target: plan.target,
+    stop: plan.stop,
+    timeframe_days: plan.days,
+    score_reason: row.score_reason || gate.primary || "",
+    tags: msTags(row),
+    read: read ? {
+      one_liner: read.one_liner || "",
+      setup: read.setup || "",
+      confirmation: read.confirmation || "",
+      invalidation: read.invalidation || "",
+      conviction: read.conviction || "",
+    } : null,
+    captured_at: new Date().toISOString(),
+  };
+}
+function msScannerAnalysisSnapshot(row, read, gate, plan) {
+  const conviction = gate.score >= 88 ? "high" : gate.score >= 76 ? "medium" : "low";
+  return {
+    generated_at: new Date().toISOString(),
+    source: "market_scanner",
+    stance: "ACCUMULATE",
+    conviction,
+    headline: read?.one_liner || `${row.symbol} passed the Discovery paper-test gate`,
+    action_what: "Paper-test a 1-share long setup",
+    action_price_zone: msPriceRange(plan.target),
+    action_invalidation: `below $${plan.stop.toFixed(plan.stop >= 100 ? 2 : 3)}`,
+    action_timeframe: `${plan.days} days`,
+    reward_risk_ratio: plan.rr,
+    bull_trigger: read?.confirmation || row.score_reason || null,
+    bear_trigger: read?.invalidation || `Below $${plan.stop.toFixed(plan.stop >= 100 ? 2 : 3)}`,
+  };
+}
+async function paperTestScannerOpportunity(symbol) {
+  const sym = String(symbol || "").toUpperCase();
+  if (!state.uid) { toast("Sign in to log paper tests", 2400, "error"); return; }
+  const row = msScannerRowFor(sym);
+  if (!row) { toast("Opportunity row not found", 2400, "error"); return; }
+  const read = msScannerReadFor(sym);
+  const gate = msInvestmentGate(row);
+  const plan = msPaperTestPlan(row, gate);
+  if (!plan.ok) {
+    toast(`Not paper-ready: ${plan.reason}`, 3200, "error");
+    return;
+  }
+
+  const held = state.holdings.some(h => h.symbol === sym && h.asset_class !== "cash");
+  const ctx = buildTradeContext(sym);
+  const scanner_snapshot = msScannerSnapshot(row, read, gate, plan);
+  const analysis_snapshot = msScannerAnalysisSnapshot(row, read, gate, plan);
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    await saveTrade({
+      symbol: sym,
+      direction: held ? "add" : "buy",
+      quantity: 1,
+      price: plan.entry,
+      trade_date: today,
+      notes: `Discovery paper test: ${gate.label} ${gate.score}, R:R ${plan.rr.toFixed(1)}:1`,
+      is_paper: true,
+      lifecycle_status: "open",
+      ...ctx,
+      analysis_snapshot,
+      scanner_snapshot,
+    });
+    toast(`Paper test logged for ${sym}`);
+    if (state.currentView === "journal") {
+      populateTradeLogList().catch(() => {});
+      populatePaperPerformance().catch(() => {});
+    }
+  } catch (e) {
+    toast(`Paper test failed: ${e.message || e}`, 3200, "error");
+  }
 }
 function msSector(symbol) {
   const s = String(symbol || "").toUpperCase();
@@ -13934,6 +14094,7 @@ function renderMarketScannerCard() {
 	    });
   const visibleResults = laneResults.slice(0, 20);
   const softCount = results.filter(r => r._soft).length;
+  const paperReadyCount = results.filter(r => msIsPaperReady(r)).length;
   const actableCount = results.filter(r => msIsActable(r, reads[r.symbol])).length;
   const highCount = results.filter(r => !r._soft && msInvestmentGate(r).score >= 76).length;
   const pullbackCount = results.filter(r => msRowMatchesLane(r, "pullback")).length;
@@ -13996,6 +14157,7 @@ function renderMarketScannerCard() {
 	    const entryState = String(r.entry_state || "").replace(/_/g, " ");
 	    const gate = msInvestmentGate(r, fit);
 	    const stage = String(r.opportunity_stage || "").replace(/_/g, " ");
+    const paperPlan = msPaperTestPlan(r, gate);
     const adv = msNum(r.avg_dollar_vol_20d);
     const isAnalyzing = !!(state.analyzingSymbols && state.analyzingSymbols[r.symbol]);
     const of = r.options_flow;
@@ -14037,10 +14199,17 @@ function renderMarketScannerCard() {
         ${msPipelineHtml(r, rd, held, watched)}
         <div class="ms-fit">
 	          <div class="ms-fit-box"><span class="ms-fit-k">Why surfaced</span><span class="ms-fit-v ${escAttr(gate.tone === "pass" ? "good" : gate.tone === "reject" ? "bad" : "")}">${escAttr(gate.primary)}</span></div>
-          <div class="ms-fit-box"><span class="ms-fit-k">Portfolio fit</span><span class="ms-fit-v ${escAttr(fit.tone)}">${escAttr(fit.label)}</span></div>
+          <div class="ms-fit-box"><span class="ms-fit-k">Exposure fit</span><span class="ms-fit-v ${escAttr(fit.tone)}">${escAttr(fit.label)}</span></div>
           <div class="ms-fit-box"><span class="ms-fit-k">Entry quality</span><span class="ms-fit-v">${escAttr(why)}</span></div>
         </div>
         <div class="ms-bars">${bars}</div>
+        ${paperPlan.ok ? `
+          <div class="ms-paper-plan">
+            <div class="ms-paper-cell"><span class="ms-paper-k">Entry</span><span class="ms-paper-v">${fmtUSD(paperPlan.entry, 2)}</span></div>
+            <div class="ms-paper-cell"><span class="ms-paper-k">Target</span><span class="ms-paper-v">${fmtUSD(paperPlan.target, 2)}</span></div>
+            <div class="ms-paper-cell"><span class="ms-paper-k">Stop</span><span class="ms-paper-v">${fmtUSD(paperPlan.stop, 2)}</span></div>
+            <div class="ms-paper-cell"><span class="ms-paper-k">Test</span><span class="ms-paper-v">${paperPlan.days}d · ${paperPlan.rr.toFixed(1)}R</span></div>
+          </div>` : ""}
         ${ofHtml}
         ${rd ? `
           <div class="ms-read">
@@ -14062,6 +14231,7 @@ function renderMarketScannerCard() {
             ${isAnalyzing ? `<span class="spinner"></span>` : "Analyze"}
           </button>
           ${(!watched && !held) ? `<button class="btn btn-secondary btn-sm" data-act="add-curated" data-symbol="${escAttr(r.symbol)}" data-name="${escAttr(r.symbol)}">+ Watch</button>` : ""}
+          ${paperPlan.ok ? `<button class="btn btn-secondary btn-sm" data-act="paper-test-scan" data-symbol="${escAttr(r.symbol)}" title="Log this scanner setup as a paper trade with target, stop, and timeframe">Paper test</button>` : ""}
         </div>
       </div>
     </div>`;
@@ -14072,16 +14242,16 @@ function renderMarketScannerCard() {
     <div class="ms-head">
       <h3>Opportunity Desk</h3>
       <div class="ms-actions-top">
-        <button class="ms-run secondary" onclick="runMarketScan({discover:true})" ${loading ? "disabled" : ""} title="Surface less obvious mid-cap names beyond the default list">
+        <button class="ms-run secondary" onclick="runMarketScan({discover:true})" ${loading ? "disabled" : ""} title="Surface less obvious mid-cap names beyond the default market list">
           ${loading ? "..." : "Deep discovery"}
         </button>
-        <button class="ms-run" onclick="runMarketScan()" ${loading ? "disabled" : ""} title="Load the stable prewarmed market scan">
+        <button class="ms-run" onclick="runMarketScan()" ${loading ? "disabled" : ""} title="Load the stable prewarmed broad-market scan">
           ${loading ? "Loading..." : "Stable scan"}
         </button>
       </div>
     </div>
     <div class="ms-sub">
-      <b>${visibleResults.length || results.length ? `${visibleResults.length || results.length} opportunities in view` : "Opportunity lanes"}</b> from a live screen of volume accumulation, momentum/relative strength, compression, and bullish options flow. Use lanes to move from broad discovery to a tradeable watchlist.
+      <b>${visibleResults.length || results.length ? `${visibleResults.length || results.length} opportunities in view` : "Opportunity lanes"}</b> from a live screen of volume accumulation, momentum/relative strength, compression, and bullish options flow. Use Paper-ready to test only the strongest setups against target, stop, and timeframe.
     </div>
 
     <div class="ms-focus">
@@ -14092,6 +14262,7 @@ function renderMarketScannerCard() {
     </div>
 
     <div class="ms-desk">
+      <div class="ms-desk-cell"><span class="ms-desk-k">Paper-ready</span><span class="ms-desk-v">${paperReadyCount}</span></div>
       <div class="ms-desk-cell"><span class="ms-desk-k">Actable</span><span class="ms-desk-v">${actableCount}</span></div>
 	      <div class="ms-desk-cell"><span class="ms-desk-k">Ready</span><span class="ms-desk-v">${highCount}</span></div>
       <div class="ms-desk-cell"><span class="ms-desk-k">Pullbacks</span><span class="ms-desk-v">${pullbackCount}</span></div>
@@ -14454,23 +14625,6 @@ function renderSettings() {
   const email = user?.email || "Anonymous (this device only)";
   view.innerHTML = `
     <div class="section-head" style="padding: 20px 20px 0;"><h2>Settings</h2></div>
-    <div class="settings-group howto-card">
-      <button class="howto-toggle" data-act="toggle-howto">
-        <span><b>How to use this app</b> — the weekly routine</span>
-        <span class="howto-chevron">${state.howtoOpen ? "▾" : "▸"}</span>
-      </button>
-      ${state.howtoOpen ? `
-      <div class="howto-body">
-        <div class="howto-step"><span class="howto-num">1</span><div><b>Scan (free).</b> Open Watchlist or Discover and tap <b>Scan now</b>. No AI cost — it scores your whole universe for setups.</div></div>
-        <div class="howto-step"><span class="howto-num">2</span><div><b>Read the shortlist.</b> In Discover, the Screener ranks names by setup quality. You're just reading the free pre-reads, not analyzing yet.</div></div>
-        <div class="howto-step"><span class="howto-num">3</span><div><b>Analyze 3–5 only.</b> Tap Analyze on the best few. This is the one place you spend money — on a handful, not the whole list.</div></div>
-        <div class="howto-step"><span class="howto-num">4</span><div><b>Read the directive.</b> Each shows <i>BUY at $X · buy $Y · confidence Z</i>. HIGH + a setup you like = act. LOW/MED = wait.</div></div>
-        <div class="howto-step"><span class="howto-num">5</span><div><b>Check holdings.</b> On Portfolio, most say HOLD — ignore those. Act only on <b>SELL</b>, <b>ADD</b>, or the red pulsing <b>EXIT</b>.</div></div>
-        <div class="howto-step"><span class="howto-num">6</span><div><b>Log what you do.</b> Tap Log Trade. Over time the Journal shows which setups actually pay off for you.</div></div>
-        <div class="howto-step"><span class="howto-num">7</span><div><b>Let Telegram watch.</b> You don't check daily. Add names to the watchlist (alerts auto-arm) and the cron pings you when something fires.</div></div>
-        <div class="howto-note">One line: <b>Scan → read shortlist → analyze the best few → act on loud directives → log it → let Telegram watch the rest.</b> This is decision support, not a signal to follow blindly — the confidence label tells you when the app itself isn't sure.</div>
-      </div>` : ""}
-    </div>
     <div class="settings-group">
       <div class="setting-row">
         <div>
@@ -14496,7 +14650,7 @@ function renderSettings() {
         <button class="btn btn-secondary btn-sm" data-act="rescan">Scan</button>
       </div>
       <div class="setting-row">
-        <div><div class="lbl">Export Portfolio (JSON)</div><div class="sub">Holdings + journal + alerts</div></div>
+        <div><div class="lbl">Export Data (JSON)</div><div class="sub">Holdings + journal + watchlist</div></div>
         <button class="btn btn-secondary btn-sm" data-act="export-data">Export</button>
       </div>
     </div>
@@ -14508,23 +14662,18 @@ function renderSettings() {
         <div><div class="lbl">Worker</div><div class="sub" style="font-family:var(--mono);font-size:10.5px;">portfolio-advisor.abdelshafie-ahmed.workers.dev</div></div>
       </div>
       <div class="setting-row">
-        <div><div class="lbl">Version</div><div class="sub">1.15.0 discovery logic</div></div>
+        <div><div class="lbl">Version</div><div class="sub">lean opportunity tester</div></div>
       </div>
     </div>
-    ${renderSettingsQualitySection()}
-    ${renderAppHealthSection()}
-    ${renderSignalLearningSection()}
     ${renderInvestorProfileSection()}
-    ${renderRiskSettings()}
-    ${renderNotificationsSection()}
     <div class="settings-group">
       <div class="section-head" style="padding: 0 4px 8px; display:flex; justify-content:space-between; align-items:baseline;">
-        <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Holdings</h3>
+        <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Optional Holdings</h3>
         <button class="btn-ghost-sm" data-act="add-holding">+ Add</button>
       </div>
       <div class="holdings-list-settings">
         ${state.holdings.length === 0
-          ? `<div class="setting-row" style="color:var(--ink-muted);font-size:12px;">No holdings yet. Tap "+ Add" to enter your first position.</div>`
+          ? `<div class="setting-row" style="color:var(--ink-muted);font-size:12px;">Optional. Add holdings only if you want Discovery to judge portfolio fit.</div>`
           : state.holdings.map(h => {
               const m = holdingMetrics(h);
               const isCash = h.asset_class === "cash";
@@ -14685,6 +14834,7 @@ async function populateTradeLogList() {
       const vs = t.verdict_snapshot || null;
       const lvs = t.local_verdict_snapshot || null;
       const pss = t.presurge_snapshot || null;
+      const ss = t.scanner_snapshot || null;
       const rationaleBits = [];
       if (vs?.verdict) {
         rationaleBits.push(`<span class="trade-why-verb">${escAttr(vs.verdict)}</span>${vs.action_line ? ` ${escAttr(vs.action_line)}` : ""}`);
@@ -14698,6 +14848,9 @@ async function populateTradeLogList() {
       }
       if (pss?.composite != null) {
         rationaleBits.push(`Pre-Surge ${pss.composite}${pss.confirmed ? " confirmed" : " watching"}`);
+      }
+      if (ss?.gate_score != null) {
+        rationaleBits.push(`Discovery ${escAttr(ss.gate_label || "gate")} ${ss.gate_score}${ss.reward_risk ? ` · R:R ${Number(ss.reward_risk).toFixed(1)}:1` : ""}`);
       }
       if (vs?.key_signal) rationaleBits.push(escAttr(vs.key_signal));
       const rationaleHtml = rationaleBits.length > 0
@@ -14856,6 +15009,12 @@ function computePaperPerformance(trades) {
       const c = t.analysis_snapshot?.conviction;
       return c ? String(c).toLowerCase() : "—";
     }),
+    by_source: groupBy(t => {
+      if (t.scanner_snapshot) return `Discovery ${t.scanner_snapshot.gate_label || ""}`.trim();
+      if (t.presurge_snapshot) return "Pre-Surge";
+      if (t.verdict_snapshot) return "Verdict";
+      return "Manual";
+    }),
   };
 }
 
@@ -14870,7 +15029,7 @@ function renderPaperPerformance(stats) {
     return `<div class="settings-group" id="paperPerfInner">
       ${header}
       <div class="setting-row" style="color:var(--ink-muted);font-size:12px;line-height:1.5;">
-        No paper trades yet. Log an ACT verdict as a paper trade — the simulation will replay it against its target, stop, and timeframe, then report the round-trip result here.
+        No paper trades yet. Use Paper test on a Discovery row or log an ACT verdict as paper — the simulation will replay it against its target, stop, and timeframe, then report the round-trip result here.
       </div>
     </div>`;
   }
@@ -14941,6 +15100,7 @@ function renderPaperPerformance(stats) {
     ${header}
     ${headline}
     ${breakdown}
+    ${groupTable("By source", stats.by_source)}
     ${groupTable("By stance", stats.by_stance)}
     ${groupTable("By conviction", stats.by_conviction)}
     <div class="tr-disclaimer">Each paper trade is replayed against its snapshotted target, stop, and timeframe using daily OHLC. First level touched closes the trade; if both touch the same day, the stop is assumed (conservative). Expectancy = average round-trip P&amp;L per closed trade — the core test of whether the verdict logic is valid.</div>
@@ -15282,12 +15442,9 @@ function resetPin() {
   }
 }
 async function manualRefresh() {
-  toast("Refreshing prices & signals…");
+  toast("Refreshing prices…");
   await refreshAllPrices();
   renderCurrentView();
-  // Refresh all verdict-input signals too. Each respects its own cache TTL,
-  // so this is cheap if called within the cache window.
-  await autoRefreshSignals().catch(e => console.warn("manual auto-refresh:", e));
   // Re-run watchlist scan to update firing conditions
   await runScan().catch(() => {});
   toast("Refreshed");
@@ -15299,7 +15456,6 @@ async function exportData() {
     exported_at: new Date().toISOString(),
     holdings: state.holdings,
     analyses: state.analyses,
-    portfolio_analysis: state.portfolioAnalysis,
     watchlist: state.watchlist,
     journal,
   };
@@ -15307,7 +15463,7 @@ async function exportData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `portfolio_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `opportunity_tester_${new Date().toISOString().slice(0,10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -15406,10 +15562,7 @@ const debouncedSearchHold = debounce(async () => {
 async function syncPortfolioAfterHoldingsChange() {
   await loadHoldingsFromFirestore();
   await refreshAllPrices();
-  state.verdictsAt = null;                  // kill the 4h debounce
-  localStorage.removeItem("verdictsAt_v2"); // and its persisted copy
-  renderCurrentView();                      // instant repaint with the new book
-  runVerdict(true).catch(() => {});         // fresh verdicts in the background
+  renderCurrentView();
 }
 
 async function submitAddHolding() {
@@ -15818,7 +15971,7 @@ function openAddCondition(symbol) {
       </select>
     </div>
     <div id="cond_fields"></div>
-    <div class="field-hint" style="margin-bottom:14px;">Conditions are checked every time you scan. When a condition becomes true, you'll see it in the Opportunities card on Portfolio tab.</div>
+    <div class="field-hint" style="margin-bottom:14px;">Conditions are checked every time you scan and stay attached to this watchlist name.</div>
     <button class="btn btn-block" data-act="submit-cond" data-symbol="${escAttr(symbol)}">Add Condition</button>
   `);
   $("#cond_type").addEventListener("change", renderCondFields);
@@ -16054,6 +16207,7 @@ document.addEventListener("click", (e) => {
         state.marketScanHideSoft = !state.marketScanHideSoft;
         renderCurrentView();
         break;
+      case "paper-test-scan":        paperTestScannerOpportunity(symbol); break;
       case "open-asset-from-watch":  openAsset(symbol, "watchlist"); break;
       case "retry-prices":
         // v1.17 — manual retry for symbols whose price feed failed.
