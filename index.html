@@ -301,7 +301,8 @@ const state = {
   marketScanCapFilter: "all",
   marketScanSetupFilter: "all",
   marketScanSectorFilter: "all",
-  investorProfile: { min_reward_risk: 2.0 },
+  investorProfile: { min_reward_risk: 2.0, auto_prime_paper: true, auto_prime_limit: 5 },
+  autoPaper: { loading: false, last: null },
   expandedTrades: {},
 };
 
@@ -453,6 +454,8 @@ async function loadInvestorProfile() {
       state.investorProfile = {
         ...state.investorProfile,
         min_reward_risk: Number(d.min_reward_risk || d.minRewardRisk || state.investorProfile.min_reward_risk) || 2,
+        auto_prime_paper: d.auto_prime_paper !== false,
+        auto_prime_limit: Math.max(1, Number(d.auto_prime_limit || state.investorProfile.auto_prime_limit || 5)),
       };
     }
   } catch (e) {
@@ -461,7 +464,14 @@ async function loadInvestorProfile() {
 }
 async function saveInvestorProfile() {
   const minRR = Math.max(0.5, Number($("#minRewardRisk")?.value || 2));
-  state.investorProfile = { min_reward_risk:minRR, updated_at:new Date().toISOString() };
+  const autoPrime = $("#autoPrimePaper")?.checked !== false;
+  const autoLimit = Math.max(1, Math.min(20, Number($("#autoPrimeLimit")?.value || 5)));
+  state.investorProfile = {
+    min_reward_risk:minRR,
+    auto_prime_paper:autoPrime,
+    auto_prime_limit:autoLimit,
+    updated_at:new Date().toISOString(),
+  };
   localStorage.setItem("opportunity_profile_v1", JSON.stringify(state.investorProfile));
   if (db && state.uid && !state.localOnly) {
     try {
@@ -495,6 +505,8 @@ async function loadCachedScan() {
       _cached: true,
     };
     state.marketScanRanAt = d.generated_at || d.updated_at || new Date().toISOString();
+    const auto = await autoLogPrimePaperTrades(state.marketScan);
+    if (auto.logged) toast(`Auto-paper logged ${auto.logged}: ${auto.symbols.join(", ")}`);
     renderCurrentView();
   } catch (e) {
     console.warn("Cached scan unavailable", e);
@@ -514,7 +526,9 @@ async function runMarketScan(opts = {}) {
         idToken,
         exclude_symbols: [],
         focus_hint: state.marketScanFocus || undefined,
-        discover_mode: opts.discover === true,
+        discover_mode: true,
+        broad_market: true,
+        max_results: 80,
         force: opts.force === true || opts.discover === true || !!state.marketScanFocus,
         write_reads: true,
       }),
@@ -523,7 +537,9 @@ async function runMarketScan(opts = {}) {
     const j = await r.json();
     state.marketScan = j;
     state.marketScanRanAt = j.generated_at || new Date().toISOString();
-    toast(`${(j.results || []).length} opportunities loaded`);
+    const auto = await autoLogPrimePaperTrades(j);
+    const suffix = auto.logged ? ` - auto-paper logged ${auto.logged}` : "";
+    toast(`${(j.results || []).length} opportunities loaded${suffix}`);
   } catch (e) {
     state.marketScan = { results:[], reads:[], scan_note:`Scan failed: ${e.message || e}` };
     toast("Scan failed", "error");
@@ -561,8 +577,33 @@ function msRiskReward(row) {
   const price = num(row?.current_price);
   const support = num(row?.nearest_support);
   const resistance = num(row?.nearest_resistance);
-  if (!(price > 0 && support > 0 && support < price && resistance > price)) return null;
-  return (resistance - price) / (price - support);
+  const direction = setupDirection(row);
+  const plan = coherentPlan(price, resistance, support, direction);
+  if (!plan.ok) return null;
+  return plan.rr;
+}
+function setupDirection(row) {
+  const text = [
+    row?.direction,
+    row?.trade_direction,
+    row?.setup_direction,
+    row?.side,
+    row?.bias,
+    row?.score_reason,
+    ...(msTags(row) || []),
+  ].filter(Boolean).join(" ").toLowerCase();
+  if (/\b(short|bear|bearish|sell|put|breakdown|downside)\b/.test(text)) return "short";
+  return "long";
+}
+function coherentPlan(entry, target, stop, direction = "long") {
+  const e = num(entry), t = num(target), s = num(stop);
+  if (!(e > 0 && t > 0 && s > 0)) return { ok:false, reason:"missing entry/target/stop" };
+  if (direction === "short") {
+    if (!(t < e && s > e)) return { ok:false, reason:"short plan needs target below entry and stop above entry" };
+    return { ok:true, rr:(e - t) / (s - e) };
+  }
+  if (!(t > e && s < e)) return { ok:false, reason:"long plan needs target above entry and stop below entry" };
+  return { ok:true, rr:(t - e) / (e - s) };
 }
 function msSector(symbol, row = null) {
   if (row?.sector) return row.sector;
@@ -656,22 +697,25 @@ function msPaperTimeframe(row) {
 }
 function msPaperTestPlan(row, gate = msInvestmentGate(row)) {
   const minRR = Number(state.investorProfile?.min_reward_risk) || 2;
+  const direction = setupDirection(row);
   const price = num(row?.current_price);
   const support = num(row?.nearest_support);
   const resistance = num(row?.nearest_resistance);
-  const rr = msRiskReward(row);
+  const target = direction === "short" ? support : resistance;
+  const stop = direction === "short" ? resistance : support;
+  const planShape = coherentPlan(price, target, stop, direction);
+  const rr = planShape.ok ? planShape.rr : null;
   const day = num(row?.day_change_pct);
   const rsi = num(row?.rsi14);
   if (row?._soft) return { ok:false, reason:"soft candidate" };
   if (gate.score < 76) return { ok:false, reason:"not Ready yet" };
   if (row?.entry_state && row.entry_state !== "actionable") return { ok:false, reason:"entry not actionable" };
   if (!(price > 0)) return { ok:false, reason:"missing live price" };
-  if (!(support > 0 && support < price)) return { ok:false, reason:"missing clean support" };
-  if (!(resistance > price)) return { ok:false, reason:"missing clean target" };
+  if (!planShape.ok) return { ok:false, reason:planShape.reason };
   if (!(rr != null && rr >= minRR)) return { ok:false, reason:`R:R below ${minRR.toFixed(1)}:1` };
   if (day != null && day <= -3) return { ok:false, reason:"selling off today" };
   if (rsi != null && rsi >= 72) return { ok:false, reason:"extended" };
-  return { ok:true, entry:price, target:resistance, stop:support, rr, days:msPaperTimeframe(row) };
+  return { ok:true, direction, entry:price, target, stop, rr, days:msPaperTimeframe(row) };
 }
 function msMatchesDeskFilters(row) {
   const cap = state.marketScanCapFilter || "all";
@@ -698,10 +742,22 @@ function priceRange(level) {
   if (!(n > 0)) return null;
   return `${fmtUSD(n, n >= 100 ? 2 : 3)}-${fmtUSD(n, n >= 100 ? 2 : 3)}`;
 }
+function scannerSetupKey(row, plan) {
+  const f = v => Number(v || 0).toFixed(3);
+  return [
+    String(row?.symbol || "").toUpperCase(),
+    plan.direction || "long",
+    f(plan.entry),
+    f(plan.target),
+    f(plan.stop),
+    plan.days || 0,
+  ].join("|");
+}
 function scannerSnapshot(row, read, gate, plan) {
   return {
     source:"market_scanner",
     symbol:row.symbol,
+    setup_key:scannerSetupKey(row, plan),
     rank:row.rank ?? null,
     opportunity_score:msPrimaryScore(row),
     actionability_score:msActionabilityScore(row),
@@ -711,6 +767,7 @@ function scannerSnapshot(row, read, gate, plan) {
     opportunity_stage:row.opportunity_stage || null,
     quality_grade:row.quality_grade || null,
     reward_risk:plan.rr,
+    direction:plan.direction,
     entry:plan.entry,
     target:plan.target,
     stop:plan.stop,
@@ -729,20 +786,50 @@ function scannerSnapshot(row, read, gate, plan) {
 }
 function scannerAnalysisSnapshot(row, read, gate, plan) {
   const conviction = gate.score >= 88 ? "high" : gate.score >= 76 ? "medium" : "low";
+  const isShort = plan.direction === "short";
   return {
     generated_at:new Date().toISOString(),
     source:"market_scanner",
-    stance:"ACCUMULATE",
+    stance:isShort ? "SHORT_TEST" : "ACCUMULATE",
     conviction,
     headline:read?.one_liner || `${row.symbol} passed the Discovery paper-test gate`,
-    action_what:"Paper-test a 1-share long setup",
+    action_what:isShort ? "Paper-test a 1-share short setup" : "Paper-test a 1-share long setup",
     action_price_zone:priceRange(plan.target),
-    action_invalidation:`below ${fmtUSD(plan.stop, plan.stop >= 100 ? 2 : 3)}`,
+    action_invalidation:`${isShort ? "above" : "below"} ${fmtUSD(plan.stop, plan.stop >= 100 ? 2 : 3)}`,
     action_timeframe:`${plan.days} days`,
     reward_risk_ratio:plan.rr,
     bull_trigger:read?.confirmation || row.score_reason || null,
-    bear_trigger:read?.invalidation || `Below ${fmtUSD(plan.stop, plan.stop >= 100 ? 2 : 3)}`,
+    bear_trigger:read?.invalidation || `${isShort ? "Above" : "Below"} ${fmtUSD(plan.stop, plan.stop >= 100 ? 2 : 3)}`,
   };
+}
+async function saveScannerPaperTrade(row, read, gate, plan, { auto = false } = {}) {
+  const sym = String(row?.symbol || "").toUpperCase();
+  const setupKey = scannerSetupKey(row, plan);
+  const existing = await loadTrades(500);
+  const today = new Date().toISOString().slice(0, 10);
+  const duplicate = existing.find(t => {
+    if (t.is_paper !== true) return false;
+    const sameSetup = t.scanner_snapshot?.setup_key && t.scanner_snapshot.setup_key === setupKey;
+    const sameOpenSymbol = String(t.symbol || "").toUpperCase() === sym && (!t.lifecycle_status || t.lifecycle_status === "open");
+    const sameDaySymbol = String(t.symbol || "").toUpperCase() === sym && fmtDate(t.trade_date || t.created_at) === today;
+    return sameSetup || sameOpenSymbol || sameDaySymbol;
+  });
+  if (duplicate) return { logged:false, reason:"duplicate", id:duplicate.id || duplicate.trade_id };
+  await saveTrade({
+    symbol:sym,
+    direction:plan.direction === "short" ? "sell" : "buy",
+    quantity:1,
+    price:plan.entry,
+    trade_date:new Date().toISOString().slice(0, 10),
+    notes:`${auto ? "Auto prime paper test" : "Discovery paper test"}: ${gate.label} ${gate.score}, R:R ${plan.rr.toFixed(1)}:1`,
+    is_paper:true,
+    auto_logged:auto,
+    setup_key:setupKey,
+    lifecycle_status:"open",
+    analysis_snapshot:scannerAnalysisSnapshot(row, read, gate, plan),
+    scanner_snapshot:scannerSnapshot(row, read, gate, plan),
+  });
+  return { logged:true, symbol:sym };
 }
 async function paperTestScannerOpportunity(symbol) {
   const sym = String(symbol || "").toUpperCase();
@@ -752,19 +839,49 @@ async function paperTestScannerOpportunity(symbol) {
   const gate = msInvestmentGate(row);
   const plan = msPaperTestPlan(row, gate);
   if (!plan.ok) return toast(`Not paper-ready: ${plan.reason}`, "error");
-  await saveTrade({
-    symbol:sym,
-    direction:"buy",
-    quantity:1,
-    price:plan.entry,
-    trade_date:new Date().toISOString().slice(0, 10),
-    notes:`Discovery paper test: ${gate.label} ${gate.score}, R:R ${plan.rr.toFixed(1)}:1`,
-    is_paper:true,
-    lifecycle_status:"open",
-    analysis_snapshot:scannerAnalysisSnapshot(row, read, gate, plan),
-    scanner_snapshot:scannerSnapshot(row, read, gate, plan),
-  });
-  toast(`Paper test logged for ${sym}`);
+  const result = await saveScannerPaperTrade(row, read, gate, plan);
+  toast(result.logged ? `Paper test logged for ${sym}` : `${sym} is already in paper test`);
+}
+function primePaperCandidates(scan) {
+  const reads = {};
+  for (const rd of (scan?.reads || [])) reads[String(rd.symbol || "").toUpperCase()] = rd;
+  return (scan?.results || [])
+    .map(row => {
+      const gate = msInvestmentGate(row);
+      const plan = msPaperTestPlan(row, gate);
+      return { row, read:reads[String(row.symbol || "").toUpperCase()], gate, plan };
+    })
+    .filter(x => x.plan.ok && msPrimaryScore(x.row) >= 75 && x.gate.score >= 76)
+    .sort((a, b) => (b.gate.score - a.gate.score) || (msPrimaryScore(b.row) - msPrimaryScore(a.row)));
+}
+async function autoLogPrimePaperTrades(scan) {
+  if (state.autoPaper.loading) return { logged:0, skipped:0 };
+  if (state.investorProfile?.auto_prime_paper === false) return { logged:0, skipped:0, disabled:true };
+  const limit = Math.max(1, Math.min(20, Number(state.investorProfile?.auto_prime_limit || 5)));
+  const candidates = primePaperCandidates(scan).slice(0, limit);
+  if (!candidates.length) {
+    state.autoPaper.last = { logged:0, skipped:0, at:new Date().toISOString(), note:"no prime paper-ready setups" };
+    return state.autoPaper.last;
+  }
+  state.autoPaper.loading = true;
+  let logged = 0;
+  let skipped = 0;
+  const symbols = [];
+  try {
+    for (const c of candidates) {
+      const result = await saveScannerPaperTrade(c.row, c.read, c.gate, c.plan, { auto:true });
+      if (result.logged) {
+        logged++;
+        symbols.push(result.symbol);
+      } else {
+        skipped++;
+      }
+    }
+  } finally {
+    state.autoPaper.loading = false;
+  }
+  state.autoPaper.last = { logged, skipped, symbols, at:new Date().toISOString() };
+  return state.autoPaper.last;
 }
 
 function renderDiscover() {
@@ -802,11 +919,11 @@ function renderMarketScannerCard() {
       <div class="card-head">
         <div>
           <h3>Opportunity Desk</h3>
-          <div class="muted" style="font-size:13px;margin-top:3px;">Whole-market discovery scored for setup quality, entry readiness, reward/risk, and paper-test suitability.</div>
+          <div class="muted" style="font-size:13px;margin-top:3px;">Broad-market discovery scored for setup quality, entry readiness, reward/risk, and automatic paper testing.</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
           <button class="btn-secondary" data-act="deep-scan" ${loading ? "disabled" : ""}>${loading ? "Loading" : "Deep discovery"}</button>
-          <button class="btn" data-act="stable-scan" ${loading ? "disabled" : ""}>${loading ? "Loading" : "Stable scan"}</button>
+          <button class="btn" data-act="stable-scan" ${loading ? "disabled" : ""}>${loading ? "Loading" : "Broad scan"}</button>
         </div>
       </div>
       <div class="toolbar">
@@ -822,7 +939,7 @@ function renderMarketScannerCard() {
         ${deskCell("Pullbacks", pullbacks)}
         ${deskCell("Flow/catalyst", catalysts)}
       </div>
-      <div class="score-legend">Opportunity /100: 75+ prime, 60-74 pre-surge, 45-59 watch. Paper-ready requires clean entry, target, stop, and minimum R:R.</div>
+      <div class="score-legend">Opportunity /100: 75+ prime, 60-74 pre-surge, 45-59 watch. Prime + paper-ready setups are auto-logged, up to your Settings limit.</div>
       <div class="pill-row">${laneButtons}</div>
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
         <div class="muted" style="font-size:13px;">${activeLane === "all" ? "Showing all filtered candidates" : `Showing ${esc(MARKET_SCAN_LANES.find(x => x[0] === activeLane)?.[1] || activeLane)}`}</div>
@@ -831,9 +948,10 @@ function renderMarketScannerCard() {
       ${loading ? `<div class="loading-row"><span class="spinner"></span><span>${state.marketScanFocus ? "Running focused market scan" : "Loading market scan"}</span></div>` : ""}
       ${!loading && !laneHadMatches && activeLane !== "all" && preFiltered.length ? `<div class="scan-note">No pure ${esc(activeLane)} setup now, showing strongest filtered candidates instead.</div>` : ""}
       ${!loading && scan?.scan_note ? `<div class="scan-note">${esc(scan.scan_note)}</div>` : ""}
+      ${!loading && state.autoPaper.last ? `<div class="scan-note">Auto-paper: ${state.autoPaper.last.logged || 0} logged${state.autoPaper.last.symbols?.length ? ` (${esc(state.autoPaper.last.symbols.join(", "))})` : ""}${state.autoPaper.last.skipped ? `, ${state.autoPaper.last.skipped} skipped as duplicate` : ""}.</div>` : ""}
       ${!loading && visible.length ? `<div class="opp-list">${rows}</div>` : ""}
       ${!loading && scan && !visible.length ? `<div class="empty">No opportunities passed the current filters. Try All, show softer rows, or run a focused scan.</div>` : ""}
-      ${!loading && !scan ? `<div class="empty">Tap Stable scan for the prewarmed broad-market sweep, or Deep discovery to search less obvious names.</div>` : ""}
+      ${!loading && !scan ? `<div class="empty">Tap Broad scan for the prewarmed market sweep, or Deep discovery to search less obvious names. Prime paper-ready setups will be logged automatically.</div>` : ""}
       ${scan && !loading ? `<div class="muted mono" style="font-size:11px;margin-top:12px;">${visible.length} shown - ${scan.scored_count ?? results.length} scored of ${scan.universe_size ?? results.length} - ${relTime(state.marketScanRanAt)}${scan._cached ? " - cached" : ""}</div>` : ""}
     </section>`;
 }
@@ -907,7 +1025,11 @@ function renderOpportunityRow(r, rd) {
             </div>
           </div>` : ""}
         <div class="row-actions">
-          ${plan.ok ? `<button class="btn" data-act="paper-test-scan" data-symbol="${esc(r.symbol)}">Paper test</button>` : `<button class="btn-secondary" disabled>${esc(msPaperTestPlan(r, gate).reason || "Not paper-ready")}</button>`}
+          ${plan.ok && score >= 75
+            ? `<span class="meta good">Auto-paper prime</span>`
+            : plan.ok
+              ? `<span class="meta warn">Paper-ready, not prime</span>`
+              : `<span class="meta warn">${esc(msPaperTestPlan(r, gate).reason || "Not paper-ready")}</span>`}
         </div>
       </div>
     </article>`;
@@ -977,6 +1099,8 @@ function simulateTradeExit(trade, series) {
   const inv = parseInvalidation(snap.action_invalidation);
   const target = zone ? (bullish ? zone.lo : zone.hi) : null;
   const stop = inv?.level ?? null;
+  const coherent = coherentPlan(entry, target, stop, bullish ? "long" : "short");
+  if (!coherent.ok) return { status:"invalid_plan", reason:coherent.reason, target_level:target, stop_level:stop };
   const days = parseTimeframeDays(snap.action_timeframe);
   const tradeDate = resolveTradeDate(trade);
   if (!tradeDate) return { status:"open", reason:"bad date" };
@@ -1046,6 +1170,16 @@ async function runPaperSimulation({ force = false } = {}) {
     for (const trade of rows) {
       simulated++;
       const result = simulateTradeExit(trade, series);
+      if (result.status === "invalid_plan") {
+        await updateTrade(trade.id || trade.trade_id, {
+          lifecycle_status:"invalid_plan",
+          exit_reason:result.reason,
+          sim_target_level:result.target_level ?? null,
+          sim_stop_level:result.stop_level ?? null,
+          sim_checked_at:new Date().toISOString(),
+        });
+        continue;
+      }
       if (result.status === "open") {
         await updateTrade(trade.id || trade.trade_id, {
           lifecycle_status:"open",
@@ -1082,14 +1216,29 @@ async function runPaperSimulationManual() {
   renderCurrentView();
 }
 
+function tradePlanStatus(t) {
+  if (t?.is_paper !== true) return { ok:true };
+  const entry = Number(t.price);
+  const direction = String(t.direction || "buy").toLowerCase();
+  const isShort = ["sell", "trim", "exit", "short"].includes(direction);
+  const snap = t.analysis_snapshot || {};
+  const zone = parsePriceZone(snap.action_price_zone);
+  const inv = parseInvalidation(snap.action_invalidation);
+  const target = zone ? (isShort ? zone.hi : zone.lo) : num(t.scanner_snapshot?.target);
+  const stop = inv?.level ?? num(t.scanner_snapshot?.stop);
+  if (!(entry > 0 && target > 0 && stop > 0)) return { ok:false, reason:"missing target/stop plan" };
+  return coherentPlan(entry, target, stop, isShort ? "short" : "long");
+}
 function tradeIsClosed(t) {
-  return String(t?.lifecycle_status || "").startsWith("closed");
+  return String(t?.lifecycle_status || "").startsWith("closed") && tradePlanStatus(t).ok;
 }
 function tradeHasSetup(t) {
   const a = t?.analysis_snapshot || {};
   return !!(t?.scanner_snapshot || t?.verdict_snapshot || t?.presurge_snapshot || a.headline || a.action_price_zone || a.action_invalidation || a.action_timeframe);
 }
 function tradeOutcome(t) {
+  const plan = tradePlanStatus(t);
+  if (!plan.ok) return ["invalid plan", "ambiguous", plan.reason];
   const ls = String(t?.lifecycle_status || "");
   if (ls === "closed_target") return ["target", "successful", t.exit_reason || "Target reached"];
   if (ls === "closed_stop") return ["stop", "failed", t.exit_reason || "Stop hit"];
@@ -1120,14 +1269,16 @@ function renderJournalQuality(trades) {
   const list = Array.isArray(trades) ? trades : [];
   const total = list.length;
   const paper = list.filter(t => t.is_paper === true).length;
+  const invalidPlans = list.filter(t => t.is_paper === true && !tradePlanStatus(t).ok).length;
   const closed = list.filter(tradeIsClosed).length;
   const withSetup = list.filter(tradeHasSetup).length;
   const moves = list.filter(tradeIsClosed).map(t => Number(t.pnl_pct)).filter(Number.isFinite);
   const avgMove = moves.length ? moves.reduce((a, b) => a + b, 0) / moves.length : null;
   const issues = [];
   if (!total) issues.push("No trades logged yet.");
-  if (total - withSetup > 0) issues.push(`${total - withSetup} trade${total - withSetup === 1 ? "" : "s"} missing setup context. Use Paper test from Discovery rows when possible.`);
+  if (total - withSetup > 0) issues.push(`${total - withSetup} trade${total - withSetup === 1 ? "" : "s"} missing setup context. Use Broad scan so prime rows are auto-logged with setup data.`);
   if (!paper) issues.push("No paper trades yet.");
+  if (invalidPlans) issues.push(`${invalidPlans} paper trade${invalidPlans === 1 ? "" : "s"} excluded because target/stop does not match direction.`);
   if (closed < 5) issues.push("Fewer than 5 closed outcomes. Treat performance as early and noisy.");
   if (!issues.length) issues.push("Journal quality is usable.");
   return `<section class="card">
@@ -1147,7 +1298,7 @@ function qualityCell(k, v, tone = null) {
   return `<div class="quality-cell"><span class="q-k">${esc(k)}</span><span class="q-v ${cls}">${esc(v)}</span></div>`;
 }
 function renderTradeRows(trades) {
-  if (!trades.length) return `<div class="empty">No trades logged yet. Use Paper test on a strong Discovery row.</div>`;
+  if (!trades.length) return `<div class="empty">No trades logged yet. Run Broad scan; prime paper-ready opportunities are logged automatically.</div>`;
   return trades.map(t => {
     const [label, cls, title] = tradeOutcome(t);
     const setup = t.scanner_snapshot?.read?.one_liner || t.analysis_snapshot?.headline || "No setup snapshot captured.";
@@ -1258,6 +1409,14 @@ function renderSettings() {
       <div class="settings-row">
         <div><div class="lbl">Minimum reward/risk</div><div class="sub">Paper-ready setups must meet this threshold.</div></div>
         <input class="setting-input" id="minRewardRisk" type="number" min="0.5" step="0.1" value="${esc(state.investorProfile.min_reward_risk || 2)}" />
+      </div>
+      <div class="settings-row">
+        <div><div class="lbl">Auto-log prime paper trades</div><div class="sub">After each broad scan, prime paper-ready setups are logged automatically.</div></div>
+        <input id="autoPrimePaper" type="checkbox" ${state.investorProfile.auto_prime_paper !== false ? "checked" : ""} />
+      </div>
+      <div class="settings-row">
+        <div><div class="lbl">Max auto paper trades per scan</div><div class="sub">Caps the number of new prime setups added to the journal.</div></div>
+        <input class="setting-input" id="autoPrimeLimit" type="number" min="1" max="20" step="1" value="${esc(state.investorProfile.auto_prime_limit || 5)}" />
       </div>
       <div class="settings-row">
         <div><div class="lbl">Worker</div><div class="sub">${esc(WORKER_URL.replace("https://", ""))}</div></div>
