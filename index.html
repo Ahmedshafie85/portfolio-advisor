@@ -304,6 +304,7 @@ const state = {
   investorProfile: { min_reward_risk: 2.0, auto_prime_paper: true, auto_prime_limit: 5 },
   autoPaper: { loading: false, last: null },
   expandedTrades: {},
+  expandedAnalysis: {},
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -717,6 +718,39 @@ function msPaperTestPlan(row, gate = msInvestmentGate(row)) {
   if (rsi != null && rsi >= 72) return { ok:false, reason:"extended" };
   return { ok:true, direction, entry:price, target, stop, rr, days:msPaperTimeframe(row) };
 }
+function paperEligibilityBreakdown(row, gate = msInvestmentGate(row), plan = msPaperTestPlan(row, gate)) {
+  const minRR = Number(state.investorProfile?.min_reward_risk) || 2;
+  const direction = setupDirection(row);
+  const price = num(row?.current_price);
+  const support = num(row?.nearest_support);
+  const resistance = num(row?.nearest_resistance);
+  const target = direction === "short" ? support : resistance;
+  const stop = direction === "short" ? resistance : support;
+  const shape = coherentPlan(price, target, stop, direction);
+  const rr = shape.ok ? shape.rr : num(row?.reward_risk);
+  const reasons = [];
+  const passes = [];
+  const add = (ok, good, bad) => (ok ? passes : reasons).push(ok ? good : bad);
+
+  add(msPrimaryScore(row) >= 75, `prime score ${Math.round(msPrimaryScore(row))}`, `not prime yet: score ${Math.round(msPrimaryScore(row))}`);
+  add(gate.score >= 76, `gate ${gate.label} ${gate.score}`, `gate below Ready: ${gate.label} ${gate.score}`);
+  add(!row?._soft, "not a soft candidate", "soft candidate");
+  add(!row?.entry_state || row.entry_state === "actionable", "entry is actionable", `entry is ${String(row?.entry_state || "unknown").replace(/_/g, " ")}`);
+  add(shape.ok, `${direction} plan geometry is valid`, shape.reason || "target/stop not valid");
+  add(rr != null && rr >= minRR, rr == null ? `R:R unavailable` : `R:R ${rr.toFixed(1)}:1`, rr == null ? "R:R unavailable" : `R:R ${rr.toFixed(1)}:1 below ${minRR.toFixed(1)}:1`);
+  add((num(row?.day_change_pct) ?? 0) > -3, "not selling off today", "selling off today");
+  add((num(row?.rsi14) ?? 55) < 72, "not extended", `RSI ${Number(row?.rsi14).toFixed(0)} is extended`);
+
+  return {
+    ok: plan.ok && msPrimaryScore(row) >= 75,
+    direction,
+    reasons,
+    passes,
+    summary: plan.ok && msPrimaryScore(row) >= 75
+      ? "Auto-paper eligible."
+      : `Not auto-paper: ${reasons.slice(0, 3).join("; ") || plan.reason || "rules not met"}.`,
+  };
+}
 function msMatchesDeskFilters(row) {
   const cap = state.marketScanCapFilter || "all";
   const setup = state.marketScanSetupFilter || "all";
@@ -966,6 +1000,8 @@ function renderOpportunityRow(r, rd) {
   const [tierLabel, tierCls] = msScoreTier(score);
   const gate = msInvestmentGate(r);
   const plan = msPaperTestPlan(r, gate);
+  const breakdown = paperEligibilityBreakdown(r, gate, plan);
+  const expanded = !!state.expandedAnalysis[String(r.symbol || "").toUpperCase()];
   const rr = msRiskReward(r);
   const day = num(r.day_change_pct);
   const adv = num(r.avg_dollar_vol_20d);
@@ -1024,12 +1060,24 @@ function renderOpportunityRow(r, rd) {
               ${rd.risk_note ? `<div><b>Risk:</b> ${esc(rd.risk_note)}</div>` : ""}
             </div>
           </div>` : ""}
+        ${expanded ? `
+          <div class="read">
+            <div class="read-one">${esc(r.symbol)} paper-trade analysis</div>
+            <div class="read-setup">${esc(breakdown.summary)}</div>
+            <div class="read-grid">
+              <div><b>Direction:</b> ${esc(breakdown.direction)}</div>
+              <div><b>Auto rule:</b> prime + paper-ready only</div>
+              ${breakdown.reasons.length ? `<div><b>Blockers:</b> ${esc(breakdown.reasons.join("; "))}</div>` : ""}
+              ${breakdown.passes.length ? `<div><b>Passed:</b> ${esc(breakdown.passes.join("; "))}</div>` : ""}
+            </div>
+          </div>` : ""}
         <div class="row-actions">
+          <button class="btn-secondary" data-act="toggle-analysis" data-symbol="${esc(r.symbol)}">${expanded ? "Hide analysis" : "Analyze"}</button>
           ${plan.ok && score >= 75
             ? `<span class="meta good">Auto-paper prime</span>`
             : plan.ok
               ? `<span class="meta warn">Paper-ready, not prime</span>`
-              : `<span class="meta warn">${esc(msPaperTestPlan(r, gate).reason || "Not paper-ready")}</span>`}
+              : `<span class="meta warn">${esc(breakdown.summary)}</span>`}
         </div>
       </div>
     </article>`;
@@ -1461,6 +1509,11 @@ document.addEventListener("click", async e => {
     else if (act === "deep-scan") await runMarketScan({ discover:true });
     else if (act === "set-ms-lane") { state.marketScanLane = target.dataset.lane || "all"; renderCurrentView(); }
     else if (act === "toggle-ms-soft") { state.marketScanHideSoft = !state.marketScanHideSoft; renderCurrentView(); }
+    else if (act === "toggle-analysis") {
+      const sym = String(target.dataset.symbol || "").toUpperCase();
+      state.expandedAnalysis[sym] = !state.expandedAnalysis[sym];
+      renderCurrentView();
+    }
     else if (act === "paper-test-scan") await paperTestScannerOpportunity(target.dataset.symbol);
     else if (act === "run-paper-sim") await runPaperSimulationManual();
     else if (act === "delete-trade") {
