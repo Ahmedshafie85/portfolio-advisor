@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#1a1814" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Opportunities" />
-<title>Opportunity Tester</title>
+<meta name="apple-mobile-web-app-title" content="Portfolio" />
+<title>Portfolio Advisor</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 
@@ -87,7 +87,7 @@ body {
 
 .tabs {
   position: fixed; bottom: 0; left: 0; right: 0;
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   background: var(--bg);
   border-top: 1px solid var(--rule);
   padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
@@ -309,7 +309,7 @@ body {
   font-style: italic; font-size: 12px;
 }
 
-/* Trade log list rows in Settings. Tight, monospaced for numbers. */
+/* Trade log list rows in Journal. Tight, monospaced for numbers. */
 .trade-log-list {
   display: flex; flex-direction: column; gap: 8px;
 }
@@ -4768,12 +4768,12 @@ body {
 <body>
 
 <div class="loader-screen" id="loader">
-  <div class="loader-logo">Opportunity</div>
+  <div class="loader-logo">Portfolio</div>
   <div class="loader-bar"></div>
 </div>
 
 <div class="pin-screen hidden" id="pinScreen">
-  <div class="pin-logo">Opportunity</div>
+  <div class="pin-logo">Portfolio</div>
   <div class="pin-tag">Advisor</div>
   <div class="pin-prompt" id="pinPrompt">Enter your 4-digit PIN</div>
   <div class="pin-dots" id="pinDots">
@@ -4786,7 +4786,7 @@ body {
 
 <div class="auth-screen hidden" id="authScreen">
   <div class="auth-card">
-    <div class="auth-logo">Opportunity</div>
+    <div class="auth-logo">Portfolio</div>
     <div class="auth-tag">Sign in to sync across devices</div>
     <div id="authMode" class="auth-tabs">
       <button class="auth-tab active" data-act="auth-tab" data-mode="signin">Sign In</button>
@@ -4821,7 +4821,7 @@ body {
 <div class="app hidden" id="app">
   <div class="topbar">
     <div>
-      <div class="topbar-title" id="topbarTitle">Discover</div>
+      <div class="topbar-title" id="topbarTitle">Portfolio</div>
       <div class="topbar-meta" id="topbarMeta">—</div>
     </div>
     <div class="topbar-icons">
@@ -4837,7 +4837,12 @@ body {
   <div class="view" id="view"></div>
 
   <div class="tabs" id="tabs">
-    <button class="tab active" data-view="discover">
+    <button class="tab active" data-view="portfolio">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+      </svg>Portfolio
+    </button>
+    <button class="tab" data-view="discover">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
       </svg>Discover
@@ -4875,7 +4880,7 @@ function showBootError(msg) {
   const loader = document.getElementById("loader");
   if (loader) {
     loader.innerHTML = `
-      <div style="font-family: serif; font-size: 24px; margin-bottom: 18px;">Opportunity</div>
+      <div style="font-family: serif; font-size: 24px; margin-bottom: 18px;">Portfolio</div>
       <div style="font-family: monospace; font-size: 12px; color: #a13d2d; padding: 16px; max-width: 90%; word-break: break-word; line-height: 1.5; background: rgba(161,61,45,0.08); border-radius: 8px; margin: 0 20px;">
         <b>Boot error:</b><br>${String(msg).slice(0, 400)}
       </div>
@@ -5110,7 +5115,7 @@ const INITIAL_VERDICT_CACHE = readVerdictCache();
 const state = {
   uid: null,
   pinAttempts: 0,
-  currentView: "discover",
+  currentView: "portfolio",
   holdings: [],
   prices: {},
   analyses: {},
@@ -5171,7 +5176,7 @@ const state = {
   lastScanAt: null,
   ohlcvCache: {}, // symbol -> { ohlcv, fetched_at }
   expandedAnalyses: {}, // key -> bool; "portfolio" or symbol
-  // H3 — which trade rows in Settings are showing their outcome trajectory.
+  // H3 — which trade rows in Journal are showing their outcome trajectory.
   // Cleared on app open; in-memory only.
   expandedTrades: {},
   // Phase M — which Watchlist/Opportunity rows have their inline verdict open.
@@ -5667,14 +5672,20 @@ async function ensureAuth() {
 async function loadInitialData() {
   await ensureAuth();
   await loadHoldingsFromFirestore();
+  if (state.holdings.length === 0) await seedHoldings();
   await loadInvestorProfile();
   await loadAnalysesFromFirestore();
+  await loadPortfolioAnalysis();
   await loadWatchlist();
   if (state.watchlist.length === 0) await seedWatchlist();
+  await loadTriggers();
+  await loadNotifications();
   await refreshAllPrices();
   renderCurrentView();
   // Background scan after first render
   setTimeout(() => runScan().catch(() => {}), 1500);
+  // Phase C — unified verdict on first load. Debounced to 4h.
+  setTimeout(() => runVerdict(false).catch(() => {}), 4500);
   // Phase R — paper-trade exit simulation on first load. Cooldown 6h via
   // localStorage. Replays every open paper trade against its symbol's daily
   // OHLC history and closes any that hit target/stop/timeout.
@@ -5690,6 +5701,15 @@ async function loadInitialData() {
     }).catch(() => {});
   }, 5500);
 
+  // ROUND 1+1.5 AUTO-REFRESH:
+  // The verdict math depends on 5 signal sources — Daily Scan (always runs),
+  // AI Analyses (per-symbol manual), Macro, Pre-Surge, News, ETF momentum.
+  // The latter three previously only ran when the user pressed buttons, which
+  // meant the verdict was usually computed with 2-of-5 signals missing.
+  // Auto-run each one in the background after first render. Each fetcher has
+  // its own cache (Macro 6h, Pre-Surge 12h, News ~6h, ETF leaderboard ~24h)
+  // so this is cheap on repeat opens.
+  setTimeout(() => { autoRefreshSignals().catch(e => console.warn("auto-refresh:", e)); }, 2000);
 }
 
 // Background-fetch every signal the verdict depends on. Each individual
@@ -7937,14 +7957,15 @@ function computePortfolioRisk() {
 // VIEWS
 // ============================================================================
 // ----------------------------------------------------------------------------
-// Router — lean top-level views:
-//   discover, journal, settings.
-// Legacy/portfolio routes are remapped to Discover so the app stays focused on
-// opportunities and paper-test feedback.
+// Router — 3 top-level views:
+//   portfolio, discover, settings.
+// Legacy view names (markets, watchlist, signals, news, bot, journal, scans)
+// are remapped to current homes so old setView() calls and deep links keep
+// working. Discover holds Watchlist + Pre-Surge scanner (no sub-tabs).
 // ----------------------------------------------------------------------------
 function renderCurrentView() {
   const v = state.currentView;
-  if (v === "portfolio") { state.currentView = "discover"; return renderDiscover(); }
+  if (v === "portfolio") return renderPortfolio();
   if (v === "discover")  return renderDiscover();
   if (v === "journal")   return renderJournal();
   if (v === "settings")  return renderSettings();
@@ -7952,22 +7973,23 @@ function renderCurrentView() {
   // stale localStorage state doesn't break the app on first load.
   if (v === "markets" || v === "watchlist") { state.currentView = "discover"; return renderDiscover(); }
   if (v === "signals" || v === "news" || v === "bot" || v === "scans") {
-    state.currentView = "discover";
-    return renderDiscover();
+    state.currentView = "portfolio";
+    return renderPortfolio();
   }
-  state.currentView = "discover";
-  renderDiscover();
+  state.currentView = "portfolio";
+  renderPortfolio();
 }
 function setView(v) {
-  // Remap legacy view names to the lean 3-tab structure.
+  // Remap legacy view names to the new 3-tab structure (Portfolio, Discover,
+  // Settings). Anything that used to live under Signals now redirects to
+  // Portfolio — the verdict layer covers the same ground.
   const LEGACY_TO_NEW = {
     markets:   { view: "discover", sub: "watchlist" },
     watchlist: { view: "discover", sub: "watchlist" },
-    portfolio: { view: "discover" },
-    news:      { view: "discover" },
-    bot:       { view: "discover" },
-    signals:   { view: "discover" },
-    scans:     { view: "discover" },
+    news:      { view: "portfolio" },
+    bot:       { view: "portfolio" },
+    signals:   { view: "portfolio" },
+    scans:     { view: "portfolio" },
   };
   const mapped = LEGACY_TO_NEW[v];
   if (mapped) {
@@ -11461,7 +11483,7 @@ async function renderAssetDetail(symbol) {
         <div class="pos-row"><span class="lbl">${isCash ? 'Value' : 'Cost Basis'}</span><span class="val">$${fmtUSD(holding.avg_cost_total, 0)}</span></div>
         ${!isCash ? `<div class="pos-row"><span class="lbl">Current Value</span><span class="val">$${fmtUSD(hm.value, 0)}</span></div>
         <div class="pos-row"><span class="lbl">Unrealized P&L</span><span class="val ${hm.pnlAbs >= 0 ? 'pos' : 'neg'}">${hm.pnlAbs >= 0 ? '+' : ''}$${fmtUSD(Math.abs(hm.pnlAbs), 0)} · ${fmtPct(hm.pnlPct)}</span></div>
-        <div class="pos-row"><span class="lbl">% of Holdings</span><span class="val">${pctOfPort != null ? pctOfPort.toFixed(1) + '%' : '—'}</span></div>` : ''}
+        <div class="pos-row"><span class="lbl">% of Portfolio</span><span class="val">${pctOfPort != null ? pctOfPort.toFixed(1) + '%' : '—'}</span></div>` : ''}
         <div class="pos-actions">
           <button class="btn btn-secondary btn-sm" data-act="edit-holding" data-symbol="${escAttr(symbol)}">Edit</button>
           <button class="btn btn-danger btn-sm" data-act="delete-holding" data-symbol="${escAttr(symbol)}">Remove</button>
@@ -13089,14 +13111,6 @@ async function saveTrade(trade) {
     trade_date: trade.trade_date || new Date().toISOString().slice(0, 10),
     created_at: trade.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    // H3 fields — null until the evaluator job fills them in
-    evaluated_at:           trade.evaluated_at           ?? null,
-    outcome:                trade.outcome                ?? null,
-    outcome_reason:         trade.outcome_reason         ?? null,
-    price_at_evaluation:    trade.price_at_evaluation    ?? null,
-    target_hit:             trade.target_hit             ?? null,
-    stop_hit:               trade.stop_hit               ?? null,
-    held_through_evaluation: trade.held_through_evaluation ?? null,
   };
   await db.collection("users").doc(state.uid).collection("trades").doc(id).set(doc, { merge: true });
   return id;
@@ -13177,30 +13191,6 @@ function buildTradeContext(symbol) {
   } catch (e) { /* non-fatal — context is best-effort */ }
   return { verdict_snapshot, analysis_snapshot, presurge_snapshot, local_verdict_snapshot, price_at_decision: price };
 }
-
-// ============================================================================
-// PHASE H3 — Trade outcome evaluator.
-//
-// Runs weekly per trade. Each evaluation appends a row to trade.outcomes[].
-// The latest row's outcome IS the trade's current outcome (denormalized to
-// trade.outcome for fast list rendering). Trade enters "final" status when
-// any of:
-//   - opposing-trade close (handled by checkRoundTripClose at log time)
-//   - 60-day age cap reached
-//   - 2 consecutive "successful" evaluations AND target hit
-//   - 2 consecutive "failed" evaluations AND invalidation breached
-//
-// Pure deterministic classification — no Claude calls. Cheap to run on app
-// open. The H5 quarterly research brief is where Claude reads ALL outcomes
-// and writes a narrative; this evaluator just produces the data.
-// ============================================================================
-
-const EVAL_INTERVAL_DAYS = 7;
-const EVAL_MAX_AGE_DAYS = 60;
-const EVAL_LAST_RUN_KEY = "evaluatorLastRun";
-// Cooldown: don't re-run the evaluator more than once every 6 hours, even if
-// boot fires repeatedly. Manual button in Settings always bypasses cooldown.
-const EVAL_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
 // ============================================================================
 // PHASE R — PAPER TRADE EXIT SIMULATION
@@ -14199,7 +14189,7 @@ function renderMarketScannerCard() {
         ${msPipelineHtml(r, rd, held, watched)}
         <div class="ms-fit">
 	          <div class="ms-fit-box"><span class="ms-fit-k">Why surfaced</span><span class="ms-fit-v ${escAttr(gate.tone === "pass" ? "good" : gate.tone === "reject" ? "bad" : "")}">${escAttr(gate.primary)}</span></div>
-          <div class="ms-fit-box"><span class="ms-fit-k">Exposure fit</span><span class="ms-fit-v ${escAttr(fit.tone)}">${escAttr(fit.label)}</span></div>
+          <div class="ms-fit-box"><span class="ms-fit-k">Portfolio fit</span><span class="ms-fit-v ${escAttr(fit.tone)}">${escAttr(fit.label)}</span></div>
           <div class="ms-fit-box"><span class="ms-fit-k">Entry quality</span><span class="ms-fit-v">${escAttr(why)}</span></div>
         </div>
         <div class="ms-bars">${bars}</div>
@@ -14625,6 +14615,23 @@ function renderSettings() {
   const email = user?.email || "Anonymous (this device only)";
   view.innerHTML = `
     <div class="section-head" style="padding: 20px 20px 0;"><h2>Settings</h2></div>
+    <div class="settings-group howto-card">
+      <button class="howto-toggle" data-act="toggle-howto">
+        <span><b>How to use this app</b> — the weekly routine</span>
+        <span class="howto-chevron">${state.howtoOpen ? "▾" : "▸"}</span>
+      </button>
+      ${state.howtoOpen ? `
+      <div class="howto-body">
+        <div class="howto-step"><span class="howto-num">1</span><div><b>Scan (free).</b> Open Watchlist or Discover and tap <b>Scan now</b>. No AI cost — it scores your whole universe for setups.</div></div>
+        <div class="howto-step"><span class="howto-num">2</span><div><b>Read the shortlist.</b> In Discover, the Screener ranks names by setup quality. You're just reading the free pre-reads, not analyzing yet.</div></div>
+        <div class="howto-step"><span class="howto-num">3</span><div><b>Analyze 3–5 only.</b> Tap Analyze on the best few. This is the one place you spend money — on a handful, not the whole list.</div></div>
+        <div class="howto-step"><span class="howto-num">4</span><div><b>Read the directive.</b> Each shows <i>BUY at $X · buy $Y · confidence Z</i>. HIGH + a setup you like = act. LOW/MED = wait.</div></div>
+        <div class="howto-step"><span class="howto-num">5</span><div><b>Check holdings.</b> On Portfolio, most say HOLD — ignore those. Act only on <b>SELL</b>, <b>ADD</b>, or the red pulsing <b>EXIT</b>.</div></div>
+        <div class="howto-step"><span class="howto-num">6</span><div><b>Log what you do.</b> Tap Log Trade. Over time the Journal shows which setups actually pay off for you.</div></div>
+        <div class="howto-step"><span class="howto-num">7</span><div><b>Let Telegram watch.</b> You don't check daily. Add names to the watchlist (alerts auto-arm) and the cron pings you when something fires.</div></div>
+        <div class="howto-note">One line: <b>Scan → read shortlist → analyze the best few → act on loud directives → log it → let Telegram watch the rest.</b> This is decision support, not a signal to follow blindly — the confidence label tells you when the app itself isn't sure.</div>
+      </div>` : ""}
+    </div>
     <div class="settings-group">
       <div class="setting-row">
         <div>
@@ -14650,7 +14657,7 @@ function renderSettings() {
         <button class="btn btn-secondary btn-sm" data-act="rescan">Scan</button>
       </div>
       <div class="setting-row">
-        <div><div class="lbl">Export Data (JSON)</div><div class="sub">Holdings + journal + watchlist</div></div>
+        <div><div class="lbl">Export Portfolio (JSON)</div><div class="sub">Holdings + journal + alerts</div></div>
         <button class="btn btn-secondary btn-sm" data-act="export-data">Export</button>
       </div>
     </div>
@@ -14662,18 +14669,23 @@ function renderSettings() {
         <div><div class="lbl">Worker</div><div class="sub" style="font-family:var(--mono);font-size:10.5px;">portfolio-advisor.abdelshafie-ahmed.workers.dev</div></div>
       </div>
       <div class="setting-row">
-        <div><div class="lbl">Version</div><div class="sub">lean opportunity tester</div></div>
+        <div><div class="lbl">Version</div><div class="sub">1.15.0 discovery logic</div></div>
       </div>
     </div>
+    ${renderSettingsQualitySection()}
+    ${renderAppHealthSection()}
+    ${renderSignalLearningSection()}
     ${renderInvestorProfileSection()}
+    ${renderRiskSettings()}
+    ${renderNotificationsSection()}
     <div class="settings-group">
       <div class="section-head" style="padding: 0 4px 8px; display:flex; justify-content:space-between; align-items:baseline;">
-        <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Optional Holdings</h3>
+        <h3 style="font-family:var(--display); font-size:18px; font-weight:500; letter-spacing:-0.01em;">Holdings</h3>
         <button class="btn-ghost-sm" data-act="add-holding">+ Add</button>
       </div>
       <div class="holdings-list-settings">
         ${state.holdings.length === 0
-          ? `<div class="setting-row" style="color:var(--ink-muted);font-size:12px;">Optional. Add holdings only if you want Discovery to judge portfolio fit.</div>`
+          ? `<div class="setting-row" style="color:var(--ink-muted);font-size:12px;">No holdings yet. Tap "+ Add" to enter your first position.</div>`
           : state.holdings.map(h => {
               const m = holdingMetrics(h);
               const isCash = h.asset_class === "cash";
@@ -14702,29 +14714,55 @@ function renderSettings() {
 }
 
 // ============================================================================
-// JOURNAL — dedicated tab (Phase R+). Holds the Trade Log and the Paper
-// Performance panel. These previously lived inside Settings; promoted to
-// their own tab so the audit surface is a first-class destination.
+// JOURNAL — trade log plus paper-performance audit.
 // ============================================================================
+function tradeIsClosed(t) {
+  return !!(t?.lifecycle_status && String(t.lifecycle_status).startsWith("closed"));
+}
+function tradeHasDecisionContext(t) {
+  const a = t?.analysis_snapshot || null;
+  return !!(
+    t?.scanner_snapshot ||
+    t?.verdict_snapshot ||
+    t?.local_verdict_snapshot ||
+    t?.presurge_snapshot ||
+    (a && (a.headline || a.action_what || a.action_price_zone || a.action_invalidation || a.action_timeframe))
+  );
+}
+function tradeOutcomeView(t) {
+  const ls = String(t?.lifecycle_status || "");
+  if (ls === "closed_target") return { label: "target", cls: "successful", title: t.exit_reason || "Target reached" };
+  if (ls === "closed_stop") return { label: "stop", cls: "failed", title: t.exit_reason || "Stop hit" };
+  if (ls === "closed_timeout") {
+    const pnl = Number(t.pnl_pct);
+    return {
+      label: "timeout",
+      cls: pnl > 0 ? "successful" : pnl < 0 ? "failed" : "ambiguous",
+      title: t.exit_reason || "Timeframe expired",
+    };
+  }
+  if (ls === "open" || !ls) return { label: "open", cls: "pending", title: "Open paper test" };
+  const outcome = String(t?.outcome || "pending").toLowerCase();
+  return { label: outcome, cls: outcome, title: t?.outcome_reason || "Pending" };
+}
+
 function renderJournalQuality(trades) {
   const list = Array.isArray(trades) ? trades : [];
   const total = list.length;
   const paper = list.filter(t => t.is_paper === true).length;
   const real = total - paper;
-  const withContext = list.filter(t => t.verdict_snapshot || t.local_verdict_snapshot || t.presurge_snapshot).length;
+  const withContext = list.filter(tradeHasDecisionContext).length;
   const missingContext = total - withContext;
-  const closed = list.filter(t => t.outcome_status === "final" || ["closed_target", "closed_stop", "timeout"].includes(String(t.outcome || ""))).length;
-  const moves = list.map(t => {
-    const outcomes = Array.isArray(t.outcomes) ? t.outcomes : [];
-    const last = outcomes.length ? outcomes[outcomes.length - 1] : null;
-    const v = last?.thesis_move_pct ?? t.thesis_move_pct;
-    return Number.isFinite(Number(v)) ? Number(v) : null;
-  }).filter(v => v != null);
+  const closed = list.filter(tradeIsClosed).length;
+  const moves = list
+    .filter(tradeIsClosed)
+    .map(t => Number(t.pnl_pct))
+    .filter(Number.isFinite);
   const avgMove = moves.length ? moves.reduce((a, b) => a + b, 0) / moves.length : null;
   const contextPct = total ? Math.round(withContext / total * 100) : 0;
   const issues = [];
   if (!total) issues.push("No trades logged yet, so the app cannot learn from your decisions.");
-  if (missingContext > 0) issues.push(`${missingContext} trade${missingContext === 1 ? "" : "s"} missing verdict context. Log from ACT rows when possible.`);
+  if (missingContext > 0) issues.push(`${missingContext} trade${missingContext === 1 ? "" : "s"} missing setup context. Use Paper test from Discovery rows when possible.`);
   if (paper === 0) issues.push("No paper trades yet. Paper-log strong Discover names before risking cash.");
   if (closed < 5) issues.push("Fewer than 5 closed outcomes. Treat signal performance as early and noisy.");
   if (!issues.length) issues.push("Journal quality is usable: trades have context and enough outcomes to start judging signals.");
@@ -14737,7 +14775,7 @@ function renderJournalQuality(trades) {
       <div class="health-grid">
         <div class="health-cell"><span class="health-k">Logged</span><span class="health-v">${total}</span></div>
         <div class="health-cell"><span class="health-k">Paper / Real</span><span class="health-v">${paper} / ${real}</span></div>
-        <div class="health-cell"><span class="health-k">With Context</span><span class="health-v">${contextPct}%</span></div>
+        <div class="health-cell"><span class="health-k">With Setup</span><span class="health-v">${contextPct}%</span></div>
         <div class="health-cell"><span class="health-k">Closed</span><span class="health-v">${closed}</span></div>
         <div class="health-cell"><span class="health-k">Avg Move</span><span class="health-v ${avgMove != null && avgMove >= 0 ? "good" : avgMove != null ? "bad" : ""}">${avgMove == null ? "—" : `${avgMove >= 0 ? "+" : ""}${avgMove.toFixed(1)}%`}</span></div>
       </div>
@@ -14748,6 +14786,7 @@ function renderJournalQuality(trades) {
 }
 
 function renderJournal() {
+  $("#topbarTitle").textContent = "Journal";
   const view = $("#view");
   if (!view) return;
   view.innerHTML = `
@@ -14784,9 +14823,6 @@ function renderJournal() {
   populatePaperPerformance().catch(e => console.warn("paper perf load:", e));
 }
 
-// Render the trade log list inside its slot. Called by renderSettings after
-// fetching from Firestore. Each row is tappable for delete (no edit yet —
-// the snapshot is the snapshot; if you mis-typed quantity, delete + re-log).
 async function populateTradeLogList() {
   const slot = $("#tradeLogList");
   if (!slot) return;
@@ -14795,7 +14831,7 @@ async function populateTradeLogList() {
     const trades = await loadTrades(100);
     if (qualitySlot) qualitySlot.innerHTML = renderJournalQuality(trades);
     if (trades.length === 0) {
-      slot.innerHTML = `<div class="setting-row" style="color:var(--ink-muted);font-size:12px;">No trades logged yet. Tap "Log Trade" on any ACT row or asset detail page.</div>`;
+      slot.innerHTML = `<div class="setting-row" style="color:var(--ink-muted);font-size:12px;">No trades logged yet. Use "Paper test" on strong Discovery rows to start measuring the scanner.</div>`;
       return;
     }
     slot.innerHTML = trades.map(t => {
@@ -14806,11 +14842,8 @@ async function populateTradeLogList() {
       const notional = (t.quantity != null && t.price != null)
         ? ` · $${fmtUSD(Math.abs(t.quantity * t.price), 0)}`
         : "";
-      // Outcome badge — shows the most recent outcome from t.outcomes[] (or
-      // legacy t.outcome field), tinted by terminal/active state.
-      const outcomeLabel = t.outcome || "pending";
-      const isFinal = t.outcome_status === "final";
-      const outcomeBadge = `<span class="trade-outcome trade-outcome-${escAttr(outcomeLabel)}" title="${escAttr(t.final_reason || (isFinal ? "Final" : "Active — re-evaluates weekly"))}">${escAttr(outcomeLabel)}${isFinal ? " · final" : ""}</span>`;
+      const ov = tradeOutcomeView(t);
+      const outcomeBadge = `<span class="trade-outcome trade-outcome-${escAttr(ov.cls)}" title="${escAttr(ov.title)}">${escAttr(ov.label)}</span>`;
       // Build trajectory expander if any outcomes exist.
       const outcomes = Array.isArray(t.outcomes) ? t.outcomes : [];
       const expanded = !!state.expandedTrades?.[t.id];
@@ -14824,13 +14857,10 @@ async function populateTradeLogList() {
               <span class="trade-traj-reason">${escAttr(o.reasoning || "")}</span>
             </div>
           `).join("")}
-          ${isFinal && t.final_reason ? `<div class="trade-traj-final">Finalized: ${escAttr(t.final_reason)}</div>` : ""}
+          ${tradeIsClosed(t) && (t.final_reason || t.exit_reason) ? `<div class="trade-traj-final">Finalized: ${escAttr(t.final_reason || t.exit_reason)}</div>` : ""}
         </div>` : "";
 
-      // Decision rationale — WHY this trade was taken, from the snapshots
-      // captured at log time. This is what turns the journal from a P&L ledger
-      // into a decision-grading tool: pair the reasoning with the outcome and
-      // you can see whether your good calls were good for the right reasons.
+      // Setup rationale captured at log time.
       const vs = t.verdict_snapshot || null;
       const lvs = t.local_verdict_snapshot || null;
       const pss = t.presurge_snapshot || null;
@@ -14852,10 +14882,25 @@ async function populateTradeLogList() {
       if (ss?.gate_score != null) {
         rationaleBits.push(`Discovery ${escAttr(ss.gate_label || "gate")} ${ss.gate_score}${ss.reward_risk ? ` · R:R ${Number(ss.reward_risk).toFixed(1)}:1` : ""}`);
       }
+      const as = t.analysis_snapshot || null;
+      if (as && !ss) {
+        if (as.headline) rationaleBits.push(escAttr(as.headline));
+        if (as.action_price_zone || as.action_invalidation || as.action_timeframe) {
+          const planBits = [
+            as.action_price_zone ? `target ${escAttr(as.action_price_zone)}` : "",
+            as.action_invalidation ? `stop ${escAttr(as.action_invalidation)}` : "",
+            as.action_timeframe ? `${escAttr(as.action_timeframe)}` : "",
+          ].filter(Boolean);
+          if (planBits.length) rationaleBits.push(planBits.join(" · "));
+        }
+      }
       if (vs?.key_signal) rationaleBits.push(escAttr(vs.key_signal));
       const rationaleHtml = rationaleBits.length > 0
         ? `<div class="trade-why">${rationaleBits.join(" · ")}</div>`
-        : `<div class="trade-why trade-why-none">No decision context captured — logged without a verdict on record.</div>`;
+        : `<div class="trade-why trade-why-none">No setup snapshot captured — use Paper test from Discovery to attach target, stop, and reason.</div>`;
+      const closedMeta = tradeIsClosed(t)
+        ? ` · ${escAttr(t.exit_reason || ov.title)}${Number.isFinite(Number(t.pnl_pct)) ? ` · ${Number(t.pnl_pct) >= 0 ? "+" : ""}${Number(t.pnl_pct).toFixed(2)}%` : ""}`
+        : "";
 
       return `
         <div class="trade-row" data-trade-id="${escAttr(t.id)}">
@@ -14868,7 +14913,7 @@ async function populateTradeLogList() {
             </div>
             ${rationaleHtml}
             <div class="trade-row-meta">
-              ${escAttr(t.trade_date || "")}${t.notes ? ` · ${escAttr(t.notes)}` : ""}
+              ${escAttr(t.trade_date || "")}${t.notes ? ` · ${escAttr(t.notes)}` : ""}${closedMeta}
             </div>
             ${trajectoryHtml}
           </div>
@@ -14906,7 +14951,6 @@ async function confirmDeleteTrade(tradeId) {
   }
 }
 
-// Manual paper-simulation trigger from Settings. Bypasses the 6h cooldown.
 async function runPaperSimulationManual() {
   toast("Running paper-trade simulation…");
   try {
@@ -15442,9 +15486,12 @@ function resetPin() {
   }
 }
 async function manualRefresh() {
-  toast("Refreshing prices…");
+  toast("Refreshing prices & signals…");
   await refreshAllPrices();
   renderCurrentView();
+  // Refresh all verdict-input signals too. Each respects its own cache TTL,
+  // so this is cheap if called within the cache window.
+  await autoRefreshSignals().catch(e => console.warn("manual auto-refresh:", e));
   // Re-run watchlist scan to update firing conditions
   await runScan().catch(() => {});
   toast("Refreshed");
@@ -15456,6 +15503,7 @@ async function exportData() {
     exported_at: new Date().toISOString(),
     holdings: state.holdings,
     analyses: state.analyses,
+    portfolio_analysis: state.portfolioAnalysis,
     watchlist: state.watchlist,
     journal,
   };
@@ -15463,7 +15511,7 @@ async function exportData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `opportunity_tester_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `portfolio_${new Date().toISOString().slice(0,10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -15562,7 +15610,10 @@ const debouncedSearchHold = debounce(async () => {
 async function syncPortfolioAfterHoldingsChange() {
   await loadHoldingsFromFirestore();
   await refreshAllPrices();
-  renderCurrentView();
+  state.verdictsAt = null;                  // kill the 4h debounce
+  localStorage.removeItem("verdictsAt_v2"); // and its persisted copy
+  renderCurrentView();                      // instant repaint with the new book
+  runVerdict(true).catch(() => {});         // fresh verdicts in the background
 }
 
 async function submitAddHolding() {
@@ -15971,7 +16022,7 @@ function openAddCondition(symbol) {
       </select>
     </div>
     <div id="cond_fields"></div>
-    <div class="field-hint" style="margin-bottom:14px;">Conditions are checked every time you scan and stay attached to this watchlist name.</div>
+    <div class="field-hint" style="margin-bottom:14px;">Conditions are checked every time you scan. When a condition becomes true, you'll see it in the Opportunities card on Portfolio tab.</div>
     <button class="btn btn-block" data-act="submit-cond" data-symbol="${escAttr(symbol)}">Add Condition</button>
   `);
   $("#cond_type").addEventListener("change", renderCondFields);
