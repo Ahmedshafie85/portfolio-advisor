@@ -301,6 +301,7 @@ const state = {
   marketScanCapFilter: "all",
   marketScanSetupFilter: "all",
   marketScanSectorFilter: "all",
+  broadScanProgress: null,
   investorProfile: { min_reward_risk: 2.0, auto_prime_paper: true, auto_prime_limit: 5 },
   autoPaper: { loading: false, last: null },
   expandedTrades: {},
@@ -485,6 +486,117 @@ async function saveInvestorProfile() {
   renderCurrentView();
 }
 
+const BROAD_BATCH_SIZE = 90;
+const BROAD_SCAN_BATCH_DEFS = [
+  { key:"tech_ai_semis", label:"Tech, AI, semis", symbols:`
+    AAPL MSFT NVDA AVGO ORCL CRM AMD NOW PLTR ADBE CSCO ACN INTC QCOM TXN MU ANET PANW CRWD SNPS SMCI MRVL ON ARM DDOG NET SNOW ZS MDB CFLT HUBS TEAM WDAY FTNT CDNS KLAC LRCX MPWR ALGM ACLS CRDO ALAB COHR LSCC RMBS SITM AMKR ONTO FORM UCTT ICHR AEHR CAMT VECO DIOD POWI AMBA OKTA TWLO GTLB S FROG BRZE ESTC PCOR APPF BL PD MNDY DOCN BILL IOT TENB RBRK PATH NCNO ASAN BASE AI
+  ` },
+  { key:"comm_consumer", label:"Communication and consumer", symbols:`
+    GOOGL META NFLX DIS TMUS CMCSA RBLX SPOT PINS TTD RDDT LYV EA TTWO MTCH SNAP ROKU WBD FOXA AMZN TSLA HD MCD NKE BKNG LOW SBUX TJX CMG ABNB DKNG CAVA RCL DECK WSM ELF WING TXRH CROX RH CHWY BOOT ONON BIRK SHAK DUOL NCLH CCL W
+  ` },
+  { key:"staples_financials", label:"Staples, banks, fintech", symbols:`
+    WMT COST PG KO PEP MDLZ CL CELH MNST TGT KR KMB GIS HSY KDP CLX SYY CHD EL JPM BAC V MA GS BRK.B WFC MS AXP SCHW BLK HOOD COIN SOFI AFRM TOST FOUR NU DLO STNE UPST PAYO MQ SEZL LMND OPEN RKT ROOT ARES OWL KKR BX TPG RITM CBOE CME IBKR PGR WRB RLI KNSL ALLY CMA WAL C PNC USB TFC BK STT DFS COF CB MMC AJG AMP TROW FITB RF
+  ` },
+  { key:"healthcare_biotech", label:"Healthcare and biotech", symbols:`
+    UNH LLY JNJ ABBV MRK ISRG TMO ABT AMGN VRTX DXCM HIMS NVO VKTX CYTK MDGL RXRX TEM HALO EXEL NTRA TNDM INSP PCVX CRNX ARWR IONS ROIV ALKS IMVT JANX CGON ACLX BEAM CRSP VERA SWTX ITCI AXSM BSX SYK EW RMD ALNY REGN MRNA BMY GILD ZBH PODD IDXX GH
+  ` },
+  { key:"industrial_defense", label:"Industrials, defense, infrastructure", symbols:`
+    GE CAT BA UBER HON RTX UNP DE LMT AXON PWR BLDR BWXT HEI FIX PRIM STRL FLR IESC EME GVA MOD ATKR HUBB APG TMDX JOBY ACHR RKLB OSK WCC URI ETN EMR PH TT IR CARR JCI WAB FAST PAYX ODFL FDX UPS
+  ` },
+  { key:"hard_assets_yield", label:"Energy, materials, utilities, real estate", symbols:`
+    XOM CVX COP SLB EOG FANG LNG RRC AR SM MTDR CIVI CRC VIST PR NOG TALO OXY HAL BKR DVN CTRA EQT WMB MPC VLO PSX HES OKE LIN FCX NEM SHW ALB UEC CCJ MP LAC SQM CLF ATI AA STLD NUE DD DOW ECL APD SCCO TECK MOS CF PKG BALL NEE SO DUK VST CEG PEG AEP EXC SRE D XEL WEC ED PLD AMT EQIX
+  ` },
+  { key:"etf_macro", label:"ETFs and macro groups", symbols:`
+    SPY QQQ IWM DIA RSP XLE XLF XLV XLI XLY XLP XLU XLB XLRE SMH IGV IBB XBI KRE KWEB ITA GDX SLV GLD TLT VEA EFA EEM URA TAN COPX SIL XME XRT IYR VNQ HYG LQD JNK UUP FXI EWZ INDA EWJ EWW
+  ` },
+];
+function parseSymbolList(value) {
+  return Array.from(new Set(String(value || "")
+    .split(/[\s,]+/)
+    .map(s => s.trim().toUpperCase())
+    .filter(s => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(s))));
+}
+function buildBroadScanBatches() {
+  const batches = [];
+  for (const def of BROAD_SCAN_BATCH_DEFS) {
+    const symbols = parseSymbolList(def.symbols);
+    for (let i = 0; i < symbols.length; i += BROAD_BATCH_SIZE) {
+      const chunk = symbols.slice(i, i + BROAD_BATCH_SIZE);
+      batches.push({
+        key:`${def.key}_${Math.floor(i / BROAD_BATCH_SIZE) + 1}`,
+        label:symbols.length > BROAD_BATCH_SIZE ? `${def.label} ${Math.floor(i / BROAD_BATCH_SIZE) + 1}` : def.label,
+        symbols:chunk,
+      });
+    }
+  }
+  return batches;
+}
+function broadUniverseSymbols() {
+  return parseSymbolList(BROAD_SCAN_BATCH_DEFS.map(x => x.symbols).join(" "));
+}
+function combinedScanSortValue(row) {
+  const gate = msInvestmentGate(row);
+  const paperBonus = msPaperTestPlan(row, gate).ok ? 25 : 0;
+  const softPenalty = row?._soft ? 8 : 0;
+  return (msPrimaryScore(row) * 2) + gate.score + (msActionabilityScore(row) * 0.5) + paperBonus - softPenalty;
+}
+function combineBroadScans(scans, finalReadScan = null, errors = []) {
+  const bySymbol = new Map();
+  let requested = 0;
+  let scored = 0;
+  let returned = 0;
+  for (const item of scans) {
+    const batch = item.batch || {};
+    const scan = item.scan || {};
+    const results = Array.isArray(scan.results) ? scan.results : [];
+    requested += batch.symbols?.length || scan.universe_size || 0;
+    scored += Number(scan.scored_count || results.length || 0);
+    returned += results.length;
+    for (const row of results) {
+      const sym = String(row?.symbol || "").toUpperCase();
+      if (!sym) continue;
+      const stamped = { ...row, source_batch:batch.label || scan.universe_source || "broad" };
+      const existing = bySymbol.get(sym);
+      if (!existing || combinedScanSortValue(stamped) > combinedScanSortValue(existing)) bySymbol.set(sym, stamped);
+    }
+  }
+  if (finalReadScan?.results?.length) {
+    for (const row of finalReadScan.results) {
+      const sym = String(row?.symbol || "").toUpperCase();
+      if (sym) bySymbol.set(sym, { ...(bySymbol.get(sym) || {}), ...row, source_batch:bySymbol.get(sym)?.source_batch || "final read" });
+    }
+  }
+  const ranked = Array.from(bySymbol.values())
+    .sort((a, b) => combinedScanSortValue(b) - combinedScanSortValue(a))
+    .slice(0, 100)
+    .map((r, i) => ({ ...r, rank:i + 1 }));
+  const reads = Array.isArray(finalReadScan?.reads) ? finalReadScan.reads : [];
+  const ready = ranked.filter(r => !r._soft && msInvestmentGate(r).score >= 76).length;
+  const paperReady = ranked.filter(r => msPaperTestPlan(r).ok).length;
+  return {
+    results:ranked,
+    reads,
+    scan_note:`Rolling broad scan covered ${requested} requested symbols across ${scans.length} batches. ${scored} scored, ${returned} returned from batch leaders; combined list has ${ranked.length} ranked candidates, ${ready} Ready and ${paperReady} paper-ready. Auto-paper runs only after this combined ranking is complete.`,
+    universe_source:"rolling_broad",
+    universe_size:requested,
+    scored_count:scored,
+    returned_count:returned,
+    batch_count:scans.length,
+    batch_errors:errors,
+    coverage_symbols:broadUniverseSymbols().length,
+    generated_at:new Date().toISOString(),
+  };
+}
+async function fetchMarketScan(body) {
+  const idToken = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
+  const r = await fetch(`${WORKER_URL}/scan-market`, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({ uid:state.uid, idToken, ...body }),
+  });
+  if (!r.ok) throw new Error(`scan-market ${r.status}`);
+  return r.json();
+}
 async function loadCachedScan() {
   if (state.marketScan || state.marketScanLoading || state._cachedTried) return;
   state._cachedTried = true;
@@ -506,8 +618,6 @@ async function loadCachedScan() {
       _cached: true,
     };
     state.marketScanRanAt = d.generated_at || d.updated_at || new Date().toISOString();
-    const auto = await autoLogPrimePaperTrades(state.marketScan);
-    if (auto.logged) toast(`Auto-paper logged ${auto.logged}: ${auto.symbols.join(", ")}`);
     renderCurrentView();
   } catch (e) {
     console.warn("Cached scan unavailable", e);
@@ -516,26 +626,18 @@ async function loadCachedScan() {
 async function runMarketScan(opts = {}) {
   if (state.marketScanLoading) return;
   state.marketScanLoading = true;
+  state.broadScanProgress = null;
   renderCurrentView();
   try {
-    const idToken = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
-    const r = await fetch(`${WORKER_URL}/scan-market`, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body:JSON.stringify({
-        uid: state.uid,
-        idToken,
-        exclude_symbols: [],
-        focus_hint: state.marketScanFocus || undefined,
-        discover_mode: true,
-        broad_market: true,
-        max_results: 80,
-        force: opts.force === true || opts.discover === true || !!state.marketScanFocus,
-        write_reads: true,
-      }),
+    const j = await fetchMarketScan({
+      exclude_symbols: [],
+      focus_hint: state.marketScanFocus || undefined,
+      discover_mode: true,
+      broad_market: true,
+      max_results: 80,
+      force: opts.force === true || opts.discover === true || !!state.marketScanFocus,
+      write_reads: true,
     });
-    if (!r.ok) throw new Error(`scan-market ${r.status}`);
-    const j = await r.json();
     state.marketScan = j;
     state.marketScanRanAt = j.generated_at || new Date().toISOString();
     const auto = await autoLogPrimePaperTrades(j);
@@ -546,6 +648,75 @@ async function runMarketScan(opts = {}) {
     toast("Scan failed", "error");
   } finally {
     state.marketScanLoading = false;
+    renderCurrentView();
+  }
+}
+async function runRollingBroadScan() {
+  if (state.marketScanLoading) return;
+  const batches = buildBroadScanBatches();
+  const universeCount = broadUniverseSymbols().length;
+  state.marketScanLoading = true;
+  state.broadScanProgress = { current:0, total:batches.length, label:"starting", requested:universeCount, scored:0 };
+  renderCurrentView();
+  const scans = [];
+  const errors = [];
+  let scored = 0;
+  try {
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      state.broadScanProgress = { current:i + 1, total:batches.length, label:batch.label, requested:universeCount, scored };
+      renderCurrentView();
+      try {
+        const scan = await fetchMarketScan({
+          symbols:batch.symbols,
+          exclude_symbols:[],
+          max_universe:batch.symbols.length,
+          min_composite:0,
+          force:true,
+          write_reads:false,
+          _patient:true,
+        });
+        scans.push({ batch, scan });
+        scored += Number(scan.scored_count || scan.results?.length || 0);
+      } catch (e) {
+        errors.push({ batch:batch.label, error:String(e.message || e).slice(0, 120) });
+      }
+      state.broadScanProgress = { current:i + 1, total:batches.length, label:batch.label, requested:universeCount, scored };
+      renderCurrentView();
+    }
+    let combined = combineBroadScans(scans, null, errors);
+    const topSymbols = combined.results.slice(0, 18).map(r => String(r.symbol || "").toUpperCase()).filter(Boolean);
+    if (topSymbols.length) {
+      state.broadScanProgress = { current:batches.length, total:batches.length, label:"final top reads", requested:universeCount, scored };
+      renderCurrentView();
+      try {
+        const finalReadScan = await fetchMarketScan({
+          symbols:topSymbols,
+          exclude_symbols:[],
+          max_universe:topSymbols.length,
+          min_composite:0,
+          force:true,
+          write_reads:true,
+          _patient:true,
+        });
+        combined = combineBroadScans(scans, finalReadScan, errors);
+      } catch (e) {
+        errors.push({ batch:"final top reads", error:String(e.message || e).slice(0, 120) });
+        combined.batch_errors = errors;
+        combined.scan_note += " Final written reads were unavailable, but the ranked sweep is still usable.";
+      }
+    }
+    state.marketScan = combined;
+    state.marketScanRanAt = combined.generated_at || new Date().toISOString();
+    const auto = await autoLogPrimePaperTrades(combined);
+    const suffix = auto.logged ? ` - auto-paper logged ${auto.logged}: ${auto.symbols.join(", ")}` : "";
+    toast(`Broad sweep ranked ${combined.results.length} opportunities${suffix}`);
+  } catch (e) {
+    state.marketScan = { results:[], reads:[], scan_note:`Broad sweep failed: ${e.message || e}`, universe_source:"rolling_broad" };
+    toast("Broad sweep failed", "error");
+  } finally {
+    state.marketScanLoading = false;
+    state.broadScanProgress = null;
     renderCurrentView();
   }
 }
@@ -927,6 +1098,7 @@ function renderDiscover() {
 function renderMarketScannerCard() {
   const scan = state.marketScan;
   const loading = state.marketScanLoading;
+  const progress = state.broadScanProgress;
   const results = scan?.results || [];
   const reads = {};
   for (const rd of (scan?.reads || [])) reads[String(rd.symbol || "").toUpperCase()] = rd;
@@ -948,6 +1120,12 @@ function renderMarketScannerCard() {
     return `<button class="pill ${activeLane === id ? "active" : ""}" data-act="set-ms-lane" data-lane="${esc(id)}">${esc(label)} ${count}</button>`;
   }).join("");
   const rows = visible.map(r => renderOpportunityRow(r, reads[String(r.symbol || "").toUpperCase()])).join("");
+  const loadingText = progress
+    ? `Sweeping ${progress.label} (${progress.current}/${progress.total}) - ${progress.scored || 0} scored of ${progress.requested || broadUniverseSymbols().length}`
+    : (state.marketScanFocus ? "Running focused market scan" : "Loading market scan");
+  const scanMeta = scan
+    ? `${visible.length} shown - ${scan.scored_count ?? results.length} scored of ${scan.universe_size ?? results.length}${scan.batch_count ? ` - ${scan.batch_count} batches` : ""}${scan.coverage_symbols ? ` - ${scan.coverage_symbols} symbol universe` : ""} - ${relTime(state.marketScanRanAt)}${scan._cached ? " - cached" : ""}`
+    : "";
   return `
     <section class="card">
       <div class="card-head">
@@ -956,8 +1134,8 @@ function renderMarketScannerCard() {
           <div class="muted" style="font-size:13px;margin-top:3px;">Broad-market discovery scored for setup quality, entry readiness, reward/risk, and automatic paper testing.</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-          <button class="btn-secondary" data-act="deep-scan" ${loading ? "disabled" : ""}>${loading ? "Loading" : "Deep discovery"}</button>
-          <button class="btn" data-act="stable-scan" ${loading ? "disabled" : ""}>${loading ? "Loading" : "Broad scan"}</button>
+          <button class="btn-secondary" data-act="deep-scan" ${loading ? "disabled" : ""}>${loading ? "Loading" : "Focused scan"}</button>
+          <button class="btn" data-act="stable-scan" ${loading ? "disabled" : ""}>${loading ? "Loading" : "Full sweep"}</button>
         </div>
       </div>
       <div class="toolbar">
@@ -979,14 +1157,15 @@ function renderMarketScannerCard() {
         <div class="muted" style="font-size:13px;">${activeLane === "all" ? "Showing all filtered candidates" : `Showing ${esc(MARKET_SCAN_LANES.find(x => x[0] === activeLane)?.[1] || activeLane)}`}</div>
         <button class="btn-ghost" data-act="toggle-ms-soft">${state.marketScanHideSoft ? "Show softer" : "Hide softer"}</button>
       </div>
-      ${loading ? `<div class="loading-row"><span class="spinner"></span><span>${state.marketScanFocus ? "Running focused market scan" : "Loading market scan"}</span></div>` : ""}
+      ${loading ? `<div class="loading-row"><span class="spinner"></span><span>${esc(loadingText)}</span></div>` : ""}
       ${!loading && !laneHadMatches && activeLane !== "all" && preFiltered.length ? `<div class="scan-note">No pure ${esc(activeLane)} setup now, showing strongest filtered candidates instead.</div>` : ""}
       ${!loading && scan?.scan_note ? `<div class="scan-note">${esc(scan.scan_note)}</div>` : ""}
+      ${!loading && scan?.batch_errors?.length ? `<div class="scan-note">${scan.batch_errors.length} sweep batch${scan.batch_errors.length === 1 ? "" : "es"} had errors; completed batches are still ranked.</div>` : ""}
       ${!loading && state.autoPaper.last ? `<div class="scan-note">Auto-paper: ${state.autoPaper.last.logged || 0} logged${state.autoPaper.last.symbols?.length ? ` (${esc(state.autoPaper.last.symbols.join(", "))})` : ""}${state.autoPaper.last.skipped ? `, ${state.autoPaper.last.skipped} skipped as duplicate` : ""}.</div>` : ""}
       ${!loading && visible.length ? `<div class="opp-list">${rows}</div>` : ""}
       ${!loading && scan && !visible.length ? `<div class="empty">No opportunities passed the current filters. Try All, show softer rows, or run a focused scan.</div>` : ""}
-      ${!loading && !scan ? `<div class="empty">Tap Broad scan for the prewarmed market sweep, or Deep discovery to search less obvious names. Prime paper-ready setups will be logged automatically.</div>` : ""}
-      ${scan && !loading ? `<div class="muted mono" style="font-size:11px;margin-top:12px;">${visible.length} shown - ${scan.scored_count ?? results.length} scored of ${scan.universe_size ?? results.length} - ${relTime(state.marketScanRanAt)}${scan._cached ? " - cached" : ""}</div>` : ""}
+      ${!loading && !scan ? `<div class="empty">Tap Full sweep for the rolling broad-market scan, or Focused scan to search a theme. Prime paper-ready setups will be logged automatically after the final combined ranking.</div>` : ""}
+      ${scan && !loading ? `<div class="muted mono" style="font-size:11px;margin-top:12px;">${esc(scanMeta)}</div>` : ""}
     </section>`;
 }
 function filterSelect(id, current, options) {
@@ -1468,7 +1647,7 @@ function renderSettings() {
       </div>
       <div class="settings-row">
         <div><div class="lbl">Worker</div><div class="sub">${esc(WORKER_URL.replace("https://", ""))}</div></div>
-        <button class="btn-secondary" data-act="stable-scan">Refresh scan</button>
+        <button class="btn-secondary" data-act="stable-scan">Run full sweep</button>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
         <button class="btn" data-act="save-settings">Save</button>
@@ -1505,7 +1684,7 @@ document.addEventListener("click", async e => {
   if (target.dataset.view) return setView(target.dataset.view);
   const act = target.dataset.act;
   try {
-    if (act === "stable-scan") await runMarketScan({ force:false });
+    if (act === "stable-scan") await runRollingBroadScan();
     else if (act === "deep-scan") await runMarketScan({ discover:true });
     else if (act === "set-ms-lane") { state.marketScanLane = target.dataset.lane || "all"; renderCurrentView(); }
     else if (act === "toggle-ms-soft") { state.marketScanHideSoft = !state.marketScanHideSoft; renderCurrentView(); }
@@ -1546,7 +1725,7 @@ document.addEventListener("keydown", e => {
   if (e.target?.id === "focusInput" && e.key === "Enter") runMarketScan({ force:true });
 });
 $("#refreshBtn").addEventListener("click", () => {
-  if (state.currentView === "discover") runMarketScan({ force:true });
+  if (state.currentView === "discover") runRollingBroadScan();
   else renderCurrentView();
 });
 
