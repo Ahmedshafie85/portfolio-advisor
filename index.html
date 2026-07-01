@@ -306,6 +306,7 @@ const state = {
   autoPaper: { loading: false, last: null },
   expandedTrades: {},
   expandedAnalysis: {},
+  aiReadLoading: {},
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -573,10 +574,17 @@ function combineBroadScans(scans, finalReadScan = null, errors = []) {
   const reads = Array.isArray(finalReadScan?.reads) ? finalReadScan.reads : [];
   const ready = ranked.filter(r => !r._soft && msInvestmentGate(r).score >= 76).length;
   const paperReady = ranked.filter(r => msPaperTestPlan(r).ok).length;
+  const aiNote = finalReadScan
+    ? reads.length
+      ? ` AI API reads loaded for ${reads.length} top rows.`
+      : finalReadScan.llm_error
+        ? " AI API read failed; deterministic scoring still completed."
+        : " AI API returned no written reads for the top rows."
+    : " Batch scoring is deterministic; AI API reads run on the final top list.";
   return {
     results:ranked,
     reads,
-    scan_note:`Rolling broad scan covered ${requested} requested symbols across ${scans.length} batches. ${scored} scored, ${returned} returned from batch leaders; combined list has ${ranked.length} ranked candidates, ${ready} Ready and ${paperReady} paper-ready. Auto-paper runs only after this combined ranking is complete.`,
+    scan_note:`Rolling broad scan covered ${requested} requested symbols across ${scans.length} batches. ${scored} scored, ${returned} returned from batch leaders; combined list has ${ranked.length} ranked candidates, ${ready} Ready and ${paperReady} paper-ready.${aiNote} Auto-paper runs only after this combined ranking is complete.`,
     universe_source:"rolling_broad",
     universe_size:requested,
     scored_count:scored,
@@ -584,6 +592,8 @@ function combineBroadScans(scans, finalReadScan = null, errors = []) {
     batch_count:scans.length,
     batch_errors:errors,
     coverage_symbols:broadUniverseSymbols().length,
+    ai_read_count:reads.length,
+    llm_error:finalReadScan?.llm_error || null,
     generated_at:new Date().toISOString(),
   };
 }
@@ -596,6 +606,57 @@ async function fetchMarketScan(body) {
   });
   if (!r.ok) throw new Error(`scan-market ${r.status}`);
   return r.json();
+}
+function mergeMarketScanUpdate(scan) {
+  if (!scan) return;
+  const current = state.marketScan || { results:[], reads:[] };
+  const bySymbol = new Map((current.results || []).map(r => [String(r.symbol || "").toUpperCase(), r]));
+  for (const row of (scan.results || [])) {
+    const sym = String(row.symbol || "").toUpperCase();
+    if (!sym) continue;
+    bySymbol.set(sym, { ...(bySymbol.get(sym) || {}), ...row });
+  }
+  const reads = new Map((current.reads || []).map(r => [String(r.symbol || "").toUpperCase(), r]));
+  for (const rd of (scan.reads || [])) {
+    const sym = String(rd.symbol || "").toUpperCase();
+    if (sym) reads.set(sym, rd);
+  }
+  const results = Array.from(bySymbol.values())
+    .sort((a, b) => combinedScanSortValue(b) - combinedScanSortValue(a))
+    .map((r, i) => ({ ...r, rank:i + 1 }));
+  state.marketScan = {
+    ...current,
+    results,
+    reads:Array.from(reads.values()),
+    ai_read_count:reads.size,
+    llm_error:scan.llm_error || current.llm_error || null,
+    scan_note:scan.scan_note || current.scan_note || "",
+    generated_at:scan.generated_at || current.generated_at || new Date().toISOString(),
+  };
+  state.marketScanRanAt = state.marketScan.generated_at;
+}
+async function runSingleSymbolRead(symbol) {
+  const sym = String(symbol || "").toUpperCase();
+  if (!sym || state.aiReadLoading[sym]) return;
+  state.aiReadLoading[sym] = true;
+  renderCurrentView();
+  try {
+    const scan = await fetchMarketScan({
+      symbols:[sym],
+      exclude_symbols:[],
+      max_universe:1,
+      min_composite:0,
+      force:true,
+      write_reads:true,
+      _patient:true,
+    });
+    mergeMarketScanUpdate(scan);
+    const readCount = (scan.reads || []).length;
+    toast(readCount ? `AI read loaded for ${sym}` : `No AI read returned for ${sym}`, readCount ? "" : "error");
+  } finally {
+    state.aiReadLoading[sym] = false;
+    renderCurrentView();
+  }
 }
 async function loadCachedScan() {
   if (state.marketScan || state.marketScanLoading || state._cachedTried) return;
@@ -687,7 +748,7 @@ async function runRollingBroadScan() {
     let combined = combineBroadScans(scans, null, errors);
     const topSymbols = combined.results.slice(0, 18).map(r => String(r.symbol || "").toUpperCase()).filter(Boolean);
     if (topSymbols.length) {
-      state.broadScanProgress = { current:batches.length, total:batches.length, label:"final top reads", requested:universeCount, scored };
+      state.broadScanProgress = { current:batches.length, total:batches.length, label:"final AI API reads", requested:universeCount, scored };
       renderCurrentView();
       try {
         const finalReadScan = await fetchMarketScan({
@@ -701,7 +762,7 @@ async function runRollingBroadScan() {
         });
         combined = combineBroadScans(scans, finalReadScan, errors);
       } catch (e) {
-        errors.push({ batch:"final top reads", error:String(e.message || e).slice(0, 120) });
+        errors.push({ batch:"final AI API reads", error:String(e.message || e).slice(0, 120) });
         combined.batch_errors = errors;
         combined.scan_note += " Final written reads were unavailable, but the ranked sweep is still usable.";
       }
@@ -867,6 +928,18 @@ function msInvestmentGate(row) {
 function msPaperTimeframe(row) {
   return String(row?.opportunity_stage || "") === "pre_surge" ? 45 : 30;
 }
+function msPaperEntryGate(row, gate = msInvestmentGate(row)) {
+  const entry = String(row?.entry_state || "").toLowerCase();
+  if (!entry || entry === "actionable") return { ok:true, mode:"actionable", label:"actionable" };
+  const label = entry.replace(/_/g, " ");
+  if (["falling", "extended", "bad_rr", "needs_levels"].includes(entry)) return { ok:false, reason:`entry is ${label}` };
+  const earlyPaperOk = ["building", "watch"].includes(entry)
+    && msPrimaryScore(row) >= 78
+    && msActionabilityScore(row) >= 65
+    && gate.score >= 76;
+  if (earlyPaperOk) return { ok:true, mode:"prime-test", label, reason:`entry is ${label}; allowed as paper test only` };
+  return { ok:false, reason:`entry is ${label}` };
+}
 function msPaperTestPlan(row, gate = msInvestmentGate(row)) {
   const minRR = Number(state.investorProfile?.min_reward_risk) || 2;
   const direction = setupDirection(row);
@@ -881,13 +954,14 @@ function msPaperTestPlan(row, gate = msInvestmentGate(row)) {
   const rsi = num(row?.rsi14);
   if (row?._soft) return { ok:false, reason:"soft candidate" };
   if (gate.score < 76) return { ok:false, reason:"not Ready yet" };
-  if (row?.entry_state && row.entry_state !== "actionable") return { ok:false, reason:"entry not actionable" };
   if (!(price > 0)) return { ok:false, reason:"missing live price" };
   if (!planShape.ok) return { ok:false, reason:planShape.reason };
   if (!(rr != null && rr >= minRR)) return { ok:false, reason:`R:R below ${minRR.toFixed(1)}:1` };
+  const entryGate = msPaperEntryGate(row, gate);
+  if (!entryGate.ok) return { ok:false, reason:entryGate.reason || "entry not actionable" };
   if (day != null && day <= -3) return { ok:false, reason:"selling off today" };
   if (rsi != null && rsi >= 72) return { ok:false, reason:"extended" };
-  return { ok:true, direction, entry:price, target, stop, rr, days:msPaperTimeframe(row) };
+  return { ok:true, direction, entry:price, target, stop, rr, days:msPaperTimeframe(row), entry_mode:entryGate.mode, entry_note:entryGate.reason || entryGate.label };
 }
 function paperEligibilityBreakdown(row, gate = msInvestmentGate(row), plan = msPaperTestPlan(row, gate)) {
   const minRR = Number(state.investorProfile?.min_reward_risk) || 2;
@@ -899,6 +973,7 @@ function paperEligibilityBreakdown(row, gate = msInvestmentGate(row), plan = msP
   const stop = direction === "short" ? resistance : support;
   const shape = coherentPlan(price, target, stop, direction);
   const rr = shape.ok ? shape.rr : num(row?.reward_risk);
+  const entryGate = msPaperEntryGate(row, gate);
   const reasons = [];
   const passes = [];
   const add = (ok, good, bad) => (ok ? passes : reasons).push(ok ? good : bad);
@@ -906,7 +981,7 @@ function paperEligibilityBreakdown(row, gate = msInvestmentGate(row), plan = msP
   add(msPrimaryScore(row) >= 75, `prime score ${Math.round(msPrimaryScore(row))}`, `not prime yet: score ${Math.round(msPrimaryScore(row))}`);
   add(gate.score >= 76, `gate ${gate.label} ${gate.score}`, `gate below Ready: ${gate.label} ${gate.score}`);
   add(!row?._soft, "not a soft candidate", "soft candidate");
-  add(!row?.entry_state || row.entry_state === "actionable", "entry is actionable", `entry is ${String(row?.entry_state || "unknown").replace(/_/g, " ")}`);
+  add(entryGate.ok, entryGate.mode === "prime-test" ? `${entryGate.reason}` : "entry is actionable", entryGate.reason || "entry not actionable");
   add(shape.ok, `${direction} plan geometry is valid`, shape.reason || "target/stop not valid");
   add(rr != null && rr >= minRR, rr == null ? `R:R unavailable` : `R:R ${rr.toFixed(1)}:1`, rr == null ? "R:R unavailable" : `R:R ${rr.toFixed(1)}:1 below ${minRR.toFixed(1)}:1`);
   add((num(row?.day_change_pct) ?? 0) > -3, "not selling off today", "selling off today");
@@ -973,6 +1048,7 @@ function scannerSnapshot(row, read, gate, plan) {
     quality_grade:row.quality_grade || null,
     reward_risk:plan.rr,
     direction:plan.direction,
+    entry_mode:plan.entry_mode || "actionable",
     entry:plan.entry,
     target:plan.target,
     stop:plan.stop,
@@ -992,13 +1068,16 @@ function scannerSnapshot(row, read, gate, plan) {
 function scannerAnalysisSnapshot(row, read, gate, plan) {
   const conviction = gate.score >= 88 ? "high" : gate.score >= 76 ? "medium" : "low";
   const isShort = plan.direction === "short";
+  const early = plan.entry_mode === "prime-test";
   return {
     generated_at:new Date().toISOString(),
     source:"market_scanner",
     stance:isShort ? "SHORT_TEST" : "ACCUMULATE",
     conviction,
     headline:read?.one_liner || `${row.symbol} passed the Discovery paper-test gate`,
-    action_what:isShort ? "Paper-test a 1-share short setup" : "Paper-test a 1-share long setup",
+    action_what:isShort
+      ? `Paper-test a 1-share ${early ? "early " : ""}short setup`
+      : `Paper-test a 1-share ${early ? "early " : ""}long setup`,
     action_price_zone:priceRange(plan.target),
     action_invalidation:`${isShort ? "above" : "below"} ${fmtUSD(plan.stop, plan.stop >= 100 ? 2 : 3)}`,
     action_timeframe:`${plan.days} days`,
@@ -1026,7 +1105,7 @@ async function saveScannerPaperTrade(row, read, gate, plan, { auto = false } = {
     quantity:1,
     price:plan.entry,
     trade_date:new Date().toISOString().slice(0, 10),
-    notes:`${auto ? "Auto prime paper test" : "Discovery paper test"}: ${gate.label} ${gate.score}, R:R ${plan.rr.toFixed(1)}:1`,
+    notes:`${auto ? "Auto prime paper test" : "Discovery paper test"}: ${gate.label} ${gate.score}, ${plan.entry_mode === "prime-test" ? "early paper test, " : ""}R:R ${plan.rr.toFixed(1)}:1`,
     is_paper:true,
     auto_logged:auto,
     setup_key:setupKey,
@@ -1065,7 +1144,10 @@ async function autoLogPrimePaperTrades(scan) {
   const limit = Math.max(1, Math.min(20, Number(state.investorProfile?.auto_prime_limit || 5)));
   const candidates = primePaperCandidates(scan).slice(0, limit);
   if (!candidates.length) {
-    state.autoPaper.last = { logged:0, skipped:0, at:new Date().toISOString(), note:"no prime paper-ready setups" };
+    const rows = scan?.results || [];
+    const prime = rows.filter(r => msPrimaryScore(r) >= 75).length;
+    const validPlans = rows.filter(r => msPaperTestPlan(r).ok).length;
+    state.autoPaper.last = { logged:0, skipped:0, at:new Date().toISOString(), note:`${prime} prime, ${validPlans} paper-ready after stop/target/R:R rules` };
     return state.autoPaper.last;
   }
   state.autoPaper.loading = true;
@@ -1124,7 +1206,7 @@ function renderMarketScannerCard() {
     ? `Sweeping ${progress.label} (${progress.current}/${progress.total}) - ${progress.scored || 0} scored of ${progress.requested || broadUniverseSymbols().length}`
     : (state.marketScanFocus ? "Running focused market scan" : "Loading market scan");
   const scanMeta = scan
-    ? `${visible.length} shown - ${scan.scored_count ?? results.length} scored of ${scan.universe_size ?? results.length}${scan.batch_count ? ` - ${scan.batch_count} batches` : ""}${scan.coverage_symbols ? ` - ${scan.coverage_symbols} symbol universe` : ""} - ${relTime(state.marketScanRanAt)}${scan._cached ? " - cached" : ""}`
+    ? `${visible.length} shown - ${scan.scored_count ?? results.length} scored of ${scan.universe_size ?? results.length}${scan.batch_count ? ` - ${scan.batch_count} batches` : ""}${scan.coverage_symbols ? ` - ${scan.coverage_symbols} symbol universe` : ""}${scan.ai_read_count != null ? ` - ${scan.ai_read_count} AI reads` : ""} - ${relTime(state.marketScanRanAt)}${scan._cached ? " - cached" : ""}`
     : "";
   return `
     <section class="card">
@@ -1161,7 +1243,7 @@ function renderMarketScannerCard() {
       ${!loading && !laneHadMatches && activeLane !== "all" && preFiltered.length ? `<div class="scan-note">No pure ${esc(activeLane)} setup now, showing strongest filtered candidates instead.</div>` : ""}
       ${!loading && scan?.scan_note ? `<div class="scan-note">${esc(scan.scan_note)}</div>` : ""}
       ${!loading && scan?.batch_errors?.length ? `<div class="scan-note">${scan.batch_errors.length} sweep batch${scan.batch_errors.length === 1 ? "" : "es"} had errors; completed batches are still ranked.</div>` : ""}
-      ${!loading && state.autoPaper.last ? `<div class="scan-note">Auto-paper: ${state.autoPaper.last.logged || 0} logged${state.autoPaper.last.symbols?.length ? ` (${esc(state.autoPaper.last.symbols.join(", "))})` : ""}${state.autoPaper.last.skipped ? `, ${state.autoPaper.last.skipped} skipped as duplicate` : ""}.</div>` : ""}
+      ${!loading && state.autoPaper.last ? `<div class="scan-note">Auto-paper: ${state.autoPaper.last.logged || 0} logged${state.autoPaper.last.symbols?.length ? ` (${esc(state.autoPaper.last.symbols.join(", "))})` : ""}${state.autoPaper.last.skipped ? `, ${state.autoPaper.last.skipped} skipped as duplicate` : ""}${state.autoPaper.last.note ? ` - ${esc(state.autoPaper.last.note)}` : ""}.</div>` : ""}
       ${!loading && visible.length ? `<div class="opp-list">${rows}</div>` : ""}
       ${!loading && scan && !visible.length ? `<div class="empty">No opportunities passed the current filters. Try All, show softer rows, or run a focused scan.</div>` : ""}
       ${!loading && !scan ? `<div class="empty">Tap Full sweep for the rolling broad-market scan, or Focused scan to search a theme. Prime paper-ready setups will be logged automatically after the final combined ranking.</div>` : ""}
@@ -1175,12 +1257,14 @@ function deskCell(k, v) {
   return `<div class="desk-cell"><span class="desk-k">${esc(k)}</span><span class="desk-v">${esc(v)}</span></div>`;
 }
 function renderOpportunityRow(r, rd) {
+  const sym = String(r.symbol || "").toUpperCase();
   const score = msPrimaryScore(r);
   const [tierLabel, tierCls] = msScoreTier(score);
   const gate = msInvestmentGate(r);
   const plan = msPaperTestPlan(r, gate);
   const breakdown = paperEligibilityBreakdown(r, gate, plan);
-  const expanded = !!state.expandedAnalysis[String(r.symbol || "").toUpperCase()];
+  const expanded = !!state.expandedAnalysis[sym];
+  const aiLoading = !!state.aiReadLoading[sym];
   const rr = msRiskReward(r);
   const day = num(r.day_change_pct);
   const adv = num(r.avg_dollar_vol_20d);
@@ -1209,6 +1293,7 @@ function renderOpportunityRow(r, rd) {
           <span class="meta good">${esc(msLaneFor(r))}</span>
           <span class="meta">${esc(msSector(r.symbol, r))}</span>
           <span class="meta">${esc(msCapBucket(r).replace(/_/g, " "))}</span>
+          ${rd ? `<span class="meta good">AI read</span>` : ""}
           ${rr != null ? `<span class="meta ${rr >= 2 ? "good" : "warn"}">R:R ${rr.toFixed(1)}:1</span>` : ""}
           ${r.current_price != null ? `<span class="meta">px ${fmtUSD(r.current_price, 2)}</span>` : ""}
           ${r.rsi14 != null ? `<span class="meta">RSI ${Number(r.rsi14).toFixed(0)}</span>` : ""}
@@ -1245,13 +1330,15 @@ function renderOpportunityRow(r, rd) {
             <div class="read-setup">${esc(breakdown.summary)}</div>
             <div class="read-grid">
               <div><b>Direction:</b> ${esc(breakdown.direction)}</div>
-              <div><b>Auto rule:</b> prime + paper-ready only</div>
+              <div><b>Auto rule:</b> prime + valid target/stop/R:R</div>
+              <div><b>AI API:</b> ${rd ? "read loaded from Worker" : "not loaded for this row yet"}</div>
               ${breakdown.reasons.length ? `<div><b>Blockers:</b> ${esc(breakdown.reasons.join("; "))}</div>` : ""}
               ${breakdown.passes.length ? `<div><b>Passed:</b> ${esc(breakdown.passes.join("; "))}</div>` : ""}
             </div>
           </div>` : ""}
         <div class="row-actions">
-          <button class="btn-secondary" data-act="toggle-analysis" data-symbol="${esc(r.symbol)}">${expanded ? "Hide analysis" : "Analyze"}</button>
+          <button class="btn-secondary" data-act="toggle-analysis" data-symbol="${esc(r.symbol)}">${expanded ? "Hide rule check" : "Rule check"}</button>
+          <button class="btn-secondary" data-act="ai-read-scan" data-symbol="${esc(r.symbol)}" ${aiLoading ? "disabled" : ""}>${aiLoading ? "AI loading" : (rd ? "Refresh AI read" : "AI read")}</button>
           ${plan.ok && score >= 75
             ? `<span class="meta good">Auto-paper prime</span>`
             : plan.ok
@@ -1693,6 +1780,7 @@ document.addEventListener("click", async e => {
       state.expandedAnalysis[sym] = !state.expandedAnalysis[sym];
       renderCurrentView();
     }
+    else if (act === "ai-read-scan") await runSingleSymbolRead(target.dataset.symbol);
     else if (act === "paper-test-scan") await paperTestScannerOpportunity(target.dataset.symbol);
     else if (act === "run-paper-sim") await runPaperSimulationManual();
     else if (act === "delete-trade") {
