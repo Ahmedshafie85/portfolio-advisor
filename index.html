@@ -148,10 +148,30 @@ button { cursor:pointer; }
 .bar-row { display:grid; grid-template-columns:40px minmax(0,1fr) 30px; gap:8px; align-items:center; font-family:var(--mono); font-size:10px; color:var(--muted); }
 .bar-track { height:5px; border-radius:999px; background:var(--rule-soft); overflow:hidden; }
 .bar-fill { display:block; height:100%; border-radius:999px; background:var(--green); }
-.paper-plan { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; margin-top:12px; }
-.paper-cell { border:1px solid rgba(74,122,74,.22); border-radius:10px; background:rgba(74,122,74,.07); padding:8px; min-width:0; }
+.trade-plan { margin-top:12px; border:1px solid var(--rule-soft); border-radius:12px; background:rgba(255,255,255,.26); overflow:hidden; }
+.trade-plan-head { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:10px 11px; border-bottom:1px solid var(--rule-soft); }
+.trade-plan-title { font-family:var(--mono); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+.trade-plan-note { color:var(--muted); font-size:12px; }
+.paper-plan { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; }
+.paper-cell { border-right:1px solid var(--rule-soft); padding:10px; min-width:0; }
+.paper-cell:last-child { border-right:0; }
+.paper-cell.good { background:rgba(74,122,74,.07); }
+.paper-cell.warn { background:rgba(176,141,60,.08); }
+.paper-cell.bad { background:rgba(161,61,45,.07); }
 .paper-k { display:block; font-family:var(--mono); color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; }
-.paper-v { display:block; margin-top:3px; font-family:var(--mono); color:var(--ink); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.paper-v { display:block; margin-top:3px; font-family:var(--mono); color:var(--ink); font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.paper-sub { display:block; margin-top:2px; color:var(--muted); font-size:11px; }
+.level-chart { margin-top:10px; border:1px solid var(--rule-soft); border-radius:12px; background:rgba(255,255,255,.25); padding:10px; }
+.level-chart svg { width:100%; height:150px; display:block; overflow:visible; }
+.chart-grid { stroke:var(--rule-soft); stroke-width:1; }
+.chart-line { fill:none; stroke:var(--blue); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+.chart-level { stroke-width:1.5; stroke-dasharray:5 4; }
+.chart-level.entry { stroke:var(--blue); }
+.chart-level.target { stroke:var(--green); }
+.chart-level.stop { stroke:var(--red); }
+.chart-label { fill:var(--muted); font:10px var(--mono); }
+.chart-caption { display:flex; flex-wrap:wrap; gap:7px; margin-top:7px; color:var(--muted); font-size:11px; }
+.chart-dot { width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:4px; }
 .read { margin-top:11px; padding:11px; border-left:3px solid var(--gold); background:rgba(176,141,60,.07); border-radius:8px; }
 .read-one { font-weight:600; color:var(--ink); }
 .read-setup { color:var(--soft); font-size:13px; margin-top:4px; }
@@ -207,7 +227,10 @@ button { cursor:pointer; }
   .desk-grid, .quality-grid, .perf-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .opp-row { grid-template-columns:1fr; }
   .rank { display:none; }
-  .reason-grid, .read-grid, .paper-plan { grid-template-columns:1fr 1fr; }
+  .reason-grid, .read-grid { grid-template-columns:1fr 1fr; }
+  .paper-plan { grid-template-columns:1fr 1fr; }
+  .paper-cell { border-right:0; border-bottom:1px solid var(--rule-soft); }
+  .paper-cell:last-child { border-bottom:0; }
   .perf-headline { align-items:flex-start; flex-direction:column; }
   .perf-side { text-align:left; }
   .settings-row { grid-template-columns:1fr; }
@@ -307,6 +330,8 @@ const state = {
   expandedTrades: {},
   expandedAnalysis: {},
   aiReadLoading: {},
+  priceCharts: {},
+  chartLoading: {},
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -655,6 +680,23 @@ async function runSingleSymbolRead(symbol) {
     toast(readCount ? `AI read loaded for ${sym}` : `No AI read returned for ${sym}`, readCount ? "" : "error");
   } finally {
     state.aiReadLoading[sym] = false;
+    renderCurrentView();
+  }
+}
+async function loadOpportunityChart(symbol) {
+  const sym = String(symbol || "").toUpperCase();
+  if (!sym || state.chartLoading[sym]) return;
+  state.chartLoading[sym] = true;
+  renderCurrentView();
+  try {
+    const price = await fetchPriceFor(sym);
+    if (!price || !Array.isArray(price.ohlcv) || price.ohlcv.length < 2) throw new Error("price history unavailable");
+    state.priceCharts[sym] = price;
+    toast(`Chart loaded for ${sym}`);
+  } catch (e) {
+    toast(`Chart unavailable for ${sym}`, "error");
+  } finally {
+    state.chartLoading[sym] = false;
     renderCurrentView();
   }
 }
@@ -1078,6 +1120,9 @@ function scannerAnalysisSnapshot(row, read, gate, plan) {
     action_what:isShort
       ? `Paper-test a 1-share ${early ? "early " : ""}short setup`
       : `Paper-test a 1-share ${early ? "early " : ""}long setup`,
+    entry_price:plan.entry,
+    take_profit:plan.target,
+    stop_loss:plan.stop,
     action_price_zone:priceRange(plan.target),
     action_invalidation:`${isShort ? "above" : "below"} ${fmtUSD(plan.stop, plan.stop >= 100 ? 2 : 3)}`,
     action_timeframe:`${plan.days} days`,
@@ -1256,6 +1301,86 @@ function filterSelect(id, current, options) {
 function deskCell(k, v) {
   return `<div class="desk-cell"><span class="desk-k">${esc(k)}</span><span class="desk-v">${esc(v)}</span></div>`;
 }
+function msTradePlanPreview(row, gate = msInvestmentGate(row), plan = msPaperTestPlan(row, gate)) {
+  const direction = setupDirection(row);
+  const entry = num(row?.current_price);
+  const support = num(row?.nearest_support);
+  const resistance = num(row?.nearest_resistance);
+  const target = direction === "short" ? support : resistance;
+  const stop = direction === "short" ? resistance : support;
+  const shape = coherentPlan(entry, target, stop, direction);
+  const rr = shape.ok ? shape.rr : null;
+  const status = plan.ok
+    ? (msPrimaryScore(row) >= 75 ? "Auto-paper eligible" : "Paper-ready, not prime")
+    : `Blocked: ${plan.reason || shape.reason || "rules not met"}`;
+  return { direction, entry, target, stop, rr, shape, status, support, resistance };
+}
+function renderTradePlan(row, preview, plan, breakdown) {
+  const statusCls = plan.ok ? (msPrimaryScore(row) >= 75 ? "good" : "warn") : "bad";
+  const rrText = preview.rr == null ? "-" : `${preview.rr.toFixed(1)}:1`;
+  const targetLabel = preview.direction === "short" ? "Take Profit / Support" : "Take Profit / Resistance";
+  const stopLabel = preview.direction === "short" ? "Stop Loss / Resistance" : "Stop Loss / Support";
+  return `<div class="trade-plan">
+    <div class="trade-plan-head">
+      <div class="trade-plan-title">${esc(row.symbol)} trade plan</div>
+      <div class="trade-plan-note">${esc(preview.direction.toUpperCase())}${plan.entry_mode === "prime-test" ? " - early paper test" : ""}</div>
+    </div>
+    <div class="paper-plan">
+      <div class="paper-cell good"><span class="paper-k">Entry</span><span class="paper-v">${preview.entry != null ? fmtUSD(preview.entry, 2) : "-"}</span><span class="paper-sub">current price</span></div>
+      <div class="paper-cell good"><span class="paper-k">${esc(targetLabel)}</span><span class="paper-v">${preview.target != null ? fmtUSD(preview.target, 2) : "-"}</span><span class="paper-sub">${preview.target == null ? "needs level" : "target level"}</span></div>
+      <div class="paper-cell bad"><span class="paper-k">${esc(stopLabel)}</span><span class="paper-v">${preview.stop != null ? fmtUSD(preview.stop, 2) : "-"}</span><span class="paper-sub">${preview.stop == null ? "needs level" : "invalidation"}</span></div>
+      <div class="paper-cell ${preview.rr != null && preview.rr >= (Number(state.investorProfile?.min_reward_risk) || 2) ? "good" : "warn"}"><span class="paper-k">Reward / Risk</span><span class="paper-v">${esc(rrText)}</span><span class="paper-sub">minimum ${Number(state.investorProfile?.min_reward_risk || 2).toFixed(1)}:1</span></div>
+      <div class="paper-cell ${statusCls}"><span class="paper-k">Paper status</span><span class="paper-v">${esc(plan.ok ? "Ready" : "Blocked")}</span><span class="paper-sub">${esc(plan.ok ? preview.status : (breakdown.reasons[0] || plan.reason || "rules not met"))}</span></div>
+    </div>
+  </div>`;
+}
+function chartHistoryFor(symbol) {
+  const p = state.priceCharts[String(symbol || "").toUpperCase()];
+  const rows = Array.isArray(p?.ohlcv) ? p.ohlcv : [];
+  return rows
+    .map(b => num(b.c ?? b.close))
+    .filter(v => v != null && v > 0)
+    .slice(-90);
+}
+function renderOpportunityChart(row, preview) {
+  const history = chartHistoryFor(row.symbol);
+  const values = history.concat([preview.entry, preview.target, preview.stop].filter(v => v != null && v > 0));
+  if (!values.length) return "";
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  if (!(max > min)) { max += 1; min -= 1; }
+  const pad = (max - min) * 0.12;
+  min -= pad;
+  max += pad;
+  const w = 640, h = 150, left = 56, right = 74, top = 10, bottom = 24;
+  const iw = w - left - right, ih = h - top - bottom;
+  const y = v => top + (max - v) / (max - min) * ih;
+  const x = i => left + (history.length <= 1 ? iw / 2 : i / (history.length - 1) * iw);
+  const line = history.length > 1
+    ? `<polyline class="chart-line" points="${history.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" />`
+    : "";
+  const levels = [
+    ["target", "TP", preview.target],
+    ["entry", "Entry", preview.entry],
+    ["stop", "SL", preview.stop],
+  ].filter(x => x[2] != null && x[2] > 0).map(([cls, label, value]) => {
+    const yy = y(value).toFixed(1);
+    return `<line class="chart-level ${cls}" x1="${left}" y1="${yy}" x2="${w - right}" y2="${yy}" /><text class="chart-label" x="${w - right + 8}" y="${Number(yy) + 3}">${esc(label)} ${esc(fmtUSD(value, 2))}</text>`;
+  }).join("");
+  return `<div class="level-chart">
+    <svg viewBox="0 0 ${w} ${h}" aria-label="${esc(row.symbol)} price chart with entry take profit and stop loss">
+      <line class="chart-grid" x1="${left}" y1="${top}" x2="${left}" y2="${h - bottom}" />
+      <line class="chart-grid" x1="${left}" y1="${h - bottom}" x2="${w - right}" y2="${h - bottom}" />
+      ${line}
+      ${levels}
+    </svg>
+    <div class="chart-caption">
+      <span><span class="chart-dot" style="background:var(--blue)"></span>${history.length > 1 ? "90d price history" : "level map"}</span>
+      <span><span class="chart-dot" style="background:var(--green)"></span>take profit</span>
+      <span><span class="chart-dot" style="background:var(--red)"></span>stop loss</span>
+    </div>
+  </div>`;
+}
 function renderOpportunityRow(r, rd) {
   const sym = String(r.symbol || "").toUpperCase();
   const score = msPrimaryScore(r);
@@ -1263,8 +1388,10 @@ function renderOpportunityRow(r, rd) {
   const gate = msInvestmentGate(r);
   const plan = msPaperTestPlan(r, gate);
   const breakdown = paperEligibilityBreakdown(r, gate, plan);
+  const preview = msTradePlanPreview(r, gate, plan);
   const expanded = !!state.expandedAnalysis[sym];
   const aiLoading = !!state.aiReadLoading[sym];
+  const chartLoading = !!state.chartLoading[sym];
   const rr = msRiskReward(r);
   const day = num(r.day_change_pct);
   const adv = num(r.avg_dollar_vol_20d);
@@ -1306,13 +1433,8 @@ function renderOpportunityRow(r, rd) {
           <div class="reason-box"><span class="reason-k">Entry state</span><span class="reason-v">${esc(String(r.entry_state || r.opportunity_stage || "watch").replace(/_/g, " "))}</span></div>
         </div>
         ${components ? `<div class="bars">${components}</div>` : ""}
-        ${plan.ok ? `
-          <div class="paper-plan">
-            <div class="paper-cell"><span class="paper-k">Entry</span><span class="paper-v">${fmtUSD(plan.entry, 2)}</span></div>
-            <div class="paper-cell"><span class="paper-k">Target</span><span class="paper-v">${fmtUSD(plan.target, 2)}</span></div>
-            <div class="paper-cell"><span class="paper-k">Stop</span><span class="paper-v">${fmtUSD(plan.stop, 2)}</span></div>
-            <div class="paper-cell"><span class="paper-k">Test</span><span class="paper-v">${plan.days}d - ${plan.rr.toFixed(1)}R</span></div>
-          </div>` : ""}
+        ${renderTradePlan(r, preview, plan, breakdown)}
+        ${renderOpportunityChart(r, preview)}
         ${rd ? `
           <div class="read">
             <div class="read-one">${esc(rd.one_liner)}</div>
@@ -1330,6 +1452,9 @@ function renderOpportunityRow(r, rd) {
             <div class="read-setup">${esc(breakdown.summary)}</div>
             <div class="read-grid">
               <div><b>Direction:</b> ${esc(breakdown.direction)}</div>
+              <div><b>Entry:</b> ${preview.entry != null ? esc(fmtUSD(preview.entry, 2)) : "-"}</div>
+              <div><b>Take profit:</b> ${preview.target != null ? esc(fmtUSD(preview.target, 2)) : "needs level"}</div>
+              <div><b>Stop loss:</b> ${preview.stop != null ? esc(fmtUSD(preview.stop, 2)) : "needs level"}</div>
               <div><b>Auto rule:</b> prime + valid target/stop/R:R</div>
               <div><b>AI API:</b> ${rd ? "read loaded from Worker" : "not loaded for this row yet"}</div>
               ${breakdown.reasons.length ? `<div><b>Blockers:</b> ${esc(breakdown.reasons.join("; "))}</div>` : ""}
@@ -1339,6 +1464,8 @@ function renderOpportunityRow(r, rd) {
         <div class="row-actions">
           <button class="btn-secondary" data-act="toggle-analysis" data-symbol="${esc(r.symbol)}">${expanded ? "Hide rule check" : "Rule check"}</button>
           <button class="btn-secondary" data-act="ai-read-scan" data-symbol="${esc(r.symbol)}" ${aiLoading ? "disabled" : ""}>${aiLoading ? "AI loading" : (rd ? "Refresh AI read" : "AI read")}</button>
+          <button class="btn-secondary" data-act="load-chart-scan" data-symbol="${esc(r.symbol)}" ${chartLoading ? "disabled" : ""}>${chartLoading ? "Chart loading" : (chartHistoryFor(r.symbol).length > 1 ? "Refresh chart" : "Load chart")}</button>
+          ${plan.ok ? `<button class="btn-secondary" data-act="paper-test-scan" data-symbol="${esc(r.symbol)}">Log paper</button>` : ""}
           ${plan.ok && score >= 75
             ? `<span class="meta good">Auto-paper prime</span>`
             : plan.ok
@@ -1616,10 +1743,13 @@ function renderTradeRows(trades) {
   return trades.map(t => {
     const [label, cls, title] = tradeOutcome(t);
     const setup = t.scanner_snapshot?.read?.one_liner || t.analysis_snapshot?.headline || "No setup snapshot captured.";
+    const snap = t.scanner_snapshot || {};
+    const analysis = t.analysis_snapshot || {};
     const plan = [
-      t.analysis_snapshot?.action_price_zone ? `target ${t.analysis_snapshot.action_price_zone}` : "",
-      t.analysis_snapshot?.action_invalidation ? `stop ${t.analysis_snapshot.action_invalidation}` : "",
-      t.analysis_snapshot?.action_timeframe || "",
+      snap.entry != null || analysis.entry_price != null ? `entry ${fmtUSD(snap.entry ?? analysis.entry_price, 2)}` : "",
+      snap.target != null || analysis.take_profit != null ? `take profit ${fmtUSD(snap.target ?? analysis.take_profit, 2)}` : analysis.action_price_zone ? `take profit ${analysis.action_price_zone}` : "",
+      snap.stop != null || analysis.stop_loss != null ? `stop loss ${fmtUSD(snap.stop ?? analysis.stop_loss, 2)}` : analysis.action_invalidation ? `stop loss ${analysis.action_invalidation}` : "",
+      analysis.action_timeframe || "",
     ].filter(Boolean).join(" - ");
     const closedMeta = tradeIsClosed(t) ? ` - ${t.exit_reason || title}${Number.isFinite(Number(t.pnl_pct)) ? ` - ${fmtPct(Number(t.pnl_pct), 2)}` : ""}` : "";
     return `<article class="trade-row">
@@ -1781,6 +1911,7 @@ document.addEventListener("click", async e => {
       renderCurrentView();
     }
     else if (act === "ai-read-scan") await runSingleSymbolRead(target.dataset.symbol);
+    else if (act === "load-chart-scan") await loadOpportunityChart(target.dataset.symbol);
     else if (act === "paper-test-scan") await paperTestScannerOpportunity(target.dataset.symbol);
     else if (act === "run-paper-sim") await runPaperSimulationManual();
     else if (act === "delete-trade") {
