@@ -118,7 +118,11 @@ button { cursor:pointer; }
 }
 .rank { font-family:var(--mono); color:var(--muted); font-size:13px; padding-top:3px; }
 .sym-row { display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
-.sym { font-family:var(--mono); font-weight:700; font-size:18px; letter-spacing:-.02em; }
+.sym {
+  font-family:var(--mono); font-weight:700; font-size:18px; letter-spacing:-.02em;
+  border:0; background:transparent; color:var(--ink); padding:0; cursor:pointer;
+}
+.sym:hover { text-decoration:underline; text-underline-offset:3px; }
 .score, .badge {
   font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.05em;
   border-radius:999px; padding:4px 7px; border:1px solid var(--rule); color:var(--soft);
@@ -140,6 +144,12 @@ button { cursor:pointer; }
 .meta.warn { color:var(--gold); }
 .meta.bad { color:var(--red); }
 .tag { font-size:11px; color:var(--muted); background:var(--elev); border-radius:999px; padding:4px 7px; }
+.detail-card { margin-top:12px; border:1px solid var(--rule-soft); border-radius:12px; background:rgba(255,255,255,.25); padding:12px; }
+.detail-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:10px; }
+.detail-title { font-family:var(--display); font-size:20px; font-weight:500; letter-spacing:-.01em; }
+.detail-sub { color:var(--soft); font-size:13px; margin-top:2px; }
+.detail-section { margin-top:11px; }
+.quick-line { color:var(--soft); font-size:13px; margin-top:9px; }
 .reason-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:10px; }
 .reason-box { border:1px solid var(--rule-soft); border-radius:10px; padding:9px; background:rgba(255,255,255,.28); }
 .reason-k { display:block; font-family:var(--mono); color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px; }
@@ -162,7 +172,7 @@ button { cursor:pointer; }
 .paper-v { display:block; margin-top:3px; font-family:var(--mono); color:var(--ink); font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .paper-sub { display:block; margin-top:2px; color:var(--muted); font-size:11px; }
 .level-chart { margin-top:10px; border:1px solid var(--rule-soft); border-radius:12px; background:rgba(255,255,255,.25); padding:10px; }
-.level-chart svg { width:100%; height:150px; display:block; overflow:visible; }
+.level-chart svg { width:100%; height:178px; display:block; overflow:visible; }
 .chart-grid { stroke:var(--rule-soft); stroke-width:1; }
 .chart-line { fill:none; stroke:var(--blue); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
 .chart-level { stroke-width:1.5; stroke-dasharray:5 4; }
@@ -1381,6 +1391,63 @@ function renderOpportunityChart(row, preview) {
     </div>
   </div>`;
 }
+function renderOpportunityDetailCard(r, rd, gate, plan, breakdown, preview, components, aiLoading, chartLoading) {
+  const historyLoaded = chartHistoryFor(r.symbol).length > 1;
+  const setupText = rd?.setup || gate.primary || r.score_reason || "Signals are scored from live price, volume, relative strength, compression, and options flow.";
+  const confirmation = rd?.confirmation || (preview.target != null ? `Break and hold above ${fmtUSD(preview.target, 2)} with supportive volume.` : "Wait for a cleaner resistance level.");
+  const invalidation = rd?.invalidation || (preview.stop != null ? `Lose ${fmtUSD(preview.stop, 2)} and the setup is invalid.` : "No reliable stop-loss level yet.");
+  return `<div class="detail-card">
+    <div class="detail-head">
+      <div>
+        <div class="detail-title">${esc(r.symbol)} analysis</div>
+        <div class="detail-sub">${esc(setupText)}</div>
+      </div>
+      <span class="badge ${gate.tone}">${gate.label} ${gate.score}</span>
+    </div>
+    ${renderOpportunityChart(r, preview)}
+    ${renderTradePlan(r, preview, plan, breakdown)}
+    <div class="reason-grid detail-section">
+      <div class="reason-box"><span class="reason-k">Entry condition</span><span class="reason-v">${esc(confirmation)}</span></div>
+      <div class="reason-box"><span class="reason-k">Invalidation</span><span class="reason-v">${esc(invalidation)}</span></div>
+      <div class="reason-box"><span class="reason-k">Why surfaced</span><span class="reason-v">${esc(gate.primary)}</span></div>
+      <div class="reason-box"><span class="reason-k">Paper rule</span><span class="reason-v">${esc(breakdown.summary)}</span></div>
+    </div>
+    ${components ? `<div class="bars detail-section">${components}</div>` : ""}
+    ${rd ? `
+      <div class="read">
+        <div class="read-one">${esc(rd.one_liner)}</div>
+        <div class="read-setup">${esc(rd.setup)}</div>
+        <div class="read-grid">
+          ${rd.watch_level ? `<div><b>Watch:</b> ${esc(rd.watch_level)}</div>` : ""}
+          ${rd.confirmation ? `<div><b>Confirm:</b> ${esc(rd.confirmation)}</div>` : ""}
+          ${rd.invalidation ? `<div><b>Invalid:</b> ${esc(rd.invalidation)}</div>` : ""}
+          ${rd.risk_note ? `<div><b>Risk:</b> ${esc(rd.risk_note)}</div>` : ""}
+        </div>
+      </div>` : `<div class="scan-note">AI read not loaded yet. Opened cards request it automatically; use AI read if the network is slow.</div>`}
+    <div class="read">
+      <div class="read-one">Rule check</div>
+      <div class="read-setup">${esc(breakdown.summary)}</div>
+      <div class="read-grid">
+        <div><b>Direction:</b> ${esc(breakdown.direction)}</div>
+        <div><b>Entry:</b> ${preview.entry != null ? esc(fmtUSD(preview.entry, 2)) : "-"}</div>
+        <div><b>Take profit:</b> ${preview.target != null ? esc(fmtUSD(preview.target, 2)) : "needs level"}</div>
+        <div><b>Stop loss:</b> ${preview.stop != null ? esc(fmtUSD(preview.stop, 2)) : "needs level"}</div>
+        ${breakdown.reasons.length ? `<div><b>Blockers:</b> ${esc(breakdown.reasons.join("; "))}</div>` : ""}
+        ${breakdown.passes.length ? `<div><b>Passed:</b> ${esc(breakdown.passes.join("; "))}</div>` : ""}
+      </div>
+    </div>
+    <div class="row-actions">
+      <button class="btn-secondary" data-act="ai-read-scan" data-symbol="${esc(r.symbol)}" ${aiLoading ? "disabled" : ""}>${aiLoading ? "AI loading" : (rd ? "Refresh AI read" : "AI read")}</button>
+      <button class="btn-secondary" data-act="load-chart-scan" data-symbol="${esc(r.symbol)}" ${chartLoading ? "disabled" : ""}>${chartLoading ? "Chart loading" : (historyLoaded ? "Refresh chart" : "Load chart")}</button>
+      ${plan.ok ? `<button class="btn-secondary" data-act="paper-test-scan" data-symbol="${esc(r.symbol)}">Log paper</button>` : ""}
+      ${plan.ok && msPrimaryScore(r) >= 75
+        ? `<span class="meta good">Auto-paper prime</span>`
+        : plan.ok
+          ? `<span class="meta warn">Paper-ready, not prime</span>`
+          : `<span class="meta warn">${esc(breakdown.summary)}</span>`}
+    </div>
+  </div>`;
+}
 function renderOpportunityRow(r, rd) {
   const sym = String(r.symbol || "").toUpperCase();
   const score = msPrimaryScore(r);
@@ -1409,7 +1476,7 @@ function renderOpportunityRow(r, rd) {
       <div class="rank">#${esc(r.rank ?? "")}</div>
       <div>
         <div class="sym-row">
-          <span class="sym">${esc(r.symbol)}</span>
+          <button class="sym" data-act="toggle-analysis" data-symbol="${esc(r.symbol)}" title="Open ${esc(r.symbol)} analysis">${esc(r.symbol)}</button>
           <span class="score ${tierCls}">${Math.round(score)} ${tierLabel}</span>
           <span class="badge ${gate.tone}">${gate.label} ${gate.score}</span>
           ${day != null ? `<span class="meta ${day >= 0 ? "good" : "bad"}">${fmtPct(day)}</span>` : ""}
@@ -1428,44 +1495,10 @@ function renderOpportunityRow(r, rd) {
           ${adv != null ? `<span class="meta ${adv >= 5_000_000 ? "good" : "warn"}">$Vol ${adv >= 1_000_000 ? (adv / 1_000_000).toFixed(0) + "M" : (adv / 1_000).toFixed(0) + "K"}</span>` : ""}
         </div>
         ${tags ? `<div class="tag-row">${tags}</div>` : ""}
-        <div class="reason-grid">
-          <div class="reason-box"><span class="reason-k">Why surfaced</span><span class="reason-v">${esc(gate.primary)}</span></div>
-          <div class="reason-box"><span class="reason-k">Entry state</span><span class="reason-v">${esc(String(r.entry_state || r.opportunity_stage || "watch").replace(/_/g, " "))}</span></div>
-        </div>
-        ${components ? `<div class="bars">${components}</div>` : ""}
-        ${renderTradePlan(r, preview, plan, breakdown)}
-        ${renderOpportunityChart(r, preview)}
-        ${rd ? `
-          <div class="read">
-            <div class="read-one">${esc(rd.one_liner)}</div>
-            <div class="read-setup">${esc(rd.setup)}</div>
-            <div class="read-grid">
-              ${rd.watch_level ? `<div><b>Watch:</b> ${esc(rd.watch_level)}</div>` : ""}
-              ${rd.confirmation ? `<div><b>Confirm:</b> ${esc(rd.confirmation)}</div>` : ""}
-              ${rd.invalidation ? `<div><b>Invalid:</b> ${esc(rd.invalidation)}</div>` : ""}
-              ${rd.risk_note ? `<div><b>Risk:</b> ${esc(rd.risk_note)}</div>` : ""}
-            </div>
-          </div>` : ""}
-        ${expanded ? `
-          <div class="read">
-            <div class="read-one">${esc(r.symbol)} paper-trade analysis</div>
-            <div class="read-setup">${esc(breakdown.summary)}</div>
-            <div class="read-grid">
-              <div><b>Direction:</b> ${esc(breakdown.direction)}</div>
-              <div><b>Entry:</b> ${preview.entry != null ? esc(fmtUSD(preview.entry, 2)) : "-"}</div>
-              <div><b>Take profit:</b> ${preview.target != null ? esc(fmtUSD(preview.target, 2)) : "needs level"}</div>
-              <div><b>Stop loss:</b> ${preview.stop != null ? esc(fmtUSD(preview.stop, 2)) : "needs level"}</div>
-              <div><b>Auto rule:</b> prime + valid target/stop/R:R</div>
-              <div><b>AI API:</b> ${rd ? "read loaded from Worker" : "not loaded for this row yet"}</div>
-              ${breakdown.reasons.length ? `<div><b>Blockers:</b> ${esc(breakdown.reasons.join("; "))}</div>` : ""}
-              ${breakdown.passes.length ? `<div><b>Passed:</b> ${esc(breakdown.passes.join("; "))}</div>` : ""}
-            </div>
-          </div>` : ""}
+        <div class="quick-line">${esc(gate.primary)} · Entry ${esc(String(r.entry_state || r.opportunity_stage || "watch").replace(/_/g, " "))}</div>
+        ${expanded ? renderOpportunityDetailCard(r, rd, gate, plan, breakdown, preview, components, aiLoading, chartLoading) : ""}
         <div class="row-actions">
-          <button class="btn-secondary" data-act="toggle-analysis" data-symbol="${esc(r.symbol)}">${expanded ? "Hide rule check" : "Rule check"}</button>
-          <button class="btn-secondary" data-act="ai-read-scan" data-symbol="${esc(r.symbol)}" ${aiLoading ? "disabled" : ""}>${aiLoading ? "AI loading" : (rd ? "Refresh AI read" : "AI read")}</button>
-          <button class="btn-secondary" data-act="load-chart-scan" data-symbol="${esc(r.symbol)}" ${chartLoading ? "disabled" : ""}>${chartLoading ? "Chart loading" : (chartHistoryFor(r.symbol).length > 1 ? "Refresh chart" : "Load chart")}</button>
-          ${plan.ok ? `<button class="btn-secondary" data-act="paper-test-scan" data-symbol="${esc(r.symbol)}">Log paper</button>` : ""}
+          <button class="btn-secondary" data-act="toggle-analysis" data-symbol="${esc(r.symbol)}">${expanded ? "Hide analysis" : "Details"}</button>
           ${plan.ok && score >= 75
             ? `<span class="meta good">Auto-paper prime</span>`
             : plan.ok
@@ -1907,8 +1940,15 @@ document.addEventListener("click", async e => {
     else if (act === "toggle-ms-soft") { state.marketScanHideSoft = !state.marketScanHideSoft; renderCurrentView(); }
     else if (act === "toggle-analysis") {
       const sym = String(target.dataset.symbol || "").toUpperCase();
-      state.expandedAnalysis[sym] = !state.expandedAnalysis[sym];
+      const willOpen = !state.expandedAnalysis[sym];
+      state.expandedAnalysis[sym] = willOpen;
       renderCurrentView();
+      if (willOpen) {
+        setTimeout(() => {
+          if (!msScannerReadFor(sym) && !state.aiReadLoading[sym]) runSingleSymbolRead(sym);
+          if (!chartHistoryFor(sym).length && !state.chartLoading[sym]) loadOpportunityChart(sym);
+        }, 0);
+      }
     }
     else if (act === "ai-read-scan") await runSingleSymbolRead(target.dataset.symbol);
     else if (act === "load-chart-scan") await loadOpportunityChart(target.dataset.symbol);
