@@ -103,6 +103,23 @@ button { cursor:pointer; }
 .desk-cell { border:1px solid var(--rule-soft); background:var(--elev); border-radius:10px; padding:10px; }
 .desk-k { display:block; color:var(--muted); font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.07em; }
 .desk-v { display:block; margin-top:5px; font-family:var(--mono); font-size:20px; font-weight:600; }
+.radar-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin:12px 0; }
+.radar-card { border:1px solid var(--rule-soft); border-radius:10px; background:rgba(255,255,255,.28); padding:10px; min-width:0; }
+.radar-card.ready { border-color:rgba(74,122,74,.35); background:rgba(74,122,74,.07); }
+.radar-card.building, .radar-card.pullback, .radar-card.breakout { border-color:rgba(176,141,60,.35); background:rgba(176,141,60,.07); }
+.radar-card.avoid { border-color:rgba(161,61,45,.28); background:rgba(161,61,45,.06); }
+.radar-k { display:block; font-family:var(--mono); color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; }
+.radar-v { display:block; font-family:var(--mono); font-size:22px; font-weight:700; margin-top:4px; }
+.radar-syms { color:var(--soft); font-size:11px; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sector-strip { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+.sector-card { border:1px solid var(--rule-soft); border-radius:10px; padding:8px 10px; background:rgba(255,255,255,.28); min-width:122px; }
+.sector-name { display:block; font-weight:700; font-size:12px; color:var(--ink); }
+.sector-meta { display:block; font-family:var(--mono); color:var(--muted); font-size:10px; margin-top:2px; }
+.watch-list { display:grid; gap:8px; margin-top:10px; }
+.watch-row { display:grid; grid-template-columns:90px minmax(0,1fr) auto; gap:10px; align-items:center; border:1px solid var(--rule-soft); border-radius:10px; padding:9px; background:rgba(255,255,255,.25); }
+.watch-sym { font-family:var(--mono); font-weight:700; }
+.watch-text { color:var(--soft); font-size:12px; }
+.setup-chip { color:var(--blue); border-color:rgba(79,111,159,.35); background:rgba(79,111,159,.08); }
 .score-legend { color:var(--muted); font-size:12px; margin:8px 0 12px; }
 .scan-note, .empty {
   border:1px solid var(--rule-soft); background:rgba(255,255,255,.32); border-radius:10px;
@@ -206,6 +223,15 @@ button { cursor:pointer; }
 .panel-block { border:1px solid var(--rule-soft); border-radius:12px; background:rgba(255,255,255,.28); padding:12px; }
 .panel-block h4 { font-family:var(--display); font-size:18px; font-weight:500; margin-bottom:7px; }
 .back-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.chart-lib-box { border:1px solid var(--rule-soft); border-radius:12px; background:rgba(255,255,255,.3); padding:12px; min-height:540px; }
+.tv-chart { width:100%; height:500px; }
+.quality-breakdown { display:grid; gap:7px; }
+.quality-row { display:grid; grid-template-columns:120px minmax(0,1fr) 44px; gap:8px; align-items:center; font-family:var(--mono); font-size:11px; color:var(--muted); }
+.lab-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:12px 0; }
+.lab-cell { border:1px solid var(--rule-soft); border-radius:12px; background:rgba(255,255,255,.28); padding:12px; }
+.lab-title { font-family:var(--mono); color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.07em; }
+.lab-value { font-family:var(--display); font-size:30px; line-height:1; margin-top:6px; }
+.missed-row { display:grid; grid-template-columns:90px minmax(0,1fr) auto; gap:10px; align-items:center; border:1px solid var(--rule-soft); border-radius:10px; padding:9px; background:rgba(255,255,255,.25); margin-top:8px; }
 .read { margin-top:11px; padding:11px; border-left:3px solid var(--gold); background:rgba(176,141,60,.07); border-radius:8px; }
 .read-one { font-weight:600; color:var(--ink); }
 .read-setup { color:var(--soft); font-size:13px; margin-top:4px; }
@@ -259,7 +285,9 @@ button { cursor:pointer; }
   .toolbar { grid-template-columns:1fr 1fr; }
   .toolbar input { grid-column:1 / -1; }
   .desk-grid, .quality-grid, .perf-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .radar-grid, .lab-grid { grid-template-columns:1fr 1fr; }
   .chart-shell { grid-template-columns:1fr; }
+  .watch-row, .missed-row { grid-template-columns:1fr; }
   .opp-row { grid-template-columns:1fr; }
   .rank { display:none; }
   .reason-grid, .read-grid { grid-template-columns:1fr 1fr; }
@@ -305,7 +333,7 @@ button { cursor:pointer; }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 4h14v16l-7-3-7 3V4z" /><path d="M9 8h6M9 12h5" />
       </svg>
-      Journal
+      Paper Lab
     </button>
     <button class="tab" data-view="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
@@ -321,6 +349,7 @@ button { cursor:pointer; }
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 
 <script>
 "use strict";
@@ -433,12 +462,21 @@ function renderCurrentView() {
 }
 
 const LOCAL_TRADES_KEY = "opportunity_paper_trades_v2";
+const TRIGGER_WATCH_KEY = "opportunity_trigger_watch_v1";
+const OPPORTUNITY_MEMORY_KEY = "opportunity_memory_v1";
 function localTrades() {
   try { return JSON.parse(localStorage.getItem(LOCAL_TRADES_KEY) || "[]"); }
   catch { return []; }
 }
 function saveLocalTrades(rows) {
   localStorage.setItem(LOCAL_TRADES_KEY, JSON.stringify(rows));
+}
+function localJson(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
+  catch { return fallback; }
+}
+function saveJson(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
 }
 function tradeId(symbol) {
   return `${new Date().toISOString().slice(0,10)}_${String(symbol).toUpperCase()}_${Math.random().toString(36).slice(2,8)}`;
@@ -771,6 +809,7 @@ async function loadCachedScan() {
       _cached: true,
     };
     state.marketScanRanAt = d.generated_at || d.updated_at || new Date().toISOString();
+    updateOpportunityMemory(state.marketScan);
     renderCurrentView();
   } catch (e) {
     console.warn("Cached scan unavailable", e);
@@ -793,6 +832,7 @@ async function runMarketScan(opts = {}) {
     });
     state.marketScan = j;
     state.marketScanRanAt = j.generated_at || new Date().toISOString();
+    updateOpportunityMemory(j);
     const auto = await autoLogPrimePaperTrades(j);
     const suffix = auto.logged ? ` - auto-paper logged ${auto.logged}` : "";
     toast(`${(j.results || []).length} opportunities loaded${suffix}`);
@@ -861,6 +901,7 @@ async function runRollingBroadScan() {
     }
     state.marketScan = combined;
     state.marketScanRanAt = combined.generated_at || new Date().toISOString();
+    updateOpportunityMemory(combined);
     const auto = await autoLogPrimePaperTrades(combined);
     const suffix = auto.logged ? ` - auto-paper logged ${auto.logged}: ${auto.symbols.join(", ")}` : "";
     toast(`Broad sweep ranked ${combined.results.length} opportunities${suffix}`);
@@ -1109,6 +1150,126 @@ function msScannerReadFor(symbol) {
   const sym = String(symbol || "").toUpperCase();
   return (state.marketScan?.reads || []).find(r => String(r.symbol || "").toUpperCase() === sym) || null;
 }
+function setupType(row) {
+  const tags = msTags(row);
+  const sym = String(row?.symbol || "").toUpperCase();
+  const sector = msSector(sym, row);
+  if (["SPY","QQQ","IWM","DIA","RSP","XLE","XLF","XLV","XLI","XLY","XLP","XLU","XLB","XLRE","SMH","IGV","IBB","XBI","KRE","KWEB","ITA","GDX","SLV","GLD","TLT"].includes(sym)) return "ETF / sector trade";
+  if (tags.includes("bullish-flow") || msComponent(row, "optflow") >= 10) return "Squeeze / flow";
+  if (tags.includes("catalyst-near") || row?.earnings_date) return "Earnings / catalyst";
+  if (msLaneFor(row) === "pullback") return "Pullback continuation";
+  if (msLaneFor(row) === "rotation" || tags.includes("coiled")) return "Compression breakout";
+  if (row?.trend !== "above_200ma" && (num(row?.return_20d) ?? 0) > 0) return "Reversal";
+  if (msLaneFor(row) === "momentum" || msComponent(row, "momentum") >= 12) return "Momentum breakout";
+  return sector === "Unknown" ? "General setup" : `${sector} setup`;
+}
+function qualityRows(row) {
+  const rr = msRiskReward(row);
+  return [
+    ["Trend", num(row?.trend_score) ?? (row?.trend === "above_200ma" ? 80 : 35)],
+    ["Volume", msComponent(row, "volume") * 5],
+    ["Rel strength", msComponent(row, "momentum") * 5],
+    ["Compression", msComponent(row, "compression") * 5],
+    ["Options flow", msComponent(row, "optflow") * 5],
+    ["Risk/reward", rr == null ? 0 : Math.min(100, rr / 3 * 100)],
+    ["Entry timing", msActionabilityScore(row)],
+  ].map(([label, value]) => [label, Math.max(0, Math.min(100, Number(value) || 0))]);
+}
+function radarBucket(row) {
+  const gate = msInvestmentGate(row);
+  const plan = msPaperTestPlan(row, gate);
+  const entry = String(row?.entry_state || "").toLowerCase();
+  const rsi = num(row?.rsi14);
+  const rr = msRiskReward(row);
+  const fromHigh = num(row?.pct_from_52w_high);
+  if (plan.ok && msPrimaryScore(row) >= 75) return { id:"ready", label:"Ready now", tone:"ready" };
+  if (["falling", "bad_rr", "needs_levels"].includes(entry) || row?._soft) return { id:"avoid", label:"Avoid", tone:"avoid" };
+  if (entry === "extended" || (rsi != null && rsi >= 68) || (rr != null && rr < 1.5)) return { id:"pullback", label:"Needs pullback", tone:"pullback" };
+  if (msComponent(row, "compression") >= 7 || (fromHigh != null && fromHigh <= -2 && fromHigh >= -15)) return { id:"breakout", label:"Breakout trigger", tone:"breakout" };
+  return { id:"building", label:"Building", tone:"building" };
+}
+function deriveTrigger(row) {
+  const gate = msInvestmentGate(row);
+  const plan = msPaperTestPlan(row, gate);
+  const preview = msTradePlanPreview(row, gate, plan);
+  const bucket = radarBucket(row);
+  const price = preview.entry;
+  if (bucket.id === "ready" && preview.target && preview.stop) {
+    return { type:"ready", action:"paper-test now", trigger_price:price, invalidation:preview.stop, text:`Paper-ready at ${fmtUSD(price, 2)}; target ${fmtUSD(preview.target, 2)}, stop ${fmtUSD(preview.stop, 2)}.` };
+  }
+  if (bucket.id === "pullback") {
+    const pullback = preview.stop || num(row?.nearest_support);
+    return { type:"pullback", action:"wait for pullback", trigger_price:pullback, invalidation:pullback ? pullback * 0.97 : null, text:pullback ? `Watch pullback toward ${fmtUSD(pullback, 2)} before entry.` : "Wait for a cleaner support level before entry." };
+  }
+  if (bucket.id === "breakout") {
+    const breakout = preview.target || num(row?.nearest_resistance);
+    return { type:"breakout", action:"breakout trigger", trigger_price:breakout, invalidation:preview.stop, text:breakout ? `Trigger above ${fmtUSD(breakout, 2)} with volume; stop near ${preview.stop ? fmtUSD(preview.stop, 2) : "support"}.` : "Needs resistance level for breakout trigger." };
+  }
+  if (bucket.id === "avoid") {
+    return { type:"avoid", action:"avoid", trigger_price:null, invalidation:preview.stop, text:`Avoid for now: ${gate.primary}.` };
+  }
+  const trigger = preview.target || num(row?.nearest_resistance);
+  return { type:"building", action:"watch setup", trigger_price:trigger, invalidation:preview.stop, text:trigger ? `Building. Alert if price moves through ${fmtUSD(trigger, 2)} with confirmation.` : "Building. Needs cleaner trigger level." };
+}
+function triggerKey(symbol, trigger) {
+  return `${String(symbol || "").toUpperCase()}|${trigger?.type || "watch"}|${Number(trigger?.trigger_price || 0).toFixed(2)}`;
+}
+function updateOpportunityMemory(scan) {
+  const rows = (scan?.results || []).filter(r => r?.symbol && num(r.current_price) != null);
+  const memory = localJson(OPPORTUNITY_MEMORY_KEY, { snapshots:{}, missed:[] });
+  memory.snapshots = memory.snapshots || {};
+  memory.missed = memory.missed || [];
+  const missedKeys = new Set(memory.missed.map(x => x.key));
+  for (const row of rows) {
+    const sym = String(row.symbol).toUpperCase();
+    const price = num(row.current_price);
+    const bucket = radarBucket(row);
+    const prev = memory.snapshots[sym];
+    if (prev && ["building", "pullback", "breakout"].includes(prev.bucket) && price >= Number(prev.price || 0) * 1.055 && !missedKeys.has(sym)) {
+      const gain = ((price / Number(prev.price)) - 1) * 100;
+      memory.missed.unshift({ key:sym, symbol:sym, from_price:prev.price, current_price:price, gain_pct:Number(gain.toFixed(1)), setup:prev.setup, first_seen:prev.at, noticed_at:new Date().toISOString() });
+      missedKeys.add(sym);
+    }
+    if (["building", "pullback", "breakout"].includes(bucket.id)) {
+      memory.snapshots[sym] = { symbol:sym, price, bucket:bucket.id, setup:setupType(row), at:prev?.at || new Date().toISOString() };
+    }
+  }
+  memory.missed = memory.missed.slice(0, 30);
+  saveJson(OPPORTUNITY_MEMORY_KEY, memory);
+  refreshTriggerWatchFromScan(scan);
+}
+function refreshTriggerWatchFromScan(scan) {
+  const rows = (scan?.results || []).slice(0, 40);
+  const existing = localJson(TRIGGER_WATCH_KEY, []);
+  const byKey = new Map(existing.map(x => [x.key, x]));
+  for (const row of rows) {
+    const bucket = radarBucket(row);
+    if (bucket.id === "avoid" || bucket.id === "ready") continue;
+    const trigger = deriveTrigger(row);
+    if (!trigger.trigger_price && trigger.type !== "building") continue;
+    const key = triggerKey(row.symbol, trigger);
+    byKey.set(key, {
+      ...(byKey.get(key) || {}),
+      key,
+      symbol:String(row.symbol).toUpperCase(),
+      setup:setupType(row),
+      bucket:bucket.label,
+      trigger,
+      price:num(row.current_price),
+      score:msPrimaryScore(row),
+      updated_at:new Date().toISOString(),
+    });
+  }
+  const list = Array.from(byKey.values())
+    .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0))
+    .slice(0, 60);
+  saveJson(TRIGGER_WATCH_KEY, list);
+}
+function deleteTriggerWatch(key) {
+  saveJson(TRIGGER_WATCH_KEY, localJson(TRIGGER_WATCH_KEY, []).filter(x => x.key !== key));
+  toast("Trigger removed");
+  renderCurrentView();
+}
 function priceRange(level) {
   const n = num(level);
   if (!(n > 0)) return null;
@@ -1126,10 +1287,15 @@ function scannerSetupKey(row, plan) {
   ].join("|");
 }
 function scannerSnapshot(row, read, gate, plan) {
+  const radar = radarBucket(row);
   return {
     source:"market_scanner",
     symbol:row.symbol,
     setup_key:scannerSetupKey(row, plan),
+    setup_type:setupType(row),
+    radar_bucket:radar.label,
+    radar_id:radar.id,
+    trigger:deriveTrigger(row),
     rank:row.rank ?? null,
     opportunity_score:msPrimaryScore(row),
     actionability_score:msActionabilityScore(row),
@@ -1272,6 +1438,55 @@ function renderDiscover() {
   if (!state.marketScan && !state.marketScanLoading) setTimeout(loadCachedScan, 0);
   view.innerHTML = renderMarketScannerCard();
 }
+function renderOpportunityRadar(results) {
+  const buckets = [
+    ["ready", "Ready now"],
+    ["building", "Building"],
+    ["pullback", "Needs pullback"],
+    ["breakout", "Breakout trigger"],
+    ["avoid", "Avoid"],
+  ];
+  return `<div class="radar-grid">${buckets.map(([id, label]) => {
+    const rows = results.filter(r => radarBucket(r).id === id);
+    const syms = rows.slice(0, 4).map(r => r.symbol).join(", ");
+    return `<div class="radar-card ${id}" data-radar="${esc(id)}">
+      <span class="radar-k">${esc(label)}</span>
+      <span class="radar-v">${rows.length}</span>
+      <div class="radar-syms">${esc(syms || "none")}</div>
+    </div>`;
+  }).join("")}</div>`;
+}
+function renderSectorRotation(results) {
+  const map = {};
+  for (const r of results) {
+    const s = msSector(r.symbol, r);
+    const item = map[s] || (map[s] = { sector:s, n:0, total:0, ready:0, top:[] });
+    item.n++;
+    item.total += msPrimaryScore(r);
+    if (radarBucket(r).id === "ready") item.ready++;
+    item.top.push(r);
+  }
+  const sectors = Object.values(map).map(x => ({ ...x, avg:x.n ? x.total / x.n : 0 }))
+    .sort((a, b) => b.avg - a.avg || b.ready - a.ready)
+    .slice(0, 8);
+  if (!sectors.length) return "";
+  return `<div class="sector-strip">${sectors.map(s => {
+    const top = s.top.sort((a, b) => msPrimaryScore(b) - msPrimaryScore(a))[0]?.symbol || "";
+    return `<div class="sector-card">
+      <span class="sector-name">${esc(s.sector)}</span>
+      <span class="sector-meta">${Math.round(s.avg)} avg · ${s.ready} ready · ${esc(top)}</span>
+    </div>`;
+  }).join("")}</div>`;
+}
+function renderTriggerWatchPanel() {
+  const list = localJson(TRIGGER_WATCH_KEY, []).slice(0, 8);
+  if (!list.length) return `<div class="scan-note">Trigger Watch will fill after a full sweep. It saves building, pullback, and breakout trigger levels automatically.</div>`;
+  return `<div class="watch-list">${list.map(w => `<div class="watch-row">
+    <div><span class="watch-sym">${esc(w.symbol)}</span><div class="meta setup-chip">${esc(w.setup || "setup")}</div></div>
+    <div class="watch-text">${esc(w.trigger?.text || "")}</div>
+    <button class="btn-ghost" data-act="delete-trigger" data-key="${esc(w.key)}">x</button>
+  </div>`).join("")}</div>`;
+}
 function renderMarketScannerCard() {
   const scan = state.marketScan;
   const loading = state.marketScanLoading;
@@ -1328,6 +1543,19 @@ function renderMarketScannerCard() {
         ${deskCell("Pullbacks", pullbacks)}
         ${deskCell("Flow/catalyst", catalysts)}
       </div>
+      ${results.length ? `<div class="panel-block" style="margin:12px 0;">
+        <h4>Opportunity Radar</h4>
+        ${renderOpportunityRadar(preFiltered)}
+        <div class="muted" style="font-size:12px;">Radar separates entries from watch-list triggers so good setups are not forced into paper trades too early.</div>
+      </div>` : ""}
+      ${results.length ? `<div class="panel-block" style="margin:12px 0;">
+        <h4>Sector Rotation</h4>
+        ${renderSectorRotation(preFiltered)}
+      </div>` : ""}
+      ${results.length ? `<div class="panel-block" style="margin:12px 0;">
+        <h4>Trigger Watch</h4>
+        ${renderTriggerWatchPanel()}
+      </div>` : ""}
       <div class="score-legend">Opportunity /100: 75+ prime, 60-74 pre-surge, 45-59 watch. Prime + paper-ready setups are auto-logged, up to your Settings limit.</div>
       <div class="pill-row">${laneButtons}</div>
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
@@ -1591,6 +1819,69 @@ function renderCandlestickChart(symbol, preview) {
     </div>
   </div>`;
 }
+function renderChartLibraryShell(symbol, preview) {
+  return `<div class="chart-lib-box">
+    <div id="tvChart" class="tv-chart" data-symbol="${esc(symbol)}"></div>
+    <div id="chartFallback" class="hidden">${renderCandlestickChart(symbol, preview)}</div>
+  </div>`;
+}
+function chartTimeValue(t) {
+  const d = new Date(Number(t) > 1e12 ? Number(t) : Number(t) * 1000);
+  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+function mountProfessionalChart(symbol, preview) {
+  const el = $("#tvChart");
+  if (!el) return;
+  const fallback = $("#chartFallback");
+  const bars = chartBarsFor(symbol).slice(-(CHART_TIMEFRAMES[state.chartTimeframe]?.bars || 66));
+  if (!window.LightweightCharts || bars.length < 2) {
+    if (fallback) fallback.classList.remove("hidden");
+    return;
+  }
+  el.innerHTML = "";
+  const chart = LightweightCharts.createChart(el, {
+    height:500,
+    layout:{ background:{ color:"transparent" }, textColor:"#4a4639" },
+    grid:{ vertLines:{ color:"#eee6d4" }, horzLines:{ color:"#eee6d4" } },
+    rightPriceScale:{ borderColor:"#d8d2bf" },
+    timeScale:{ borderColor:"#d8d2bf", timeVisible:false },
+    crosshair:{ mode:LightweightCharts.CrosshairMode.Normal },
+  });
+  const candle = chart.addCandlestickSeries({
+    upColor:"#4a7a4a", downColor:"#a13d2d", borderUpColor:"#4a7a4a", borderDownColor:"#a13d2d", wickUpColor:"#4a7a4a", wickDownColor:"#a13d2d",
+  });
+  const data = bars.map(b => ({ time:chartTimeValue(b.t), open:b.o, high:b.h, low:b.l, close:b.c })).filter(b => b.time);
+  candle.setData(data);
+  const volume = chart.addHistogramSeries({ priceFormat:{ type:"volume" }, priceScaleId:"" });
+  volume.priceScale().applyOptions({ scaleMargins:{ top:0.82, bottom:0 } });
+  volume.setData(bars.map(b => ({ time:chartTimeValue(b.t), value:b.v || 0, color:b.c >= b.o ? "rgba(74,122,74,.28)" : "rgba(161,61,45,.25)" })).filter(b => b.time));
+  const closes = bars.map(b => b.c);
+  const addMA = (period, color) => {
+    const series = chart.addLineSeries({ color, lineWidth:2, priceLineVisible:false, lastValueVisible:false });
+    const ma = movingAverage(closes, period).map((v, i) => v == null ? null : ({ time:chartTimeValue(bars[i].t), value:v })).filter(Boolean);
+    if (ma.length) series.setData(ma);
+  };
+  addMA(20, "#b08d3c");
+  addMA(50, "#4f6f9f");
+  [
+    [preview.entry, "Entry", "#4f6f9f"],
+    [preview.target, "TP", "#4a7a4a"],
+    [preview.stop, "SL", "#a13d2d"],
+  ].forEach(([price, title, color]) => {
+    if (price > 0) candle.createPriceLine({ price, color, lineWidth:2, lineStyle:LightweightCharts.LineStyle.Dashed, axisLabelVisible:true, title });
+  });
+  chart.timeScale().fitContent();
+  window._opportunityChart = chart;
+}
+function renderQualityBreakdown(row) {
+  return `<div class="quality-breakdown">${qualityRows(row).map(([label, value]) => `
+    <div class="quality-row">
+      <span>${esc(label)}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${Math.round(value)}%;background:${value >= 70 ? "var(--green)" : value >= 45 ? "var(--gold)" : "var(--red)"}"></span></span>
+      <span>${Math.round(value)}</span>
+    </div>
+  `).join("")}</div>`;
+}
 function chartRowFor(symbol) {
   const sym = String(symbol || "").toUpperCase();
   const cached = msScannerRowFor(sym);
@@ -1653,7 +1944,7 @@ function renderChartView() {
         <div class="timeframes">${tfButtons}</div>
       </div>
       <div class="chart-shell">
-        <div>${renderCandlestickChart(sym, preview)}</div>
+        <div>${renderChartLibraryShell(sym, preview)}</div>
         <aside class="chart-panel">
           <div class="panel-block">
             <h4>Trade Plan</h4>
@@ -1670,6 +1961,7 @@ function renderChartView() {
           </div>
           ${rd ? `<div class="panel-block"><h4>AI Read</h4><div class="read-one">${esc(rd.one_liner)}</div><div class="read-setup">${esc(rd.setup)}</div></div>` : `<div class="panel-block"><h4>AI Read</h4><div class="muted">Loading or not requested yet.</div></div>`}
           ${components ? `<div class="panel-block"><h4>Signal Stack</h4><div class="bars">${components}</div></div>` : ""}
+          <div class="panel-block"><h4>Quality Breakdown</h4>${renderQualityBreakdown(row)}</div>
           <div class="row-actions">
             ${plan.ok ? `<button class="btn" data-act="paper-test-scan" data-symbol="${esc(sym)}">Log paper trade</button>` : `<span class="meta warn">${esc(breakdown.summary)}</span>`}
           </div>
@@ -1677,6 +1969,7 @@ function renderChartView() {
       </div>
     </div>
   </section>`;
+  setTimeout(() => mountProfessionalChart(sym, preview), 0);
 }
 function renderOpportunityRow(r, rd) {
   const sym = String(r.symbol || "").toUpperCase();
@@ -1692,6 +1985,8 @@ function renderOpportunityRow(r, rd) {
   const rr = msRiskReward(r);
   const day = num(r.day_change_pct);
   const adv = num(r.avg_dollar_vol_20d);
+  const setup = setupType(r);
+  const radar = radarBucket(r);
   const tags = msTags(r).slice(0, 7).map(t => `<span class="tag">${esc(String(t).replace(/-/g, " "))}</span>`).join("");
   const components = renderComponentBars(r);
   return `
@@ -1708,6 +2003,8 @@ function renderOpportunityRow(r, rd) {
         <div class="name">${esc(r.name || "")}</div>
         <div class="meta-row">
           <span class="meta good">${esc(msLaneFor(r))}</span>
+          <span class="meta setup-chip">${esc(setup)}</span>
+          <span class="meta ${radar.id === "ready" ? "good" : radar.id === "avoid" ? "bad" : "warn"}">${esc(radar.label)}</span>
           <span class="meta">${esc(msSector(r.symbol, r))}</span>
           <span class="meta">${esc(msCapBucket(r).replace(/_/g, " "))}</span>
           ${rd ? `<span class="meta good">AI read</span>` : ""}
@@ -1718,7 +2015,7 @@ function renderOpportunityRow(r, rd) {
           ${adv != null ? `<span class="meta ${adv >= 5_000_000 ? "good" : "warn"}">$Vol ${adv >= 1_000_000 ? (adv / 1_000_000).toFixed(0) + "M" : (adv / 1_000).toFixed(0) + "K"}</span>` : ""}
         </div>
         ${tags ? `<div class="tag-row">${tags}</div>` : ""}
-        <div class="quick-line">${esc(gate.primary)} · Entry ${esc(String(r.entry_state || r.opportunity_stage || "watch").replace(/_/g, " "))}</div>
+        <div class="quick-line">${esc(gate.primary)} · ${esc(deriveTrigger(r).text)}</div>
         ${expanded ? renderOpportunityDetailCard(r, rd, gate, plan, breakdown, preview, components, aiLoading, chartLoading) : ""}
         <div class="row-actions">
           <button class="btn-secondary" data-act="toggle-analysis" data-symbol="${esc(r.symbol)}">${expanded ? "Hide analysis" : "Details"}</button>
@@ -1945,22 +2242,82 @@ function tradeOutcome(t) {
   }
   return ["open", "", "Open paper test"];
 }
+function tradeSetupType(t) {
+  return t?.scanner_snapshot?.setup_type
+    || t?.scanner_snapshot?.entry_mode
+    || t?.analysis_snapshot?.setup_type
+    || (t?.scanner_snapshot ? "Discovery setup" : "Manual");
+}
+function tradeEntryMode(t) {
+  return t?.scanner_snapshot?.entry_mode
+    || (t?.auto_logged ? "auto-prime" : t?.is_paper ? "manual-paper" : "real");
+}
+function renderPaperLabDashboard(trades, stats) {
+  const paper = (trades || []).filter(t => t.is_paper === true);
+  const invalid = paper.filter(t => !tradePlanStatus(t).ok || t.lifecycle_status === "invalid_plan").length;
+  const watch = localJson(TRIGGER_WATCH_KEY, []);
+  const missed = localJson(OPPORTUNITY_MEMORY_KEY, { missed:[] }).missed || [];
+  const auto = paper.filter(t => t.auto_logged).length;
+  const bestSetup = stats.by_setup?.[0];
+  const exp = stats.overall?.n ? `${stats.overall.expectancy >= 0 ? "+" : ""}${stats.overall.expectancy}%` : "-";
+  return `<section class="card">
+    <div class="card-head"><h3>Paper Trade Lab</h3><button class="btn-ghost" data-act="run-paper-sim">Run sim</button></div>
+    <div class="lab-grid">
+      ${labCell("Open paper", stats.open_count)}
+      ${labCell("Closed tests", stats.overall.n)}
+      ${labCell("Expectancy", exp, stats.overall.expectancy)}
+      ${labCell("Auto logged", auto)}
+      ${labCell("Invalid plans", invalid, invalid ? -1 : null)}
+      ${labCell("Trigger watch", watch.length)}
+    </div>
+    <div class="issue">Auto-paper only logs prime rows that pass entry, take-profit, stop-loss, and reward/risk rules. Trigger Watch keeps good setups that are not ready yet.</div>
+    ${bestSetup ? `<div class="issue">Best current sample: ${esc(bestSetup.key)} with ${bestSetup.n} closed and ${bestSetup.expectancy >= 0 ? "+" : ""}${bestSetup.expectancy}% expectancy.</div>` : `<div class="issue">No closed setup sample yet. Run the sim after trades have enough candles to test target/stop/time expiry.</div>`}
+    ${missed.length ? `<div class="issue">${missed.length} missed opportunity${missed.length === 1 ? "" : "ies"} captured from watch-list names that moved before entry.</div>` : ""}
+  </section>`;
+}
+function labCell(k, v, tone = null) {
+  const cls = tone == null ? "" : Number(tone) >= 0 ? "good-text" : "bad-text";
+  return `<div class="lab-cell"><span class="lab-title">${esc(k)}</span><span class="lab-value ${cls}">${esc(v)}</span></div>`;
+}
+function renderMissedOpportunityReview() {
+  const memory = localJson(OPPORTUNITY_MEMORY_KEY, { missed:[] });
+  const missed = (memory.missed || []).slice(0, 10);
+  if (!missed.length) {
+    return `<section class="card">
+      <div class="card-head"><h3>Missed Opportunity Review</h3></div>
+      <div class="empty">No missed moves tracked yet. After more sweeps, building and pullback names that run without entry will appear here.</div>
+    </section>`;
+  }
+  return `<section class="card">
+    <div class="card-head"><h3>Missed Opportunity Review</h3></div>
+    ${missed.map(m => `<div class="missed-row">
+      <div><span class="watch-sym">${esc(m.symbol)}</span><div class="meta setup-chip">${esc(m.setup || "setup")}</div></div>
+      <div class="watch-text">Moved from ${fmtUSD(m.from_price, 2)} to ${fmtUSD(m.current_price, 2)} after being watch-only. Review whether the entry rule was too strict.</div>
+      <span class="meta good">+${esc(m.gain_pct)}%</span>
+    </div>`).join("")}
+  </section>`;
+}
 function renderJournal() {
-  $("#topbarTitle").textContent = "Journal";
+  $("#topbarTitle").textContent = "Paper Lab";
   $("#view").innerHTML = `
+    <section id="paperLabDashboard"></section>
     <section id="journalQuality"></section>
     <section class="card">
       <div class="card-head"><h3>Trade Log</h3></div>
       <div class="trade-list" id="tradeList"><div class="loading-row"><span class="spinner"></span><span>Loading trades</span></div></div>
     </section>
-    <section id="paperPerformance"></section>`;
+    <section id="paperPerformance"></section>
+    <section id="missedReview"></section>`;
   populateJournal();
 }
 async function populateJournal() {
   const trades = await loadTrades(500);
+  const stats = computePaperPerformance(trades);
+  $("#paperLabDashboard").innerHTML = renderPaperLabDashboard(trades, stats);
   $("#journalQuality").innerHTML = renderJournalQuality(trades);
   $("#tradeList").innerHTML = renderTradeRows(trades);
-  $("#paperPerformance").innerHTML = renderPaperPerformance(computePaperPerformance(trades));
+  $("#paperPerformance").innerHTML = renderPaperPerformance(stats);
+  $("#missedReview").innerHTML = renderMissedOpportunityReview();
 }
 function renderJournalQuality(trades) {
   const list = Array.isArray(trades) ? trades : [];
@@ -2058,6 +2415,8 @@ function computePaperPerformance(trades) {
     open_count:open.length,
     overall:stat(closed),
     by_source:groups(t => t.scanner_snapshot ? `Discovery ${t.scanner_snapshot.gate_label || ""}`.trim() : "Manual"),
+    by_setup:groups(tradeSetupType),
+    by_entry:groups(tradeEntryMode),
     by_conviction:groups(t => t.analysis_snapshot?.conviction || "-"),
   };
 }
@@ -2089,6 +2448,8 @@ function renderPaperPerformance(stats) {
       ${stats.open_count ? `<span class="meta">${stats.open_count} open</span>` : ""}
     </div>
     ${groupTable("By source", stats.by_source)}
+    ${groupTable("By setup", stats.by_setup)}
+    ${groupTable("By entry mode", stats.by_entry)}
     ${groupTable("By conviction", stats.by_conviction)}
   </section>`;
 }
@@ -2182,6 +2543,7 @@ document.addEventListener("click", async e => {
     else if (act === "ai-read-scan") await runSingleSymbolRead(target.dataset.symbol);
     else if (act === "load-chart-scan") await loadOpportunityChart(target.dataset.symbol);
     else if (act === "paper-test-scan") await paperTestScannerOpportunity(target.dataset.symbol);
+    else if (act === "delete-trigger") deleteTriggerWatch(target.dataset.key);
     else if (act === "run-paper-sim") await runPaperSimulationManual();
     else if (act === "delete-trade") {
       if (confirm("Delete this trade?")) {
