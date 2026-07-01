@@ -182,6 +182,30 @@ button { cursor:pointer; }
 .chart-label { fill:var(--muted); font:10px var(--mono); }
 .chart-caption { display:flex; flex-wrap:wrap; gap:7px; margin-top:7px; color:var(--muted); font-size:11px; }
 .chart-dot { width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:4px; }
+.chart-page { display:grid; gap:14px; }
+.chart-shell { display:grid; grid-template-columns:minmax(0,1.75fr) minmax(280px,.75fr); gap:14px; align-items:start; }
+.chart-toolbar { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+.timeframes { display:flex; gap:6px; flex-wrap:wrap; }
+.tf-btn {
+  border:1px solid var(--rule); border-radius:999px; background:transparent; color:var(--soft);
+  padding:7px 10px; font-family:var(--mono); font-size:11px; font-weight:700;
+}
+.tf-btn.active { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+.pro-chart { border:1px solid var(--rule-soft); border-radius:12px; background:rgba(255,255,255,.3); padding:12px; }
+.pro-chart svg { width:100%; height:auto; display:block; overflow:visible; }
+.candle-up { fill:rgba(74,122,74,.78); stroke:var(--green); }
+.candle-down { fill:rgba(161,61,45,.72); stroke:var(--red); }
+.wick-up { stroke:var(--green); }
+.wick-down { stroke:var(--red); }
+.ma20 { fill:none; stroke:var(--gold); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.ma50 { fill:none; stroke:var(--blue); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.vol-up { fill:rgba(74,122,74,.25); }
+.vol-down { fill:rgba(161,61,45,.22); }
+.axis-label { fill:var(--muted); font:10px var(--mono); }
+.chart-panel { display:grid; gap:10px; }
+.panel-block { border:1px solid var(--rule-soft); border-radius:12px; background:rgba(255,255,255,.28); padding:12px; }
+.panel-block h4 { font-family:var(--display); font-size:18px; font-weight:500; margin-bottom:7px; }
+.back-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .read { margin-top:11px; padding:11px; border-left:3px solid var(--gold); background:rgba(176,141,60,.07); border-radius:8px; }
 .read-one { font-weight:600; color:var(--ink); }
 .read-setup { color:var(--soft); font-size:13px; margin-top:4px; }
@@ -235,6 +259,7 @@ button { cursor:pointer; }
   .toolbar { grid-template-columns:1fr 1fr; }
   .toolbar input { grid-column:1 / -1; }
   .desk-grid, .quality-grid, .perf-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .chart-shell { grid-template-columns:1fr; }
   .opp-row { grid-template-columns:1fr; }
   .rank { display:none; }
   .reason-grid, .read-grid { grid-template-columns:1fr 1fr; }
@@ -342,6 +367,8 @@ const state = {
   aiReadLoading: {},
   priceCharts: {},
   chartLoading: {},
+  chartSymbol: null,
+  chartTimeframe: "3m",
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -399,6 +426,7 @@ function setView(view) {
 }
 function renderCurrentView() {
   setMeta();
+  if (state.currentView === "chart") return renderChartView();
   if (state.currentView === "journal") return renderJournal();
   if (state.currentView === "settings") return renderSettings();
   return renderDiscover();
@@ -670,7 +698,7 @@ function mergeMarketScanUpdate(scan) {
   };
   state.marketScanRanAt = state.marketScan.generated_at;
 }
-async function runSingleSymbolRead(symbol) {
+async function runSingleSymbolRead(symbol, { silent = false } = {}) {
   const sym = String(symbol || "").toUpperCase();
   if (!sym || state.aiReadLoading[sym]) return;
   state.aiReadLoading[sym] = true;
@@ -687,13 +715,13 @@ async function runSingleSymbolRead(symbol) {
     });
     mergeMarketScanUpdate(scan);
     const readCount = (scan.reads || []).length;
-    toast(readCount ? `AI read loaded for ${sym}` : `No AI read returned for ${sym}`, readCount ? "" : "error");
+    if (!silent) toast(readCount ? `AI read loaded for ${sym}` : `No AI read returned for ${sym}`, readCount ? "" : "error");
   } finally {
     state.aiReadLoading[sym] = false;
     renderCurrentView();
   }
 }
-async function loadOpportunityChart(symbol) {
+async function loadOpportunityChart(symbol, { silent = false } = {}) {
   const sym = String(symbol || "").toUpperCase();
   if (!sym || state.chartLoading[sym]) return;
   state.chartLoading[sym] = true;
@@ -702,13 +730,25 @@ async function loadOpportunityChart(symbol) {
     const price = await fetchPriceFor(sym);
     if (!price || !Array.isArray(price.ohlcv) || price.ohlcv.length < 2) throw new Error("price history unavailable");
     state.priceCharts[sym] = price;
-    toast(`Chart loaded for ${sym}`);
+    if (!silent) toast(`Chart loaded for ${sym}`);
   } catch (e) {
-    toast(`Chart unavailable for ${sym}`, "error");
+    if (!silent) toast(`Chart unavailable for ${sym}`, "error");
   } finally {
     state.chartLoading[sym] = false;
     renderCurrentView();
   }
+}
+function openChartPage(symbol) {
+  const sym = String(symbol || "").toUpperCase();
+  if (!sym) return;
+  state.chartSymbol = sym;
+  state.currentView = "chart";
+  $$(".tab").forEach(t => t.classList.remove("active"));
+  renderCurrentView();
+  setTimeout(() => {
+    if (!chartHistoryFor(sym).length && !state.chartLoading[sym]) loadOpportunityChart(sym, { silent:true });
+    if (!msScannerReadFor(sym) && !state.aiReadLoading[sym]) runSingleSymbolRead(sym, { silent:true });
+  }, 0);
 }
 async function loadCachedScan() {
   if (state.marketScan || state.marketScanLoading || state._cachedTried) return;
@@ -1448,6 +1488,196 @@ function renderOpportunityDetailCard(r, rd, gate, plan, breakdown, preview, comp
     </div>
   </div>`;
 }
+const CHART_TIMEFRAMES = {
+  "1m": { label:"1M", bars:22 },
+  "3m": { label:"3M", bars:66 },
+  "6m": { label:"6M", bars:126 },
+  "1y": { label:"1Y", bars:252 },
+};
+function chartBarsFor(symbol) {
+  const rows = Array.isArray(state.priceCharts[String(symbol || "").toUpperCase()]?.ohlcv)
+    ? state.priceCharts[String(symbol || "").toUpperCase()].ohlcv : [];
+  return rows.map(b => ({
+    t:b.t,
+    o:num(b.o ?? b.open ?? b.c ?? b.close),
+    h:num(b.h ?? b.high ?? b.c ?? b.close),
+    l:num(b.l ?? b.low ?? b.c ?? b.close),
+    c:num(b.c ?? b.close),
+    v:num(b.v ?? b.volume),
+  })).filter(b => b.o != null && b.h != null && b.l != null && b.c != null && b.h >= b.l);
+}
+function movingAverage(values, period) {
+  return values.map((_, i) => {
+    if (i + 1 < period) return null;
+    const slice = values.slice(i + 1 - period, i + 1);
+    return slice.reduce((a, b) => a + b, 0) / period;
+  });
+}
+function dateShort(t) {
+  const d = new Date(Number(t) > 1e12 ? Number(t) : Number(t) * 1000);
+  return isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-US", { month:"short", day:"numeric" });
+}
+function renderCandlestickChart(symbol, preview) {
+  const tf = CHART_TIMEFRAMES[state.chartTimeframe] ? state.chartTimeframe : "3m";
+  const allBars = chartBarsFor(symbol);
+  const bars = allBars.slice(-CHART_TIMEFRAMES[tf].bars);
+  if (bars.length < 2) {
+    return `<div class="pro-chart">${renderOpportunityChart({ symbol }, preview)}<div class="scan-note">Loading candle history. The chart page will fill in once price data returns.</div></div>`;
+  }
+  const levelValues = [preview.entry, preview.target, preview.stop].filter(v => v != null && v > 0);
+  let hi = Math.max(...bars.map(b => b.h), ...levelValues);
+  let lo = Math.min(...bars.map(b => b.l), ...levelValues);
+  if (!(hi > lo)) { hi += 1; lo -= 1; }
+  const pad = (hi - lo) * 0.08;
+  hi += pad; lo -= pad;
+  const w = 980, h = 520, left = 62, right = 104, top = 18, priceH = 332, gap = 26, volH = 88;
+  const bottom = top + priceH + gap + volH;
+  const iw = w - left - right;
+  const x = i => left + (bars.length <= 1 ? iw / 2 : i / (bars.length - 1) * iw);
+  const y = v => top + (hi - v) / (hi - lo) * priceH;
+  const maxV = Math.max(...bars.map(b => b.v || 0), 1);
+  const candleW = Math.max(2, Math.min(10, (iw / bars.length) * 0.58));
+  const grid = Array.from({ length:5 }, (_, i) => {
+    const value = lo + (hi - lo) * (i / 4);
+    const yy = y(value);
+    return `<line class="chart-grid" x1="${left}" y1="${yy.toFixed(1)}" x2="${w - right}" y2="${yy.toFixed(1)}" /><text class="axis-label" x="${w - right + 9}" y="${(yy + 3).toFixed(1)}">${esc(fmtUSD(value, value >= 100 ? 0 : 2))}</text>`;
+  }).join("");
+  const candles = bars.map((b, i) => {
+    const xx = x(i);
+    const up = b.c >= b.o;
+    const cls = up ? "up" : "down";
+    const bodyTop = y(Math.max(b.o, b.c));
+    const bodyBottom = y(Math.min(b.o, b.c));
+    const bodyH = Math.max(1.4, bodyBottom - bodyTop);
+    const volY = top + priceH + gap + volH - ((b.v || 0) / maxV) * volH;
+    const volX = xx - candleW / 2;
+    return `<line class="wick-${cls}" x1="${xx.toFixed(1)}" y1="${y(b.h).toFixed(1)}" x2="${xx.toFixed(1)}" y2="${y(b.l).toFixed(1)}" stroke-width="1.2" />
+      <rect class="candle-${cls}" x="${(xx - candleW / 2).toFixed(1)}" y="${bodyTop.toFixed(1)}" width="${candleW.toFixed(1)}" height="${bodyH.toFixed(1)}" rx="1" />
+      <rect class="vol-${cls}" x="${volX.toFixed(1)}" y="${volY.toFixed(1)}" width="${candleW.toFixed(1)}" height="${(top + priceH + gap + volH - volY).toFixed(1)}" />`;
+  }).join("");
+  const closes = bars.map(b => b.c);
+  const maPath = (period, cls) => {
+    const ma = movingAverage(closes, period);
+    const pts = ma.map((v, i) => v == null ? null : `${x(i).toFixed(1)},${y(v).toFixed(1)}`).filter(Boolean);
+    return pts.length > 1 ? `<polyline class="${cls}" points="${pts.join(" ")}" />` : "";
+  };
+  const levels = [
+    ["target", "TP", preview.target],
+    ["entry", "Entry", preview.entry],
+    ["stop", "SL", preview.stop],
+  ].filter(x => x[2] != null && x[2] > 0).map(([cls, label, value]) => {
+    const yy = y(value).toFixed(1);
+    return `<line class="chart-level ${cls}" x1="${left}" y1="${yy}" x2="${w - right}" y2="${yy}" /><text class="chart-label" x="${w - right + 8}" y="${Number(yy) + 3}">${esc(label)} ${esc(fmtUSD(value, 2))}</text>`;
+  }).join("");
+  const dates = bars.length ? `
+    <text class="axis-label" x="${left}" y="${bottom + 20}">${esc(dateShort(bars[0].t))}</text>
+    <text class="axis-label" x="${w - right - 42}" y="${bottom + 20}">${esc(dateShort(bars[bars.length - 1].t))}</text>` : "";
+  return `<div class="pro-chart">
+    <svg viewBox="0 0 ${w} ${h}" aria-label="${esc(symbol)} candlestick chart">
+      ${grid}
+      <line class="chart-grid" x1="${left}" y1="${top}" x2="${left}" y2="${bottom}" />
+      <line class="chart-grid" x1="${left}" y1="${top + priceH}" x2="${w - right}" y2="${top + priceH}" />
+      ${candles}
+      ${maPath(20, "ma20")}
+      ${maPath(50, "ma50")}
+      ${levels}
+      ${dates}
+    </svg>
+    <div class="chart-caption">
+      <span><span class="chart-dot" style="background:var(--green)"></span>up candle</span>
+      <span><span class="chart-dot" style="background:var(--red)"></span>down candle</span>
+      <span><span class="chart-dot" style="background:var(--gold)"></span>MA20</span>
+      <span><span class="chart-dot" style="background:var(--blue)"></span>MA50 / entry</span>
+    </div>
+  </div>`;
+}
+function chartRowFor(symbol) {
+  const sym = String(symbol || "").toUpperCase();
+  const cached = msScannerRowFor(sym);
+  if (cached) return cached;
+  const price = state.priceCharts[sym];
+  return {
+    symbol:sym,
+    name:sym,
+    current_price:price?.current_price ?? chartBarsFor(sym).slice(-1)[0]?.c ?? null,
+    nearest_support:null,
+    nearest_resistance:null,
+    opportunity_score:0,
+    actionability_score:0,
+    components:{},
+    tags:[],
+  };
+}
+function renderComponentBars(row) {
+  return [
+    ["Vol", msComponent(row, "volume"), row.components?.volume?.max || 20, "#b08d3c"],
+    ["Mom", msComponent(row, "momentum"), row.components?.momentum?.max || 20, "#4a7a4a"],
+    ["Coil", msComponent(row, "compression"), row.components?.compression?.max || 20, "#4f6f9f"],
+    ["Opt", msComponent(row, "optflow"), row.components?.optflow?.max || 20, "#8a5fb0"],
+  ].filter(x => x[1] > 0).map(([label, value, max, color]) => `
+    <div class="bar-row"><span>${label}</span><span class="bar-track"><span class="bar-fill" style="width:${Math.max(0, Math.min(100, value / max * 100)).toFixed(0)}%;background:${color}"></span></span><span>${Math.round(value)}</span></div>
+  `).join("");
+}
+function renderChartView() {
+  const sym = String(state.chartSymbol || "").toUpperCase();
+  $("#topbarTitle").textContent = sym ? `${sym} Chart` : "Chart";
+  const view = $("#view");
+  if (!sym) {
+    view.innerHTML = `<section class="card"><button class="btn-secondary" data-act="back-discover">Back</button><div class="empty">No symbol selected.</div></section>`;
+    return;
+  }
+  const row = chartRowFor(sym);
+  const rd = msScannerReadFor(sym);
+  const gate = msInvestmentGate(row);
+  const plan = msPaperTestPlan(row, gate);
+  const breakdown = paperEligibilityBreakdown(row, gate, plan);
+  const preview = msTradePlanPreview(row, gate, plan);
+  const components = renderComponentBars(row);
+  const tfButtons = Object.entries(CHART_TIMEFRAMES).map(([id, cfg]) =>
+    `<button class="tf-btn ${state.chartTimeframe === id ? "active" : ""}" data-act="set-chart-tf" data-tf="${esc(id)}">${esc(cfg.label)}</button>`
+  ).join("");
+  const confirmation = rd?.confirmation || (preview.target != null ? `Break and hold above ${fmtUSD(preview.target, 2)} with supportive volume.` : "Wait for a cleaner resistance level.");
+  const invalidation = rd?.invalidation || (preview.stop != null ? `Lose ${fmtUSD(preview.stop, 2)} and the setup is invalid.` : "No reliable stop-loss level yet.");
+  view.innerHTML = `<section class="chart-page">
+    <div class="back-row">
+      <button class="btn-secondary" data-act="back-discover">Back to desk</button>
+      <button class="btn-secondary" data-act="refresh-chart-page" data-symbol="${esc(sym)}" ${state.chartLoading[sym] ? "disabled" : ""}>${state.chartLoading[sym] ? "Loading chart" : "Refresh data"}</button>
+      <button class="btn-secondary" data-act="ai-read-scan" data-symbol="${esc(sym)}" ${state.aiReadLoading[sym] ? "disabled" : ""}>${state.aiReadLoading[sym] ? "AI loading" : (rd ? "Refresh AI read" : "AI read")}</button>
+    </div>
+    <div class="card">
+      <div class="chart-toolbar">
+        <div>
+          <h3>${esc(sym)} Professional Chart</h3>
+          <div class="muted" style="font-size:13px;">Candles, volume, MA20/MA50, and the paper-trade levels from Discovery.</div>
+        </div>
+        <div class="timeframes">${tfButtons}</div>
+      </div>
+      <div class="chart-shell">
+        <div>${renderCandlestickChart(sym, preview)}</div>
+        <aside class="chart-panel">
+          <div class="panel-block">
+            <h4>Trade Plan</h4>
+            ${renderTradePlan(row, preview, plan, breakdown)}
+          </div>
+          <div class="panel-block">
+            <h4>Conditions</h4>
+            <div class="read-grid">
+              <div><b>Entry:</b> ${esc(confirmation)}</div>
+              <div><b>Stop:</b> ${esc(invalidation)}</div>
+              <div><b>Direction:</b> ${esc(preview.direction)}</div>
+              <div><b>Status:</b> ${esc(plan.ok ? "paper-ready" : plan.reason || "blocked")}</div>
+            </div>
+          </div>
+          ${rd ? `<div class="panel-block"><h4>AI Read</h4><div class="read-one">${esc(rd.one_liner)}</div><div class="read-setup">${esc(rd.setup)}</div></div>` : `<div class="panel-block"><h4>AI Read</h4><div class="muted">Loading or not requested yet.</div></div>`}
+          ${components ? `<div class="panel-block"><h4>Signal Stack</h4><div class="bars">${components}</div></div>` : ""}
+          <div class="row-actions">
+            ${plan.ok ? `<button class="btn" data-act="paper-test-scan" data-symbol="${esc(sym)}">Log paper trade</button>` : `<span class="meta warn">${esc(breakdown.summary)}</span>`}
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>`;
+}
 function renderOpportunityRow(r, rd) {
   const sym = String(r.symbol || "").toUpperCase();
   const score = msPrimaryScore(r);
@@ -1463,20 +1693,13 @@ function renderOpportunityRow(r, rd) {
   const day = num(r.day_change_pct);
   const adv = num(r.avg_dollar_vol_20d);
   const tags = msTags(r).slice(0, 7).map(t => `<span class="tag">${esc(String(t).replace(/-/g, " "))}</span>`).join("");
-  const components = [
-    ["Vol", msComponent(r, "volume"), r.components?.volume?.max || 20, "#b08d3c"],
-    ["Mom", msComponent(r, "momentum"), r.components?.momentum?.max || 20, "#4a7a4a"],
-    ["Coil", msComponent(r, "compression"), r.components?.compression?.max || 20, "#4f6f9f"],
-    ["Opt", msComponent(r, "optflow"), r.components?.optflow?.max || 20, "#8a5fb0"],
-  ].filter(x => x[1] > 0).map(([label, value, max, color]) => `
-    <div class="bar-row"><span>${label}</span><span class="bar-track"><span class="bar-fill" style="width:${Math.max(0, Math.min(100, value / max * 100)).toFixed(0)}%;background:${color}"></span></span><span>${Math.round(value)}</span></div>
-  `).join("");
+  const components = renderComponentBars(r);
   return `
     <article class="opp-row">
       <div class="rank">#${esc(r.rank ?? "")}</div>
       <div>
         <div class="sym-row">
-          <button class="sym" data-act="toggle-analysis" data-symbol="${esc(r.symbol)}" title="Open ${esc(r.symbol)} analysis">${esc(r.symbol)}</button>
+          <button class="sym" data-act="open-chart-page" data-symbol="${esc(r.symbol)}" title="Open ${esc(r.symbol)} chart">${esc(r.symbol)}</button>
           <span class="score ${tierCls}">${Math.round(score)} ${tierLabel}</span>
           <span class="badge ${gate.tone}">${gate.label} ${gate.score}</span>
           ${day != null ? `<span class="meta ${day >= 0 ? "good" : "bad"}">${fmtPct(day)}</span>` : ""}
@@ -1936,6 +2159,12 @@ document.addEventListener("click", async e => {
   try {
     if (act === "stable-scan") await runRollingBroadScan();
     else if (act === "deep-scan") await runMarketScan({ discover:true });
+    else if (act === "open-chart-page") openChartPage(target.dataset.symbol);
+    else if (act === "back-discover") setView("discover");
+    else if (act === "set-chart-tf") { state.chartTimeframe = target.dataset.tf || "3m"; renderCurrentView(); }
+    else if (act === "refresh-chart-page") {
+      await loadOpportunityChart(target.dataset.symbol || state.chartSymbol);
+    }
     else if (act === "set-ms-lane") { state.marketScanLane = target.dataset.lane || "all"; renderCurrentView(); }
     else if (act === "toggle-ms-soft") { state.marketScanHideSoft = !state.marketScanHideSoft; renderCurrentView(); }
     else if (act === "toggle-analysis") {
@@ -1984,7 +2213,8 @@ document.addEventListener("keydown", e => {
   if (e.target?.id === "focusInput" && e.key === "Enter") runMarketScan({ force:true });
 });
 $("#refreshBtn").addEventListener("click", () => {
-  if (state.currentView === "discover") runRollingBroadScan();
+  if (state.currentView === "chart" && state.chartSymbol) loadOpportunityChart(state.chartSymbol);
+  else if (state.currentView === "discover") runRollingBroadScan();
   else renderCurrentView();
 });
 
