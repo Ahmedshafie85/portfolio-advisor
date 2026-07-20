@@ -464,6 +464,13 @@ function renderCurrentView() {
 const LOCAL_TRADES_KEY = "opportunity_paper_trades_v2";
 const TRIGGER_WATCH_KEY = "opportunity_trigger_watch_v1";
 const OPPORTUNITY_MEMORY_KEY = "opportunity_memory_v1";
+const PAPER_EVENT_LEDGER_KEY = "opportunity_paper_events_v1";
+const PAPER_SIM_COSTS = Object.freeze({
+  spread_pct: 0.0008,
+  slippage_pct: 0.0015,
+  commission_per_share: 0.005,
+  min_commission: 0.005,
+});
 function localTrades() {
   try { return JSON.parse(localStorage.getItem(LOCAL_TRADES_KEY) || "[]"); }
   catch { return []; }
@@ -588,122 +595,18 @@ async function saveInvestorProfile() {
   renderCurrentView();
 }
 
-const BROAD_BATCH_SIZE = 90;
-const BROAD_SCAN_BATCH_DEFS = [
-  { key:"tech_ai_semis", label:"Tech, AI, semis", symbols:`
-    AAPL MSFT NVDA AVGO ORCL CRM AMD NOW PLTR ADBE CSCO ACN INTC QCOM TXN MU ANET PANW CRWD SNPS SMCI MRVL ON ARM DDOG NET SNOW ZS MDB CFLT HUBS TEAM WDAY FTNT CDNS KLAC LRCX MPWR ALGM ACLS CRDO ALAB COHR LSCC RMBS SITM AMKR ONTO FORM UCTT ICHR AEHR CAMT VECO DIOD POWI AMBA OKTA TWLO GTLB S FROG BRZE ESTC PCOR APPF BL PD MNDY DOCN BILL IOT TENB RBRK PATH NCNO ASAN BASE AI
-  ` },
-  { key:"comm_consumer", label:"Communication and consumer", symbols:`
-    GOOGL META NFLX DIS TMUS CMCSA RBLX SPOT PINS TTD RDDT LYV EA TTWO MTCH SNAP ROKU WBD FOXA AMZN TSLA HD MCD NKE BKNG LOW SBUX TJX CMG ABNB DKNG CAVA RCL DECK WSM ELF WING TXRH CROX RH CHWY BOOT ONON BIRK SHAK DUOL NCLH CCL W
-  ` },
-  { key:"staples_financials", label:"Staples, banks, fintech", symbols:`
-    WMT COST PG KO PEP MDLZ CL CELH MNST TGT KR KMB GIS HSY KDP CLX SYY CHD EL JPM BAC V MA GS BRK.B WFC MS AXP SCHW BLK HOOD COIN SOFI AFRM TOST FOUR NU DLO STNE UPST PAYO MQ SEZL LMND OPEN RKT ROOT ARES OWL KKR BX TPG RITM CBOE CME IBKR PGR WRB RLI KNSL ALLY CMA WAL C PNC USB TFC BK STT DFS COF CB MMC AJG AMP TROW FITB RF
-  ` },
-  { key:"healthcare_biotech", label:"Healthcare and biotech", symbols:`
-    UNH LLY JNJ ABBV MRK ISRG TMO ABT AMGN VRTX DXCM HIMS NVO VKTX CYTK MDGL RXRX TEM HALO EXEL NTRA TNDM INSP PCVX CRNX ARWR IONS ROIV ALKS IMVT JANX CGON ACLX BEAM CRSP VERA SWTX ITCI AXSM BSX SYK EW RMD ALNY REGN MRNA BMY GILD ZBH PODD IDXX GH
-  ` },
-  { key:"industrial_defense", label:"Industrials, defense, infrastructure", symbols:`
-    GE CAT BA UBER HON RTX UNP DE LMT AXON PWR BLDR BWXT HEI FIX PRIM STRL FLR IESC EME GVA MOD ATKR HUBB APG TMDX JOBY ACHR RKLB OSK WCC URI ETN EMR PH TT IR CARR JCI WAB FAST PAYX ODFL FDX UPS
-  ` },
-  { key:"hard_assets_yield", label:"Energy, materials, utilities, real estate", symbols:`
-    XOM CVX COP SLB EOG FANG LNG RRC AR SM MTDR CIVI CRC VIST PR NOG TALO OXY HAL BKR DVN CTRA EQT WMB MPC VLO PSX HES OKE LIN FCX NEM SHW ALB UEC CCJ MP LAC SQM CLF ATI AA STLD NUE DD DOW ECL APD SCCO TECK MOS CF PKG BALL NEE SO DUK VST CEG PEG AEP EXC SRE D XEL WEC ED PLD AMT EQIX
-  ` },
-  { key:"etf_macro", label:"ETFs and macro groups", symbols:`
-    SPY QQQ IWM DIA RSP XLE XLF XLV XLI XLY XLP XLU XLB XLRE SMH IGV IBB XBI KRE KWEB ITA GDX SLV GLD TLT VEA EFA EEM URA TAN COPX SIL XME XRT IYR VNQ HYG LQD JNK UUP FXI EWZ INDA EWJ EWW
-  ` },
-];
-function parseSymbolList(value) {
-  return Array.from(new Set(String(value || "")
-    .split(/[\s,]+/)
-    .map(s => s.trim().toUpperCase())
-    .filter(s => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(s))));
-}
-function buildBroadScanBatches() {
-  const batches = [];
-  for (const def of BROAD_SCAN_BATCH_DEFS) {
-    const symbols = parseSymbolList(def.symbols);
-    for (let i = 0; i < symbols.length; i += BROAD_BATCH_SIZE) {
-      const chunk = symbols.slice(i, i + BROAD_BATCH_SIZE);
-      batches.push({
-        key:`${def.key}_${Math.floor(i / BROAD_BATCH_SIZE) + 1}`,
-        label:symbols.length > BROAD_BATCH_SIZE ? `${def.label} ${Math.floor(i / BROAD_BATCH_SIZE) + 1}` : def.label,
-        symbols:chunk,
-      });
-    }
-  }
-  return batches;
-}
-function broadUniverseSymbols() {
-  return parseSymbolList(BROAD_SCAN_BATCH_DEFS.map(x => x.symbols).join(" "));
-}
 function combinedScanSortValue(row) {
   const gate = msInvestmentGate(row);
   const paperBonus = msPaperTestPlan(row, gate).ok ? 25 : 0;
   const softPenalty = row?._soft ? 8 : 0;
   return (msPrimaryScore(row) * 2) + gate.score + (msActionabilityScore(row) * 0.5) + paperBonus - softPenalty;
 }
-function combineBroadScans(scans, finalReadScan = null, errors = []) {
-  const bySymbol = new Map();
-  let requested = 0;
-  let scored = 0;
-  let returned = 0;
-  for (const item of scans) {
-    const batch = item.batch || {};
-    const scan = item.scan || {};
-    const results = Array.isArray(scan.results) ? scan.results : [];
-    requested += batch.symbols?.length || scan.universe_size || 0;
-    scored += Number(scan.scored_count || results.length || 0);
-    returned += results.length;
-    for (const row of results) {
-      const sym = String(row?.symbol || "").toUpperCase();
-      if (!sym) continue;
-      const stamped = { ...row, source_batch:batch.label || scan.universe_source || "broad" };
-      const existing = bySymbol.get(sym);
-      if (!existing || combinedScanSortValue(stamped) > combinedScanSortValue(existing)) bySymbol.set(sym, stamped);
-    }
-  }
-  if (finalReadScan?.results?.length) {
-    for (const row of finalReadScan.results) {
-      const sym = String(row?.symbol || "").toUpperCase();
-      if (sym) bySymbol.set(sym, { ...(bySymbol.get(sym) || {}), ...row, source_batch:bySymbol.get(sym)?.source_batch || "final read" });
-    }
-  }
-  const ranked = Array.from(bySymbol.values())
-    .sort((a, b) => combinedScanSortValue(b) - combinedScanSortValue(a))
-    .slice(0, 100)
-    .map((r, i) => ({ ...r, rank:i + 1 }));
-  const reads = Array.isArray(finalReadScan?.reads) ? finalReadScan.reads : [];
-  const ready = ranked.filter(r => !r._soft && msInvestmentGate(r).score >= 76).length;
-  const paperReady = ranked.filter(r => msPaperTestPlan(r).ok).length;
-  const aiNote = finalReadScan
-    ? reads.length
-      ? ` AI API reads loaded for ${reads.length} top rows.`
-      : finalReadScan.llm_error
-        ? " AI API read failed; deterministic scoring still completed."
-        : " AI API returned no written reads for the top rows."
-    : " Batch scoring is deterministic; AI API reads run on the final top list.";
-  return {
-    results:ranked,
-    reads,
-    scan_note:`Rolling broad scan covered ${requested} requested symbols across ${scans.length} batches. ${scored} scored, ${returned} returned from batch leaders; combined list has ${ranked.length} ranked candidates, ${ready} Ready and ${paperReady} paper-ready.${aiNote} Auto-paper runs only after this combined ranking is complete.`,
-    universe_source:"rolling_broad",
-    universe_size:requested,
-    scored_count:scored,
-    returned_count:returned,
-    batch_count:scans.length,
-    batch_errors:errors,
-    coverage_symbols:broadUniverseSymbols().length,
-    ai_read_count:reads.length,
-    llm_error:finalReadScan?.llm_error || null,
-    generated_at:new Date().toISOString(),
-  };
-}
 async function fetchMarketScan(body) {
   const idToken = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
   const r = await fetch(`${WORKER_URL}/scan-market`, {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({ uid:state.uid, idToken, ...body }),
+    body:JSON.stringify({ uid:state.uid, idToken, investor_profile:state.investorProfile, ...body }),
   });
   if (!r.ok) throw new Error(`scan-market ${r.status}`);
   return r.json();
@@ -833,6 +736,7 @@ async function runMarketScan(opts = {}) {
     state.marketScan = j;
     state.marketScanRanAt = j.generated_at || new Date().toISOString();
     updateOpportunityMemory(j);
+    saveScanPaperEvents(j);
     const auto = await autoLogPrimePaperTrades(j);
     const suffix = auto.logged ? ` - auto-paper logged ${auto.logged}` : "";
     toast(`${(j.results || []).length} opportunities loaded${suffix}`);
@@ -846,67 +750,34 @@ async function runMarketScan(opts = {}) {
 }
 async function runRollingBroadScan() {
   if (state.marketScanLoading) return;
-  const batches = buildBroadScanBatches();
-  const universeCount = broadUniverseSymbols().length;
   state.marketScanLoading = true;
-  state.broadScanProgress = { current:0, total:batches.length, label:"starting", requested:universeCount, scored:0 };
+  state.broadScanProgress = { current:0, total:1, label:"dynamic universe", requested:0, scored:0 };
   renderCurrentView();
-  const scans = [];
-  const errors = [];
-  let scored = 0;
   try {
-    for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i];
-      state.broadScanProgress = { current:i + 1, total:batches.length, label:batch.label, requested:universeCount, scored };
-      renderCurrentView();
-      try {
-        const scan = await fetchMarketScan({
-          symbols:batch.symbols,
-          exclude_symbols:[],
-          max_universe:batch.symbols.length,
-          min_composite:0,
-          force:true,
-          write_reads:false,
-          _patient:true,
-        });
-        scans.push({ batch, scan });
-        scored += Number(scan.scored_count || scan.results?.length || 0);
-      } catch (e) {
-        errors.push({ batch:batch.label, error:String(e.message || e).slice(0, 120) });
-      }
-      state.broadScanProgress = { current:i + 1, total:batches.length, label:batch.label, requested:universeCount, scored };
-      renderCurrentView();
-    }
-    let combined = combineBroadScans(scans, null, errors);
-    const topSymbols = combined.results.slice(0, 18).map(r => String(r.symbol || "").toUpperCase()).filter(Boolean);
-    if (topSymbols.length) {
-      state.broadScanProgress = { current:batches.length, total:batches.length, label:"final AI API reads", requested:universeCount, scored };
-      renderCurrentView();
-      try {
-        const finalReadScan = await fetchMarketScan({
-          symbols:topSymbols,
-          exclude_symbols:[],
-          max_universe:topSymbols.length,
-          min_composite:0,
-          force:true,
-          write_reads:true,
-          _patient:true,
-        });
-        combined = combineBroadScans(scans, finalReadScan, errors);
-      } catch (e) {
-        errors.push({ batch:"final AI API reads", error:String(e.message || e).slice(0, 120) });
-        combined.batch_errors = errors;
-        combined.scan_note += " Final written reads were unavailable, but the ranked sweep is still usable.";
-      }
-    }
-    state.marketScan = combined;
-    state.marketScanRanAt = combined.generated_at || new Date().toISOString();
-    updateOpportunityMemory(combined);
-    const auto = await autoLogPrimePaperTrades(combined);
+    const scan = await fetchMarketScan({
+      exclude_symbols:[],
+      min_composite:0,
+      force:true,
+      write_reads:true,
+      dynamic_universe:true,
+      _patient:true,
+    });
+    state.broadScanProgress = {
+      current:1,
+      total:1,
+      label:scan.universe?.source || "dynamic universe",
+      requested:scan.universe_size || scan.universe?.filtered_count || 0,
+      scored:scan.scored_count || scan.results?.length || 0,
+    };
+    state.marketScan = scan;
+    state.marketScanRanAt = scan.generated_at || new Date().toISOString();
+    updateOpportunityMemory(scan);
+    saveScanPaperEvents(scan);
+    const auto = await autoLogPrimePaperTrades(scan);
     const suffix = auto.logged ? ` - auto-paper logged ${auto.logged}: ${auto.symbols.join(", ")}` : "";
-    toast(`Broad sweep ranked ${combined.results.length} opportunities${suffix}`);
+    toast(`Dynamic sweep ranked ${(scan.results || []).length} opportunities${suffix}`);
   } catch (e) {
-    state.marketScan = { results:[], reads:[], scan_note:`Broad sweep failed: ${e.message || e}`, universe_source:"rolling_broad" };
+    state.marketScan = { results:[], reads:[], scan_note:`Dynamic sweep failed: ${e.message || e}`, universe_source:"dynamic_point_in_time" };
     toast("Broad sweep failed", "error");
   } finally {
     state.marketScanLoading = false;
@@ -925,6 +796,15 @@ const MARKET_SCAN_LANES = [
   ["rotation", "Rotation"],
 ];
 const MEGA_SYMBOLS = new Set(["AAPL","MSFT","NVDA","AVGO","GOOGL","META","AMZN","TSLA","LLY","JPM","V","MA","UNH","XOM","COST","WMT","HD","PG","NFLX","ORCL","CRM"]);
+const CANDIDATE_V2_ENUMS = {
+  direction:["long", "short"],
+  trigger_status:["READY", "WAITING", "BLOCKED", "STALE_DATA", "MISSING_DATA", "FIRED"],
+  verdict:["READY", "WORKUP", "WATCH", "REJECT"],
+};
+function candidateMinRR() {
+  const v = Number(state.investorProfile?.min_reward_risk);
+  return Number.isFinite(v) && v > 0 ? v : 2;
+}
 function msComponent(row, key) {
   return num(row?.components?.[key]?.score) || 0;
 }
@@ -938,28 +818,22 @@ function msTags(row) {
   return Array.isArray(row?.tags) ? row.tags : [];
 }
 function msRiskReward(row) {
-  const provided = num(row?.reward_risk);
+  const provided = num(row?.net_reward_risk ?? row?.playbook?.net_reward_risk ?? row?.reward_risk);
   if (provided != null) return provided;
   const price = num(row?.current_price);
   const support = num(row?.nearest_support);
   const resistance = num(row?.nearest_resistance);
   const direction = setupDirection(row);
+  if (!direction) return null;
   const plan = coherentPlan(price, resistance, support, direction);
   if (!plan.ok) return null;
   return plan.rr;
 }
 function setupDirection(row) {
-  const text = [
-    row?.direction,
-    row?.trade_direction,
-    row?.setup_direction,
-    row?.side,
-    row?.bias,
-    row?.score_reason,
-    ...(msTags(row) || []),
-  ].filter(Boolean).join(" ").toLowerCase();
-  if (/\b(short|bear|bearish|sell|put|breakdown|downside)\b/.test(text)) return "short";
-  return "long";
+  const vals = [row?.direction, row?.trade_direction, row?.setup_direction]
+    .map(v => String(v || "").trim().toLowerCase())
+    .filter(v => CANDIDATE_V2_ENUMS.direction.includes(v));
+  return vals.length ? vals[0] : null;
 }
 function coherentPlan(entry, target, stop, direction = "long") {
   const e = num(entry), t = num(target), s = num(stop);
@@ -1026,12 +900,15 @@ function msRowMatchesLane(row, lane) {
 }
 function msIsActable(row) {
   if (!row || row._soft) return false;
-  if (row.entry_state) return row.entry_state === "actionable";
+  if (row.schema_version === "CandidateV2") {
+    return row.verdict === "READY" && row.trigger_status === "FIRED";
+  }
+  if (row.entry_state) return row.entry_state === "actionable" && msRiskReward(row) != null && msRiskReward(row) >= candidateMinRR();
   const rr = msRiskReward(row);
-  return msActionabilityScore(row) >= 72 && msPrimaryScore(row) >= 55 && (rr == null || rr >= 2) && ((num(row.rsi14) ?? 55) < 72) && ((num(row.day_change_pct) ?? 0) > -3);
+  return msActionabilityScore(row) >= 72 && msPrimaryScore(row) >= 55 && rr != null && rr >= candidateMinRR() && num(row.rsi14) != null && num(row.rsi14) < 72 && num(row.day_change_pct) != null && num(row.day_change_pct) > -3;
 }
 function msInvestmentGate(row) {
-  const minRR = Number(state.investorProfile?.min_reward_risk) || 2;
+  const minRR = candidateMinRR();
   const rr = msRiskReward(row);
   const rsi = num(row?.rsi14);
   const day = num(row?.day_change_pct);
@@ -1043,13 +920,33 @@ function msInvestmentGate(row) {
   const checks = [];
   let score = 0;
   const add = (ok, weight, good, bad) => { checks.push(ok ? good : bad); if (ok) score += weight; };
+  if (row?.schema_version === "CandidateV2") {
+    const blockers = [
+      ...(row.validation?.missing_required || []).map(x => `missing ${x}`),
+      ...(row.validation?.stale_fields || []).map(x => `stale ${x}`),
+      ...(row.validation?.inconsistent_fields || []).map(x => `inconsistent ${x}`),
+      ...(row.validation?.blockers || []),
+    ];
+    const vScore = Number(row?.scores?.data_confidence ?? row?.data_confidence ?? 0);
+    const rrBlocks = rr == null || rr < minRR;
+    if (rrBlocks) blockers.unshift(rr == null ? "R:R unavailable" : `R:R ${rr.toFixed(1)}:1 below ${minRR.toFixed(1)}:1`);
+    const ready = row.verdict === "READY" && row.trigger_status === "FIRED" && !rrBlocks;
+    const label = ready ? "READY" : row.verdict === "READY" ? "WORKUP" : row.verdict === "WORKUP" ? "WORKUP" : row.verdict === "WATCH" ? "WATCH" : "EARLY";
+    const tone = ready ? "pass" : row.verdict === "REJECT" ? "reject" : "workup";
+    return {
+      score: Math.round(num(row?.scores?.trigger_readiness ?? row?.trigger_readiness) ?? vScore),
+      label,
+      tone,
+      primary: blockers[0] || row.score_reason || (ready ? "CandidateV2 validation passed" : "CandidateV2 validation pending"),
+    };
+  }
   add(composite >= 60, 24, "strong opportunity footprint", "opportunity footprint still early");
   add(actionability >= 65 || row?.entry_state === "actionable", 20, "entry quality is close", "entry still needs confirmation");
-  add(rr == null || rr >= Math.min(minRR, 1.5), 16, rr == null ? "levels need work" : `R:R ${rr.toFixed(1)}:1 workable`, rr == null ? "levels missing" : `R:R ${rr.toFixed(1)}:1 too poor`);
+  add(rr != null && rr >= minRR, 16, `R:R ${rr.toFixed(1)}:1 clears ${minRR.toFixed(1)}:1`, rr == null ? "levels missing" : `R:R ${rr.toFixed(1)}:1 too poor`);
   add(row?.trend === "above_200ma" || ret20 > 0 || row?.optflow_bullish === true, 16, "trend/turn is constructive", "trend not confirmed");
-  add(day == null || day > -3, 10, "not selling off today", "selling off today");
-  add(rsi == null || (rsi >= 35 && rsi < 72), 8, "RSI usable", "RSI stretched/weak");
-  add(adv == null || adv >= 5_000_000, 6, "liquidity acceptable", "liquidity thin");
+  add(day != null && day > -3, 10, "not selling off today", day == null ? "day change missing" : "selling off today");
+  add(rsi != null && rsi >= 35 && rsi < 72, 8, "RSI usable", rsi == null ? "RSI missing" : "RSI stretched/weak");
+  add(adv != null && adv >= 5_000_000, 6, "liquidity acceptable", adv == null ? "liquidity missing" : "liquidity thin");
   if (tags.some(t => ["bullish-flow","volume-surge","rs-leader","coiled"].includes(t))) score += 4;
   if (row?._soft) score -= 10;
   score = Math.max(0, Math.min(100, Math.round(score)));
@@ -1063,7 +960,8 @@ function msPaperTimeframe(row) {
 }
 function msPaperEntryGate(row, gate = msInvestmentGate(row)) {
   const entry = String(row?.entry_state || "").toLowerCase();
-  if (!entry || entry === "actionable") return { ok:true, mode:"actionable", label:"actionable" };
+  if (entry === "actionable") return { ok:true, mode:"actionable", label:"actionable" };
+  if (!entry) return { ok:false, reason:"entry state missing" };
   const label = entry.replace(/_/g, " ");
   if (["falling", "extended", "bad_rr", "needs_levels"].includes(entry)) return { ok:false, reason:`entry is ${label}` };
   const earlyPaperOk = ["building", "watch"].includes(entry)
@@ -1074,11 +972,34 @@ function msPaperEntryGate(row, gate = msInvestmentGate(row)) {
   return { ok:false, reason:`entry is ${label}` };
 }
 function msPaperTestPlan(row, gate = msInvestmentGate(row)) {
-  const minRR = Number(state.investorProfile?.min_reward_risk) || 2;
+  const minRR = candidateMinRR();
   const direction = setupDirection(row);
   const price = num(row?.current_price);
   const support = num(row?.nearest_support);
   const resistance = num(row?.nearest_resistance);
+  if (!direction) return { ok:false, reason:"missing explicit direction" };
+  if (row?.schema_version === "CandidateV2") {
+    const pb = row.playbook || {};
+    const entryLow = num(pb.entry_zone?.low ?? row.entry_zone?.low);
+    const entryHigh = num(pb.entry_zone?.high ?? row.entry_zone?.high);
+    const target = num(pb.target_1 ?? row.target_1);
+    const stop = num(pb.stop ?? row.stop);
+    const rr = num(pb.net_reward_risk ?? row.net_reward_risk ?? row.reward_risk);
+    const blockers = [
+      ...(row.validation?.missing_required || []).map(x => `missing ${x}`),
+      ...(row.validation?.stale_fields || []).map(x => `stale ${x}`),
+      ...(row.validation?.inconsistent_fields || []).map(x => `inconsistent ${x}`),
+      ...(row.validation?.blockers || []),
+    ];
+    if (row.verdict !== "READY" || row.trigger_status !== "FIRED") {
+      return { ok:false, reason:blockers[0] || `playbook ${row.playbook_state || row.trigger_status || "not triggered"}` };
+    }
+    if (!(entryLow > 0 && entryHigh >= entryLow && target > entryHigh && stop > 0 && stop < entryLow)) {
+      return { ok:false, reason:"playbook levels invalid" };
+    }
+    if (!(rr != null && rr >= minRR)) return { ok:false, reason:`net R:R below ${minRR.toFixed(1)}:1` };
+    return { ok:true, direction, entry:entryHigh, entry_low:entryLow, entry_high:entryHigh, target, target_2:num(pb.target_2 ?? row.target_2), stop, rr, days:msPaperTimeframe(row), entry_mode:"playbook-triggered", entry_note:`${setupType(row)} ${row.playbook_state || "TRIGGERED"}` };
+  }
   const target = direction === "short" ? support : resistance;
   const stop = direction === "short" ? resistance : support;
   const planShape = coherentPlan(price, target, stop, direction);
@@ -1097,11 +1018,46 @@ function msPaperTestPlan(row, gate = msInvestmentGate(row)) {
   return { ok:true, direction, entry:price, target, stop, rr, days:msPaperTimeframe(row), entry_mode:entryGate.mode, entry_note:entryGate.reason || entryGate.label };
 }
 function paperEligibilityBreakdown(row, gate = msInvestmentGate(row), plan = msPaperTestPlan(row, gate)) {
-  const minRR = Number(state.investorProfile?.min_reward_risk) || 2;
+  const minRR = candidateMinRR();
   const direction = setupDirection(row);
   const price = num(row?.current_price);
   const support = num(row?.nearest_support);
   const resistance = num(row?.nearest_resistance);
+  if (!direction) {
+    return {
+      ok:false,
+      direction:"missing",
+      reasons:["missing explicit direction"],
+      passes:[],
+      summary:"Not auto-paper: missing explicit direction.",
+    };
+  }
+  if (row?.schema_version === "CandidateV2") {
+    const pb = row.playbook || {};
+    const reasons = [
+      ...(row.validation?.missing_required || []).map(x => `missing ${x}`),
+      ...(row.validation?.stale_fields || []).map(x => `stale ${x}`),
+      ...(row.validation?.inconsistent_fields || []).map(x => `inconsistent ${x}`),
+      ...(row.validation?.blockers || []),
+    ];
+    if (row.trigger_status !== "FIRED") reasons.unshift(`state is ${row.playbook_state || row.trigger_status || "not triggered"}`);
+    if ((num(pb.net_reward_risk ?? row.net_reward_risk) ?? 0) < minRR) reasons.push(`net R:R below ${minRR.toFixed(1)}:1`);
+    const passes = [
+      `playbook ${setupType(row)}`,
+      `state ${row.playbook_state || "-"}`,
+      pb.trigger_level ? `trigger ${fmtUSD(pb.trigger_level, 2)}` : "",
+      pb.target_1 ? `target ${fmtUSD(pb.target_1, 2)}` : "",
+    ].filter(Boolean);
+    return {
+      ok: plan.ok && msPrimaryScore(row) >= 75,
+      direction,
+      reasons,
+      passes,
+      summary: plan.ok && msPrimaryScore(row) >= 75
+        ? "Auto-paper eligible from deterministic playbook."
+        : `Not auto-paper: ${reasons.slice(0, 3).join("; ") || plan.reason || "rules not met"}.`,
+    };
+  }
   const target = direction === "short" ? support : resistance;
   const stop = direction === "short" ? resistance : support;
   const shape = coherentPlan(price, target, stop, direction);
@@ -1117,8 +1073,8 @@ function paperEligibilityBreakdown(row, gate = msInvestmentGate(row), plan = msP
   add(entryGate.ok, entryGate.mode === "prime-test" ? `${entryGate.reason}` : "entry is actionable", entryGate.reason || "entry not actionable");
   add(shape.ok, `${direction} plan geometry is valid`, shape.reason || "target/stop not valid");
   add(rr != null && rr >= minRR, rr == null ? `R:R unavailable` : `R:R ${rr.toFixed(1)}:1`, rr == null ? "R:R unavailable" : `R:R ${rr.toFixed(1)}:1 below ${minRR.toFixed(1)}:1`);
-  add((num(row?.day_change_pct) ?? 0) > -3, "not selling off today", "selling off today");
-  add((num(row?.rsi14) ?? 55) < 72, "not extended", `RSI ${Number(row?.rsi14).toFixed(0)} is extended`);
+  add(num(row?.day_change_pct) != null && num(row?.day_change_pct) > -3, "not selling off today", num(row?.day_change_pct) == null ? "day change missing" : "selling off today");
+  add(num(row?.rsi14) != null && num(row?.rsi14) < 72, "not extended", num(row?.rsi14) == null ? "RSI missing" : `RSI ${Number(row?.rsi14).toFixed(0)} is extended`);
 
   return {
     ok: plan.ok && msPrimaryScore(row) >= 75,
@@ -1151,6 +1107,14 @@ function msScannerReadFor(symbol) {
   return (state.marketScan?.reads || []).find(r => String(r.symbol || "").toUpperCase() === sym) || null;
 }
 function setupType(row) {
+  const setupMap = {
+    volatility_contraction_breakout:"Volatility contraction breakout",
+    trend_pullback_reclaim:"Trend pullback reclaim",
+    relative_strength_breakout:"Relative-strength breakout",
+    post_earnings_gap_continuation:"Post-earnings gap continuation",
+    failed_breakdown_reversal:"Failed-breakdown reversal",
+  };
+  if (row?.schema_version === "CandidateV2" && setupMap[row.setup_type]) return setupMap[row.setup_type];
   const tags = msTags(row);
   const sym = String(row?.symbol || "").toUpperCase();
   const sector = msSector(sym, row);
@@ -1164,6 +1128,16 @@ function setupType(row) {
   return sector === "Unknown" ? "General setup" : `${sector} setup`;
 }
 function qualityRows(row) {
+  if (row?.schema_version === "CandidateV2" && row.scores) {
+    return [
+      ["Setup", row.scores.setup_quality],
+      ["Trigger", row.scores.trigger_readiness],
+      ["Regime", row.scores.regime_fit],
+      ["Risk", row.scores.risk_quality],
+      ["Edge", row.scores.historical_edge],
+      ["Data", row.scores.data_confidence],
+    ].map(([label, value]) => [label, Math.max(0, Math.min(100, Number(value) || 0))]);
+  }
   const rr = msRiskReward(row);
   return [
     ["Trend", num(row?.trend_score) ?? (row?.trend === "above_200ma" ? 80 : 35)],
@@ -1176,6 +1150,14 @@ function qualityRows(row) {
   ].map(([label, value]) => [label, Math.max(0, Math.min(100, Number(value) || 0))]);
 }
 function radarBucket(row) {
+  if (row?.schema_version === "CandidateV2") {
+    if (row.verdict === "READY" && row.trigger_status === "FIRED") return { id:"ready", label:"Ready now", tone:"ready" };
+    if (row.verdict === "REJECT") return { id:"avoid", label:"Avoid", tone:"avoid" };
+    if (row.trigger_status === "READY") return { id:"breakout", label:"Armed", tone:"breakout" };
+    if (row.trigger_status === "BLOCKED") return { id:"pullback", label:"Needs reset", tone:"pullback" };
+    if (row.trigger_status === "MISSING_DATA" || row.trigger_status === "STALE_DATA") return { id:"avoid", label:"Avoid", tone:"avoid" };
+    return { id:"building", label:"Building", tone:"building" };
+  }
   const gate = msInvestmentGate(row);
   const plan = msPaperTestPlan(row, gate);
   const entry = String(row?.entry_state || "").toLowerCase();
@@ -1279,7 +1261,7 @@ function scannerSetupKey(row, plan) {
   const f = v => Number(v || 0).toFixed(3);
   return [
     String(row?.symbol || "").toUpperCase(),
-    plan.direction || "long",
+    plan.direction || "missing",
     f(plan.entry),
     f(plan.target),
     f(plan.stop),
@@ -1307,8 +1289,22 @@ function scannerSnapshot(row, read, gate, plan) {
     reward_risk:plan.rr,
     direction:plan.direction,
     entry_mode:plan.entry_mode || "actionable",
+    playbook_state:row.playbook_state || null,
+    playbook:row.playbook || null,
+    scan_timestamp:row.scan_timestamp || row.universe_as_of_utc || row.as_of_utc || state.marketScanRanAt || new Date().toISOString(),
+    trigger_timestamp:row.trigger_timestamp || (row.trigger_status === "FIRED" ? (row.as_of_utc || new Date().toISOString()) : null),
+    fill_timestamp:null,
+    regime:row.regime || null,
+    regime_primary:row.regime?.primary || null,
+    regime_tags:row.regime?.tags || [],
+    regime_timestamp:row.regime_timestamp || row.regime?.as_of_utc || null,
+    sector_rank:row.sector_rank ?? null,
+    benchmark_relative_strength:row.benchmark_relative_strength || null,
     entry:plan.entry,
+    entry_zone:row.entry_zone || row.playbook?.entry_zone || null,
+    trigger_level:row.trigger_level || row.playbook?.trigger_level || null,
     target:plan.target,
+    target_2:plan.target_2 ?? row.target_2 ?? row.playbook?.target_2 ?? null,
     stop:plan.stop,
     timeframe_days:plan.days,
     score_reason:row.score_reason || gate.primary || "",
@@ -1322,6 +1318,79 @@ function scannerSnapshot(row, read, gate, plan) {
     } : null,
     captured_at:new Date().toISOString(),
   };
+}
+function paperEventId(row) {
+  const sym = String(row?.symbol || "").toUpperCase();
+  const setup = row?.setup_type || setupType(row) || "setup";
+  const trigger = row?.trigger_level || row?.playbook?.trigger_level || "trigger";
+  const scanTs = row?.universe_as_of_utc || row?.as_of_utc || state.marketScanRanAt || new Date().toISOString();
+  return `${fmtDate(scanTs)}_${sym}_${setup}_${String(trigger).replace(/[^0-9A-Za-z.]/g, "")}`;
+}
+function scannerEventSnapshot(row, read = null) {
+  const gate = msInvestmentGate(row);
+  const plan = msPaperTestPlan(row, gate);
+  const trigger = deriveTrigger(row);
+  const scanTs = row.universe_as_of_utc || row.as_of_utc || state.marketScanRanAt || new Date().toISOString();
+  return {
+    event_id:paperEventId(row),
+    symbol:String(row.symbol || "").toUpperCase(),
+    detected_at:new Date().toISOString(),
+    scan_timestamp:scanTs,
+    trigger_timestamp:row.trigger_status === "FIRED" ? (row.as_of_utc || scanTs) : null,
+    fill_timestamp:null,
+    status:"detected",
+    included_in_denominator:true,
+    selected_for_paper:plan.ok && msPrimaryScore(row) >= 75 && gate.score >= 76,
+    setup_type:row.setup_type || setupType(row),
+    trigger_type:row.trigger_status || trigger?.type || row.playbook_state || "detected",
+    trigger_level:row.trigger_level || row.playbook?.trigger_level || null,
+    trigger_conditions:row.trigger_conditions || row.playbook?.trigger_conditions || [],
+    direction:setupDirection(row) || row.direction || null,
+    entry_zone:row.entry_zone || row.playbook?.entry_zone || null,
+    stop:row.stop ?? row.playbook?.stop ?? null,
+    target_1:row.target_1 ?? row.playbook?.target_1 ?? null,
+    target_2:row.target_2 ?? row.playbook?.target_2 ?? null,
+    expiry:row.expiry || row.playbook?.expiry || null,
+    regime_primary:row.regime?.primary || null,
+    regime_tags:row.regime?.tags || [],
+    regime_timestamp:row.regime_timestamp || row.regime?.as_of_utc || null,
+    sector:msSector(row.symbol, row),
+    sector_rank:row.sector_rank ?? null,
+    benchmark_relative_strength:row.benchmark_relative_strength || null,
+    scan_rank:row.rank ?? null,
+    verdict:row.verdict || null,
+    trigger_status:row.trigger_status || null,
+    playbook_state:row.playbook_state || null,
+    opportunity_score:msPrimaryScore(row),
+    actionability_score:msActionabilityScore(row),
+    reward_risk:msRiskReward(row),
+    read_one_liner:read?.one_liner || "",
+    raw_candidate: {
+      schema_version:row.schema_version || null,
+      source:row.source || row.universe_source || null,
+      as_of_utc:row.as_of_utc || null,
+      universe_as_of_utc:row.universe_as_of_utc || null,
+      market_data:row.market_data || null,
+      validation:row.validation || null,
+    },
+  };
+}
+function saveScanPaperEvents(scan) {
+  const results = Array.isArray(scan?.results) ? scan.results : [];
+  if (!results.length) return { saved:0 };
+  const reads = {};
+  for (const rd of (scan?.reads || [])) reads[String(rd.symbol || "").toUpperCase()] = rd;
+  const existing = localJson(PAPER_EVENT_LEDGER_KEY, []);
+  const byId = new Map(existing.map(e => [e.event_id, e]));
+  for (const row of results) {
+    const evt = scannerEventSnapshot(row, reads[String(row.symbol || "").toUpperCase()]);
+    byId.set(evt.event_id, { ...(byId.get(evt.event_id) || {}), ...evt, last_seen_at:new Date().toISOString() });
+  }
+  const rows = Array.from(byId.values())
+    .sort((a, b) => String(b.scan_timestamp || "").localeCompare(String(a.scan_timestamp || "")))
+    .slice(0, 2000);
+  saveJson(PAPER_EVENT_LEDGER_KEY, rows);
+  return { saved:results.length, total:rows.length };
 }
 function scannerAnalysisSnapshot(row, read, gate, plan) {
   const conviction = gate.score >= 88 ? "high" : gate.score >= 76 ? "medium" : "low";
@@ -1343,6 +1412,14 @@ function scannerAnalysisSnapshot(row, read, gate, plan) {
     action_invalidation:`${isShort ? "above" : "below"} ${fmtUSD(plan.stop, plan.stop >= 100 ? 2 : 3)}`,
     action_timeframe:`${plan.days} days`,
     reward_risk_ratio:plan.rr,
+    setup_type:row.setup_type || setupType(row),
+    regime_primary:row.regime?.primary || null,
+    trigger_type:row.trigger_status || row.playbook_state || null,
+    scan_timestamp:row.universe_as_of_utc || row.as_of_utc || state.marketScanRanAt || new Date().toISOString(),
+    trigger_timestamp:row.trigger_status === "FIRED" ? (row.as_of_utc || new Date().toISOString()) : null,
+    fill_timestamp:null,
+    playbook_state:row.playbook_state || null,
+    playbook:row.playbook || null,
     bull_trigger:read?.confirmation || row.score_reason || null,
     bear_trigger:read?.invalidation || `${isShort ? "Above" : "Below"} ${fmtUSD(plan.stop, plan.stop >= 100 ? 2 : 3)}`,
   };
@@ -1350,6 +1427,7 @@ function scannerAnalysisSnapshot(row, read, gate, plan) {
 async function saveScannerPaperTrade(row, read, gate, plan, { auto = false } = {}) {
   const sym = String(row?.symbol || "").toUpperCase();
   const setupKey = scannerSetupKey(row, plan);
+  const eventId = paperEventId(row);
   const existing = await loadTrades(500);
   const today = new Date().toISOString().slice(0, 10);
   const duplicate = existing.find(t => {
@@ -1370,6 +1448,7 @@ async function saveScannerPaperTrade(row, read, gate, plan, { auto = false } = {
     is_paper:true,
     auto_logged:auto,
     setup_key:setupKey,
+    paper_event_id:eventId,
     lifecycle_status:"open",
     analysis_snapshot:scannerAnalysisSnapshot(row, read, gate, plan),
     scanner_snapshot:scannerSnapshot(row, read, gate, plan),
@@ -1487,6 +1566,25 @@ function renderTriggerWatchPanel() {
     <button class="btn-ghost" data-act="delete-trigger" data-key="${esc(w.key)}">x</button>
   </div>`).join("")}</div>`;
 }
+function renderRegimeSummary(scan) {
+  const regime = scan?.regime;
+  const universe = scan?.universe;
+  if (!regime && !universe) return "";
+  const breadth = regime?.breadth || {};
+  const vol = regime?.volatility || {};
+  const tags = (regime?.tags || []).slice(0, 4).map(t => String(t).replace(/_/g, " ")).join(", ");
+  return `<div class="panel-block" style="margin:12px 0;">
+    <h4>Regime</h4>
+    <div class="read-grid">
+      <div><b>Primary:</b> ${esc(regime?.primary ? String(regime.primary).replace(/_/g, " ") : "-")}</div>
+      <div><b>Tags:</b> ${esc(tags || "-")}</div>
+      <div><b>Breadth:</b> ${breadth.above_20d_pct != null ? esc(`${breadth.above_20d_pct}% / ${breadth.above_50d_pct}% / ${breadth.above_200d_pct}%`) : "-"}</div>
+      <div><b>Vol:</b> ${esc(vol.regime || "-")}${vol.vix != null ? ` (${esc(Number(vol.vix).toFixed(1))})` : ""}</div>
+      <div><b>Universe:</b> ${esc(universe?.source || scan?.universe_source || "-")}</div>
+      <div><b>As of:</b> ${esc(regime?.as_of_utc || universe?.as_of_utc || scan?.generated_at || "-")}</div>
+    </div>
+  </div>`;
+}
 function renderMarketScannerCard() {
   const scan = state.marketScan;
   const loading = state.marketScanLoading;
@@ -1513,10 +1611,10 @@ function renderMarketScannerCard() {
   }).join("");
   const rows = visible.map(r => renderOpportunityRow(r, reads[String(r.symbol || "").toUpperCase()])).join("");
   const loadingText = progress
-    ? `Sweeping ${progress.label} (${progress.current}/${progress.total}) - ${progress.scored || 0} scored of ${progress.requested || broadUniverseSymbols().length}`
+    ? `Sweeping ${progress.label} (${progress.current}/${progress.total}) - ${progress.scored || 0} scored of ${progress.requested || scan?.universe?.filtered_count || scan?.universe_size || results.length || 0}`
     : (state.marketScanFocus ? "Running focused market scan" : "Loading market scan");
   const scanMeta = scan
-    ? `${visible.length} shown - ${scan.scored_count ?? results.length} scored of ${scan.universe_size ?? results.length}${scan.batch_count ? ` - ${scan.batch_count} batches` : ""}${scan.coverage_symbols ? ` - ${scan.coverage_symbols} symbol universe` : ""}${scan.ai_read_count != null ? ` - ${scan.ai_read_count} AI reads` : ""} - ${relTime(state.marketScanRanAt)}${scan._cached ? " - cached" : ""}`
+    ? `${visible.length} shown - ${scan.scored_count ?? results.length} scored of ${scan.universe_size ?? scan.universe?.filtered_count ?? results.length}${scan.universe?.as_of_utc ? ` - universe ${scan.universe.as_of_utc}` : ""}${scan.regime?.as_of_utc ? ` - regime ${scan.regime.as_of_utc}` : ""}${scan.ai_read_count != null ? ` - ${scan.ai_read_count} AI reads` : ""} - ${relTime(state.marketScanRanAt)}${scan._cached ? " - cached" : ""}`
     : "";
   return `
     <section class="card">
@@ -1543,6 +1641,7 @@ function renderMarketScannerCard() {
         ${deskCell("Pullbacks", pullbacks)}
         ${deskCell("Flow/catalyst", catalysts)}
       </div>
+      ${results.length ? renderRegimeSummary(scan) : ""}
       ${results.length ? `<div class="panel-block" style="margin:12px 0;">
         <h4>Opportunity Radar</h4>
         ${renderOpportunityRadar(preFiltered)}
@@ -1584,6 +1683,22 @@ function msTradePlanPreview(row, gate = msInvestmentGate(row), plan = msPaperTes
   const entry = num(row?.current_price);
   const support = num(row?.nearest_support);
   const resistance = num(row?.nearest_resistance);
+  if (!direction) return { direction:"missing", entry, target:null, stop:null, rr:null, shape:{ ok:false, reason:"missing explicit direction" }, status:"Blocked: missing explicit direction", support, resistance };
+  if (row?.schema_version === "CandidateV2") {
+    const pb = row.playbook || {};
+    const entryLow = num(pb.entry_zone?.low ?? row.entry_zone?.low);
+    const entryHigh = num(pb.entry_zone?.high ?? row.entry_zone?.high);
+    const target = num(pb.target_1 ?? row.target_1);
+    const stop = num(pb.stop ?? row.stop);
+    const rr = num(pb.net_reward_risk ?? row.net_reward_risk ?? row.reward_risk);
+    const shape = (entryLow > 0 && entryHigh >= entryLow && target > entryHigh && stop > 0 && stop < entryLow)
+      ? { ok:true, rr }
+      : { ok:false, reason:"playbook levels invalid" };
+    const status = plan.ok
+      ? (msPrimaryScore(row) >= 75 ? "Auto-paper eligible" : "Paper-ready, not prime")
+      : `Blocked: ${plan.reason || shape.reason || "rules not met"}`;
+    return { direction, entry:entryHigh, entry_low:entryLow, entry_high:entryHigh, trigger:pb.trigger_level ?? row.trigger_level, target, target_2:num(pb.target_2 ?? row.target_2), stop, rr, shape, status, support, resistance };
+  }
   const target = direction === "short" ? support : resistance;
   const stop = direction === "short" ? resistance : support;
   const shape = coherentPlan(entry, target, stop, direction);
@@ -1596,6 +1711,12 @@ function msTradePlanPreview(row, gate = msInvestmentGate(row), plan = msPaperTes
 function renderTradePlan(row, preview, plan, breakdown) {
   const statusCls = plan.ok ? (msPrimaryScore(row) >= 75 ? "good" : "warn") : "bad";
   const rrText = preview.rr == null ? "-" : `${preview.rr.toFixed(1)}:1`;
+  const entryText = preview.entry_low != null && preview.entry_high != null
+    ? `${fmtUSD(preview.entry_low, 2)}-${fmtUSD(preview.entry_high, 2)}`
+    : (preview.entry != null ? fmtUSD(preview.entry, 2) : "-");
+  const tpText = preview.target_2 != null
+    ? `${preview.target != null ? fmtUSD(preview.target, 2) : "-"} / ${fmtUSD(preview.target_2, 2)}`
+    : (preview.target != null ? fmtUSD(preview.target, 2) : "-");
   const targetLabel = preview.direction === "short" ? "Take Profit / Support" : "Take Profit / Resistance";
   const stopLabel = preview.direction === "short" ? "Stop Loss / Resistance" : "Stop Loss / Support";
   return `<div class="trade-plan">
@@ -1604,8 +1725,8 @@ function renderTradePlan(row, preview, plan, breakdown) {
       <div class="trade-plan-note">${esc(preview.direction.toUpperCase())}${plan.entry_mode === "prime-test" ? " - early paper test" : ""}</div>
     </div>
     <div class="paper-plan">
-      <div class="paper-cell good"><span class="paper-k">Entry</span><span class="paper-v">${preview.entry != null ? fmtUSD(preview.entry, 2) : "-"}</span><span class="paper-sub">current price</span></div>
-      <div class="paper-cell good"><span class="paper-k">${esc(targetLabel)}</span><span class="paper-v">${preview.target != null ? fmtUSD(preview.target, 2) : "-"}</span><span class="paper-sub">${preview.target == null ? "needs level" : "target level"}</span></div>
+      <div class="paper-cell good"><span class="paper-k">Entry zone</span><span class="paper-v">${esc(entryText)}</span><span class="paper-sub">${preview.trigger != null ? `trigger ${fmtUSD(preview.trigger, 2)}` : "playbook level"}</span></div>
+      <div class="paper-cell good"><span class="paper-k">${esc(targetLabel)}</span><span class="paper-v">${esc(tpText)}</span><span class="paper-sub">${preview.target == null ? "needs level" : "TP1 / TP2"}</span></div>
       <div class="paper-cell bad"><span class="paper-k">${esc(stopLabel)}</span><span class="paper-v">${preview.stop != null ? fmtUSD(preview.stop, 2) : "-"}</span><span class="paper-sub">${preview.stop == null ? "needs level" : "invalidation"}</span></div>
       <div class="paper-cell ${preview.rr != null && preview.rr >= (Number(state.investorProfile?.min_reward_risk) || 2) ? "good" : "warn"}"><span class="paper-k">Reward / Risk</span><span class="paper-v">${esc(rrText)}</span><span class="paper-sub">minimum ${Number(state.investorProfile?.min_reward_risk || 2).toFixed(1)}:1</span></div>
       <div class="paper-cell ${statusCls}"><span class="paper-k">Paper status</span><span class="paper-v">${esc(plan.ok ? "Ready" : "Blocked")}</span><span class="paper-sub">${esc(plan.ok ? preview.status : (breakdown.reasons[0] || plan.reason || "rules not met"))}</span></div>
@@ -1697,7 +1818,7 @@ function renderOpportunityDetailCard(r, rd, gate, plan, breakdown, preview, comp
       <div class="read-setup">${esc(breakdown.summary)}</div>
       <div class="read-grid">
         <div><b>Direction:</b> ${esc(breakdown.direction)}</div>
-        <div><b>Entry:</b> ${preview.entry != null ? esc(fmtUSD(preview.entry, 2)) : "-"}</div>
+        <div><b>Entry:</b> ${preview.entry_low != null && preview.entry_high != null ? esc(`${fmtUSD(preview.entry_low, 2)}-${fmtUSD(preview.entry_high, 2)}`) : (preview.entry != null ? esc(fmtUSD(preview.entry, 2)) : "-")}</div>
         <div><b>Take profit:</b> ${preview.target != null ? esc(fmtUSD(preview.target, 2)) : "needs level"}</div>
         <div><b>Stop loss:</b> ${preview.stop != null ? esc(fmtUSD(preview.stop, 2)) : "needs level"}</div>
         ${breakdown.reasons.length ? `<div><b>Blockers:</b> ${esc(breakdown.reasons.join("; "))}</div>` : ""}
@@ -1987,6 +2108,8 @@ function renderOpportunityRow(r, rd) {
   const adv = num(r.avg_dollar_vol_20d);
   const setup = setupType(r);
   const radar = radarBucket(r);
+  const regimeStatus = r.regime_compatibility?.status || "";
+  const rel20 = num(r.benchmark_relative_strength?.relative_20d);
   const tags = msTags(r).slice(0, 7).map(t => `<span class="tag">${esc(String(t).replace(/-/g, " "))}</span>`).join("");
   const components = renderComponentBars(r);
   return `
@@ -2006,13 +2129,17 @@ function renderOpportunityRow(r, rd) {
           <span class="meta setup-chip">${esc(setup)}</span>
           <span class="meta ${radar.id === "ready" ? "good" : radar.id === "avoid" ? "bad" : "warn"}">${esc(radar.label)}</span>
           <span class="meta">${esc(msSector(r.symbol, r))}</span>
+          ${r.sector_rank != null ? `<span class="meta">sector #${esc(r.sector_rank)}</span>` : ""}
+          ${rel20 != null ? `<span class="meta ${rel20 >= 0 ? "good" : "warn"}">vs SPY ${fmtPct(rel20)}</span>` : ""}
+          ${regimeStatus ? `<span class="meta ${regimeStatus === "compatible" ? "good" : "bad"}">regime ${esc(regimeStatus)}</span>` : ""}
           <span class="meta">${esc(msCapBucket(r).replace(/_/g, " "))}</span>
           ${rd ? `<span class="meta good">AI read</span>` : ""}
-          ${rr != null ? `<span class="meta ${rr >= 2 ? "good" : "warn"}">R:R ${rr.toFixed(1)}:1</span>` : ""}
+          ${rr != null ? `<span class="meta ${rr >= candidateMinRR() ? "good" : "warn"}">R:R ${rr.toFixed(1)}:1</span>` : ""}
           ${r.current_price != null ? `<span class="meta">px ${fmtUSD(r.current_price, 2)}</span>` : ""}
           ${r.rsi14 != null ? `<span class="meta">RSI ${Number(r.rsi14).toFixed(0)}</span>` : ""}
           ${r.return_20d != null ? `<span class="meta">${fmtPct(r.return_20d)} 20d</span>` : ""}
           ${adv != null ? `<span class="meta ${adv >= 5_000_000 ? "good" : "warn"}">$Vol ${adv >= 1_000_000 ? (adv / 1_000_000).toFixed(0) + "M" : (adv / 1_000).toFixed(0) + "K"}</span>` : ""}
+          ${(r.regime_timestamp || r.universe_as_of_utc) ? `<span class="meta">as of ${esc(r.regime_timestamp || r.universe_as_of_utc)}</span>` : ""}
         </div>
         ${tags ? `<div class="tag-row">${tags}</div>` : ""}
         <div class="quick-line">${esc(gate.primary)} · ${esc(deriveTrigger(r).text)}</div>
@@ -2068,54 +2195,6 @@ function resolveTradeDate(trade) {
   }
   return null;
 }
-function closeEvent(status, exitPrice, exitDate, holdDays, entry, bullish, reason) {
-  const raw = ((exitPrice - entry) / entry) * 100;
-  const pnl = bullish ? raw : -raw;
-  return {
-    status,
-    exit_price:Number(exitPrice.toFixed(4)),
-    exit_date:exitDate,
-    hold_days:holdDays,
-    raw_move_pct:Number(raw.toFixed(2)),
-    pnl_pct:Number(pnl.toFixed(2)),
-    exit_reason:reason,
-    is_win:pnl > 0,
-  };
-}
-function simulateTradeExit(trade, series) {
-  const entry = Number(trade.price);
-  const direction = String(trade.direction || "buy").toLowerCase();
-  const bullish = ["buy", "add"].includes(direction);
-  const bearish = ["sell", "trim", "exit"].includes(direction);
-  if (!entry || (!bullish && !bearish)) return { status:"open", reason:"bad entry" };
-  const snap = trade.analysis_snapshot || {};
-  const zone = parsePriceZone(snap.action_price_zone);
-  const inv = parseInvalidation(snap.action_invalidation);
-  const target = zone ? (bullish ? zone.lo : zone.hi) : null;
-  const stop = inv?.level ?? null;
-  const coherent = coherentPlan(entry, target, stop, bullish ? "long" : "short");
-  if (!coherent.ok) return { status:"invalid_plan", reason:coherent.reason, target_level:target, stop_level:stop };
-  const days = parseTimeframeDays(snap.action_timeframe);
-  const tradeDate = resolveTradeDate(trade);
-  if (!tradeDate) return { status:"open", reason:"bad date" };
-  const deadline = new Date(tradeDate.getTime() + days * 86400000);
-  for (const bar of series) {
-    const d = new Date(bar.date);
-    if (isNaN(d.getTime()) || d < tradeDate) continue;
-    const hold = Math.max(0, Math.round((d.getTime() - tradeDate.getTime()) / 86400000));
-    const hi = Number(bar.high ?? bar.close);
-    const lo = Number(bar.low ?? bar.close);
-    if (bullish) {
-      if (stop != null && lo <= stop) return closeEvent("closed_stop", stop, bar.date, hold, entry, bullish, `Stop ${fmtUSD(stop)} hit`);
-      if (target != null && hi >= target) return closeEvent("closed_target", target, bar.date, hold, entry, bullish, `Target ${fmtUSD(target)} reached`);
-    } else {
-      if (stop != null && hi >= stop) return closeEvent("closed_stop", stop, bar.date, hold, entry, bullish, `Invalidation ${fmtUSD(stop)} breached`);
-      if (target != null && lo <= target) return closeEvent("closed_target", target, bar.date, hold, entry, bullish, `Target ${fmtUSD(target)} reached`);
-    }
-    if (d >= deadline) return closeEvent("closed_timeout", Number(bar.close), bar.date, hold, entry, bullish, `Timeframe expired (${days}d)`);
-  }
-  return { status:"open", target_level:target, stop_level:stop, deadline_days:days };
-}
 function ohlcvDate(t) {
   const n = Number(t);
   if (Number.isFinite(n)) {
@@ -2142,64 +2221,328 @@ async function fetchPriceFor(symbol) {
   if (!p && isCryptoSymbol(symbol) && !/-USD$/i.test(symbol)) p = await get(`${symbol}-USD`).catch(() => null);
   return p;
 }
+function barTimestamp(bar) {
+  const raw = bar?.t ?? bar?.time ?? bar?.date;
+  const n = Number(raw);
+  if (Number.isFinite(n)) {
+    const d = new Date(n > 1e12 ? n : n * 1000);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+function isTradingSession(ts) {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return false;
+  const day = d.getUTCDay();
+  return day !== 0 && day !== 6;
+}
+function adjustedValue(bar, adjKey, rawKey) {
+  const v = Number(bar?.[adjKey] ?? bar?.[`adj_${rawKey}`] ?? bar?.[rawKey]);
+  return Number.isFinite(v) ? v : null;
+}
+function normalizeAdjustedBars(price) {
+  return (price?.ohlcv || [])
+    .map(b => {
+      const ts = barTimestamp(b);
+      const o = adjustedValue(b, "adj_open", "o");
+      const h = adjustedValue(b, "adj_high", "h");
+      const l = adjustedValue(b, "adj_low", "l");
+      const c = adjustedValue(b, "adj_close", "c");
+      return {
+        timestamp:ts,
+        date:ts ? ts.slice(0, 10) : null,
+        open:o, high:h, low:l, close:c,
+        volume:Number(b?.adj_volume ?? b?.v ?? b?.volume) || null,
+        adjusted:b?.adj_close != null || b?.adj_c != null,
+        timeframe:b?.timeframe || price?.interval || "1d",
+      };
+    })
+    .filter(b => b.timestamp && isTradingSession(b.timestamp) && b.open != null && b.high != null && b.low != null && b.close != null)
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+}
+function eventPlan(event) {
+  const pb = event?.playbook || event?.scanner_snapshot?.playbook || {};
+  const direction = String(event?.direction || event?.scanner_snapshot?.direction || pb.direction || "long").toLowerCase();
+  const isShort = direction === "short" || direction === "sell";
+  return {
+    direction:isShort ? "short" : "long",
+    trigger:Number(event?.trigger_level ?? event?.scanner_snapshot?.trigger_level ?? pb.trigger_level),
+    entry_low:Number(event?.entry_zone?.low ?? event?.scanner_snapshot?.entry_zone?.low ?? pb.entry_zone?.low),
+    entry_high:Number(event?.entry_zone?.high ?? event?.scanner_snapshot?.entry_zone?.high ?? pb.entry_zone?.high ?? event?.price),
+    stop:Number(event?.stop ?? event?.scanner_snapshot?.stop ?? pb.stop),
+    target:Number(event?.target_1 ?? event?.scanner_snapshot?.target ?? pb.target_1),
+    target_2:Number(event?.target_2 ?? event?.scanner_snapshot?.target_2 ?? pb.target_2),
+    expiry:event?.expiry || event?.scanner_snapshot?.expiry || pb.expiry || null,
+  };
+}
+function costModel(price, side, costs = PAPER_SIM_COSTS) {
+  const spread = Math.max(0, Number(costs.spread_pct ?? 0)) * price;
+  const slippage = Math.max(0, Number(costs.slippage_pct ?? 0)) * price;
+  const commission = Math.max(Number(costs.min_commission ?? 0), Number(costs.commission_per_share ?? 0));
+  const sign = side === "buy" ? 1 : -1;
+  return {
+    fill:Number((price + sign * (spread / 2 + slippage)).toFixed(4)),
+    commission:Number(commission.toFixed(4)),
+    spread:Number(spread.toFixed(4)),
+    slippage:Number(slippage.toFixed(4)),
+  };
+}
+function firstBarAfter(bars, iso) {
+  const t = new Date(iso || 0).getTime();
+  return bars.find(b => new Date(b.timestamp).getTime() > t) || null;
+}
+function findConfirmationBar(event, bars, plan) {
+  if (event.trigger_timestamp) {
+    const known = firstBarAfter([{ timestamp:event.trigger_timestamp }].concat(bars), "1900-01-01T00:00:00.000Z");
+    return known ? { timestamp:event.trigger_timestamp, date:String(event.trigger_timestamp).slice(0, 10), known:true } : null;
+  }
+  const scanTime = new Date(event.scan_timestamp || event.detected_at || 0).getTime();
+  for (const bar of bars) {
+    if (new Date(bar.timestamp).getTime() <= scanTime) continue;
+    if (plan.direction === "long" && Number.isFinite(plan.trigger) && bar.high >= plan.trigger) return bar;
+    if (plan.direction === "short" && Number.isFinite(plan.trigger) && bar.low <= plan.trigger) return bar;
+  }
+  return null;
+}
+function mfeMaeUpdate(plan, entry, bar, state) {
+  if (plan.direction === "long") {
+    state.mfe = Math.max(state.mfe, bar.high - entry);
+    state.mae = Math.min(state.mae, bar.low - entry);
+  } else {
+    state.mfe = Math.max(state.mfe, entry - bar.low);
+    state.mae = Math.min(state.mae, entry - bar.high);
+  }
+}
+function closeWalkForward(status, event, plan, entryFill, exitPx, exitBar, fillBar, state, reason, costs = PAPER_SIM_COSTS) {
+  const exitCost = costModel(exitPx, plan.direction === "long" ? "sell" : "buy", costs);
+  const exitFill = exitCost.fill;
+  const gross = plan.direction === "long" ? exitFill - entryFill.fill : entryFill.fill - exitFill;
+  const net = gross - entryFill.commission - exitCost.commission;
+  const risk = plan.direction === "long" ? entryFill.fill - plan.stop : plan.stop - entryFill.fill;
+  const rMultiple = risk > 0 ? net / risk : null;
+  const holdMs = new Date(exitBar.timestamp).getTime() - new Date(fillBar.timestamp).getTime();
+  return {
+    status,
+    event_id:event.event_id || null,
+    symbol:event.symbol,
+    scan_timestamp:event.scan_timestamp || null,
+    trigger_timestamp:event.trigger_timestamp || state.trigger_timestamp || null,
+    fill_timestamp:fillBar.timestamp,
+    exit_timestamp:exitBar.timestamp,
+    fill_price:entryFill.fill,
+    exit_price:exitFill,
+    stop_level:plan.stop,
+    target_level:plan.target,
+    holding_period_sessions:state.sessions,
+    holding_period_days:Math.max(0, Math.round(holdMs / 86400000)),
+    mfe:Number(state.mfe.toFixed(4)),
+    mae:Number(state.mae.toFixed(4)),
+    mfe_r:rMultiple == null || risk <= 0 ? null : Number((state.mfe / risk).toFixed(2)),
+    mae_r:rMultiple == null || risk <= 0 ? null : Number((state.mae / risk).toFixed(2)),
+    r_multiple:rMultiple == null ? null : Number(rMultiple.toFixed(3)),
+    pnl_pct:Number(((net / entryFill.fill) * 100).toFixed(2)),
+    gross_pnl:Number(gross.toFixed(4)),
+    net_pnl:Number(net.toFixed(4)),
+    costs:{ entry:entryFill, exit:exitCost },
+    exit_reason:reason,
+    is_win:rMultiple != null ? rMultiple > 0 : net > 0,
+    setup_type:event.setup_type || event.scanner_snapshot?.setup_type || null,
+    regime_primary:event.regime_primary || event.scanner_snapshot?.regime_primary || null,
+    trigger_type:event.trigger_type || event.trigger_status || event.scanner_snapshot?.trigger?.type || null,
+    selected_for_paper:event.selected_for_paper === true || event.is_paper === true,
+    in_sample_only:true,
+  };
+}
+function simulateWalkForwardEvent(event, bars, costs = PAPER_SIM_COSTS) {
+  const plan = eventPlan(event);
+  if (!["long", "short"].includes(plan.direction)) return { status:"invalid_plan", reason:"missing direction" };
+  if (!(plan.trigger > 0 && plan.stop > 0 && plan.target > 0)) return { status:"invalid_plan", reason:"missing trigger/target/stop" };
+  if (plan.direction === "long" && !(plan.target > plan.trigger && plan.stop < plan.trigger)) return { status:"invalid_plan", reason:"long levels inconsistent" };
+  if (plan.direction === "short" && !(plan.target < plan.trigger && plan.stop > plan.trigger)) return { status:"invalid_plan", reason:"short levels inconsistent" };
+  const clean = (bars || []).filter(b => b.timestamp && b.open != null && b.high != null && b.low != null && b.close != null);
+  const confirmation = findConfirmationBar(event, clean, plan);
+  if (!confirmation) return { status:"detected", reason:"not confirmed", target_level:plan.target, stop_level:plan.stop };
+  const fillBar = firstBarAfter(clean, confirmation.timestamp);
+  if (!fillBar) return { status:"confirmed_unfilled", trigger_timestamp:confirmation.timestamp, reason:"no executable bar after confirmation" };
+  const entryFill = costModel(fillBar.open, plan.direction === "long" ? "buy" : "sell", costs);
+  const risk = plan.direction === "long" ? entryFill.fill - plan.stop : plan.stop - entryFill.fill;
+  if (!(risk > 0)) return { status:"invalid_plan", reason:"cost-adjusted entry invalidates risk" };
+  const deadline = plan.expiry ? new Date(plan.expiry).getTime() : new Date(fillBar.timestamp).getTime() + PAPER_SIM_DEFAULT_DEADLINE_DAYS * 86400000;
+  const state = { mfe:0, mae:0, sessions:0, trigger_timestamp:confirmation.timestamp };
+  for (const bar of clean) {
+    if (new Date(bar.timestamp).getTime() < new Date(fillBar.timestamp).getTime()) continue;
+    state.sessions++;
+    mfeMaeUpdate(plan, entryFill.fill, bar, state);
+    const hitTarget = plan.direction === "long" ? bar.high >= plan.target : bar.low <= plan.target;
+    const hitStop = plan.direction === "long" ? bar.low <= plan.stop : bar.high >= plan.stop;
+    if (hitTarget && hitStop) {
+      return closeWalkForward("ambiguous_same_bar", event, plan, entryFill, bar.close, bar, fillBar, state, "Target and stop touched in the same bar; intraday ordering required.", costs);
+    }
+    if (hitStop) return closeWalkForward("closed_stop", event, plan, entryFill, plan.stop, bar, fillBar, state, "Stop hit after fill.", costs);
+    if (hitTarget) return closeWalkForward("closed_target", event, plan, entryFill, plan.target, bar, fillBar, state, "Target hit after fill.", costs);
+    if (new Date(bar.timestamp).getTime() >= deadline) return closeWalkForward("closed_timeout", event, plan, entryFill, bar.close, bar, fillBar, state, "Expiry reached.", costs);
+  }
+  return {
+    status:"open",
+    trigger_timestamp:confirmation.timestamp,
+    fill_timestamp:fillBar.timestamp,
+    fill_price:entryFill.fill,
+    target_level:plan.target,
+    stop_level:plan.stop,
+    mfe:Number(state.mfe.toFixed(4)),
+    mae:Number(state.mae.toFixed(4)),
+    holding_period_sessions:state.sessions,
+  };
+}
+function simulateSpyComparison(result, spyBars) {
+  if (!result?.fill_timestamp || !result?.exit_timestamp || !Array.isArray(spyBars)) return null;
+  const entryBar = firstBarAfter(spyBars, new Date(new Date(result.fill_timestamp).getTime() - 1).toISOString());
+  const exitBar = spyBars.find(b => new Date(b.timestamp).getTime() >= new Date(result.exit_timestamp).getTime());
+  if (!entryBar || !exitBar || !(entryBar.open > 0 && exitBar.close > 0)) return null;
+  return {
+    benchmark:"SPY",
+    entry_timestamp:entryBar.timestamp,
+    exit_timestamp:exitBar.timestamp,
+    return_pct:Number(((exitBar.close / entryBar.open - 1) * 100).toFixed(2)),
+  };
+}
 async function runPaperSimulation({ force = false } = {}) {
   if (!force) {
     const last = localStorage.getItem(PAPER_SIM_LAST_RUN_KEY);
     if (last && Date.now() - new Date(last).getTime() < PAPER_SIM_COOLDOWN_MS) return { ran:false, reason:"cooldown" };
   }
   const trades = await loadTrades(500);
-  const open = trades.filter(t => t.is_paper === true && (!t.lifecycle_status || t.lifecycle_status === "open"));
-  if (!open.length) {
+  const paperTrades = trades.filter(t => t.is_paper === true);
+  let events = localJson(PAPER_EVENT_LEDGER_KEY, []);
+  const byEventId = new Map(events.map(e => [e.event_id, e]));
+  for (const t of paperTrades) {
+    const eventId = t.paper_event_id || t.scanner_snapshot?.event_id || t.setup_key || tradeId(t.symbol);
+    if (!byEventId.has(eventId)) {
+      const snap = t.scanner_snapshot || {};
+      byEventId.set(eventId, {
+        event_id:eventId,
+        symbol:String(t.symbol || "").toUpperCase(),
+        scan_timestamp:snap.scan_timestamp || t.created_at || t.trade_date,
+        trigger_timestamp:snap.trigger_timestamp || null,
+        fill_timestamp:snap.fill_timestamp || null,
+        selected_for_paper:true,
+        included_in_denominator:true,
+        setup_type:snap.setup_type || tradeSetupType(t),
+        trigger_type:snap.playbook_state || snap.trigger?.type || "manual-paper",
+        direction:snap.direction || (String(t.direction).toLowerCase() === "sell" ? "short" : "long"),
+        trigger_level:snap.trigger_level || snap.entry || t.price,
+        entry_zone:snap.entry_zone || { low:t.price, high:t.price },
+        stop:snap.stop,
+        target_1:snap.target,
+        target_2:snap.target_2,
+        expiry:null,
+        regime_primary:snap.regime_primary || null,
+        regime_tags:snap.regime_tags || [],
+        regime_timestamp:snap.regime_timestamp || null,
+        linked_trade_id:t.id || t.trade_id,
+      });
+    }
+  }
+  events = Array.from(byEventId.values());
+  if (!events.length) {
     localStorage.setItem(PAPER_SIM_LAST_RUN_KEY, new Date().toISOString());
     return { ran:true, simulated:0, closed:0 };
   }
+  const tradeByEvent = new Map(paperTrades.map(t => [t.paper_event_id || t.scanner_snapshot?.event_id || t.setup_key, t]));
   const bySymbol = {};
-  for (const t of open) (bySymbol[t.symbol] = bySymbol[t.symbol] || []).push(t);
+  for (const e of events) (bySymbol[e.symbol] = bySymbol[e.symbol] || []).push(e);
+  const spyPrice = await fetchPriceFor("SPY");
+  const spyBars = normalizeAdjustedBars(spyPrice);
   let simulated = 0;
   let closed = 0;
+  let ambiguous = 0;
+  const updatedEvents = [];
   for (const [symbol, rows] of Object.entries(bySymbol)) {
     const price = await fetchPriceFor(symbol);
-    const series = (price?.ohlcv || []).map(b => ({ date:ohlcvDate(b.t), high:b.h, low:b.l, close:b.c })).filter(b => b.date && b.high != null && b.low != null);
-    if (!series.length) continue;
-    for (const trade of rows) {
+    const series = normalizeAdjustedBars(price);
+    if (!series.length) {
+      updatedEvents.push(...rows.map(e => ({ ...e, simulation_status:"data_unavailable", sim_checked_at:new Date().toISOString() })));
+      continue;
+    }
+    for (const event of rows) {
       simulated++;
-      const result = simulateTradeExit(trade, series);
+      const result = simulateWalkForwardEvent(event, series);
+      const spy = simulateSpyComparison(result, spyBars);
+      const patch = {
+        ...event,
+        simulation_status:result.status,
+        trigger_timestamp:result.trigger_timestamp || event.trigger_timestamp || null,
+        fill_timestamp:result.fill_timestamp || event.fill_timestamp || null,
+        exit_timestamp:result.exit_timestamp || event.exit_timestamp || null,
+        fill_price:result.fill_price ?? event.fill_price ?? null,
+        exit_price:result.exit_price ?? event.exit_price ?? null,
+        r_multiple:result.r_multiple ?? event.r_multiple ?? null,
+        pnl_pct:result.pnl_pct ?? event.pnl_pct ?? null,
+        mfe:result.mfe ?? event.mfe ?? null,
+        mae:result.mae ?? event.mae ?? null,
+        mfe_r:result.mfe_r ?? event.mfe_r ?? null,
+        mae_r:result.mae_r ?? event.mae_r ?? null,
+        holding_period_sessions:result.holding_period_sessions ?? event.holding_period_sessions ?? null,
+        holding_period_days:result.holding_period_days ?? event.holding_period_days ?? null,
+        exit_reason:result.exit_reason || result.reason || event.exit_reason || "",
+        costs:result.costs || event.costs || null,
+        spy_comparison:spy,
+        adjusted_ohlcv_used:series.some(b => b.adjusted),
+        sim_checked_at:new Date().toISOString(),
+      };
+      updatedEvents.push(patch);
+      const trade = tradeByEvent.get(event.event_id);
       if (result.status === "invalid_plan") {
-        await updateTrade(trade.id || trade.trade_id, {
-          lifecycle_status:"invalid_plan",
-          exit_reason:result.reason,
-          sim_target_level:result.target_level ?? null,
-          sim_stop_level:result.stop_level ?? null,
+        if (trade) await updateTrade(trade.id || trade.trade_id, {
+          lifecycle_status:"invalid_plan", exit_reason:result.reason,
+          sim_target_level:result.target_level ?? null, sim_stop_level:result.stop_level ?? null,
           sim_checked_at:new Date().toISOString(),
         });
         continue;
       }
-      if (result.status === "open") {
-        await updateTrade(trade.id || trade.trade_id, {
-          lifecycle_status:"open",
+      if (result.status === "open" || result.status === "detected" || result.status === "confirmed_unfilled") {
+        if (trade) await updateTrade(trade.id || trade.trade_id, {
+          lifecycle_status:result.status === "open" ? "open" : result.status,
+          trigger_timestamp:patch.trigger_timestamp,
+          fill_timestamp:patch.fill_timestamp,
+          fill_price:patch.fill_price,
           sim_target_level:result.target_level ?? null,
           sim_stop_level:result.stop_level ?? null,
-          sim_deadline_days:result.deadline_days ?? null,
           sim_checked_at:new Date().toISOString(),
         });
       } else {
-        await updateTrade(trade.id || trade.trade_id, {
+        if (result.status === "ambiguous_same_bar") ambiguous++;
+        else closed++;
+        if (trade) await updateTrade(trade.id || trade.trade_id, {
           lifecycle_status:result.status,
+          trigger_timestamp:patch.trigger_timestamp,
+          fill_timestamp:patch.fill_timestamp,
+          fill_price:result.fill_price,
           exit_price:result.exit_price,
-          exit_date:result.exit_date,
-          hold_days:result.hold_days,
+          exit_date:String(result.exit_timestamp || "").slice(0, 10),
+          exit_timestamp:result.exit_timestamp,
+          hold_days:result.holding_period_days,
+          holding_period_sessions:result.holding_period_sessions,
           pnl_pct:result.pnl_pct,
-          raw_move_pct:result.raw_move_pct,
+          r_multiple:result.r_multiple,
+          mfe:result.mfe,
+          mae:result.mae,
+          mfe_r:result.mfe_r,
+          mae_r:result.mae_r,
+          raw_move_pct:result.pnl_pct,
           exit_reason:result.exit_reason,
           is_win:result.is_win,
+          spy_comparison:spy,
           sim_checked_at:new Date().toISOString(),
         });
-        closed++;
       }
     }
   }
+  const untouched = events.filter(e => !updatedEvents.some(u => u.event_id === e.event_id));
+  saveJson(PAPER_EVENT_LEDGER_KEY, updatedEvents.concat(untouched).slice(0, 2000));
   localStorage.setItem(PAPER_SIM_LAST_RUN_KEY, new Date().toISOString());
-  return { ran:true, simulated, closed };
+  return { ran:true, simulated, closed, ambiguous };
 }
 async function runPaperSimulationManual() {
   toast("Running paper simulation");
@@ -2224,7 +2567,7 @@ function tradePlanStatus(t) {
   return coherentPlan(entry, target, stop, isShort ? "short" : "long");
 }
 function tradeIsClosed(t) {
-  return String(t?.lifecycle_status || "").startsWith("closed") && tradePlanStatus(t).ok;
+  return (String(t?.lifecycle_status || "").startsWith("closed") || t?.lifecycle_status === "ambiguous_same_bar") && tradePlanStatus(t).ok;
 }
 function tradeHasSetup(t) {
   const a = t?.analysis_snapshot || {};
@@ -2258,20 +2601,21 @@ function renderPaperLabDashboard(trades, stats) {
   const watch = localJson(TRIGGER_WATCH_KEY, []);
   const missed = localJson(OPPORTUNITY_MEMORY_KEY, { missed:[] }).missed || [];
   const auto = paper.filter(t => t.auto_logged).length;
-  const bestSetup = stats.by_setup?.[0];
-  const exp = stats.overall?.n ? `${stats.overall.expectancy >= 0 ? "+" : ""}${stats.overall.expectancy}%` : "-";
+  const bestSetup = stats.best_setup;
+  const exp = stats.overall?.n ? `${stats.overall.expectancy_r >= 0 ? "+" : ""}${stats.overall.expectancy_r}R` : "-";
   return `<section class="card">
     <div class="card-head"><h3>Paper Trade Lab</h3><button class="btn-ghost" data-act="run-paper-sim">Run sim</button></div>
     <div class="lab-grid">
       ${labCell("Open paper", stats.open_count)}
-      ${labCell("Closed tests", stats.overall.n)}
-      ${labCell("Expectancy", exp, stats.overall.expectancy)}
+      ${labCell("Detected events", stats.total_events || 0)}
+      ${labCell("Resolved", stats.overall.n)}
+      ${labCell("Expectancy", exp, stats.overall.expectancy_r)}
       ${labCell("Auto logged", auto)}
       ${labCell("Invalid plans", invalid, invalid ? -1 : null)}
       ${labCell("Trigger watch", watch.length)}
     </div>
-    <div class="issue">Auto-paper only logs prime rows that pass entry, take-profit, stop-loss, and reward/risk rules. Trigger Watch keeps good setups that are not ready yet.</div>
-    ${bestSetup ? `<div class="issue">Best current sample: ${esc(bestSetup.key)} with ${bestSetup.n} closed and ${bestSetup.expectancy >= 0 ? "+" : ""}${bestSetup.expectancy}% expectancy.</div>` : `<div class="issue">No closed setup sample yet. Run the sim after trades have enough candles to test target/stop/time expiry.</div>`}
+    <div class="issue">The walk-forward ledger includes every detected scan candidate. Auto-paper is only the selected subset; controls remain in the denominator.</div>
+    ${bestSetup ? `<div class="issue">Best setup uses confidence-adjusted R expectancy, not largest sample: ${esc(bestSetup.key)} with ${bestSetup.n} resolved and ${bestSetup.expectancy_r >= 0 ? "+" : ""}${bestSetup.expectancy_r}R.</div>` : `<div class="issue">No resolved setup sample yet. Run the sim after events have enough sessions to test fill, target, stop, or expiry.</div>`}
     ${missed.length ? `<div class="issue">${missed.length} missed opportunity${missed.length === 1 ? "" : "ies"} captured from watch-list names that moved before entry.</div>` : ""}
   </section>`;
 }
@@ -2330,7 +2674,7 @@ function renderJournalQuality(trades) {
   const avgMove = moves.length ? moves.reduce((a, b) => a + b, 0) / moves.length : null;
   const issues = [];
   if (!total) issues.push("No trades logged yet.");
-  if (total - withSetup > 0) issues.push(`${total - withSetup} trade${total - withSetup === 1 ? "" : "s"} missing setup context. Use Broad scan so prime rows are auto-logged with setup data.`);
+  if (total - withSetup > 0) issues.push(`${total - withSetup} trade${total - withSetup === 1 ? "" : "s"} missing setup context. Use Full sweep so prime rows are auto-logged with setup data.`);
   if (!paper) issues.push("No paper trades yet.");
   if (invalidPlans) issues.push(`${invalidPlans} paper trade${invalidPlans === 1 ? "" : "s"} excluded because target/stop does not match direction.`);
   if (closed < 5) issues.push("Fewer than 5 closed outcomes. Treat performance as early and noisy.");
@@ -2352,7 +2696,7 @@ function qualityCell(k, v, tone = null) {
   return `<div class="quality-cell"><span class="q-k">${esc(k)}</span><span class="q-v ${cls}">${esc(v)}</span></div>`;
 }
 function renderTradeRows(trades) {
-  if (!trades.length) return `<div class="empty">No trades logged yet. Run Broad scan; prime paper-ready opportunities are logged automatically.</div>`;
+  if (!trades.length) return `<div class="empty">No trades logged yet. Run Full sweep; prime paper-ready opportunities are logged automatically.</div>`;
   return trades.map(t => {
     const [label, cls, title] = tradeOutcome(t);
     const setup = t.scanner_snapshot?.read?.one_liner || t.analysis_snapshot?.headline || "No setup snapshot captured.";
@@ -2385,77 +2729,139 @@ function renderTradeRows(trades) {
 }
 function computePaperPerformance(trades) {
   const paper = (trades || []).filter(t => t.is_paper === true);
+  const events = localJson(PAPER_EVENT_LEDGER_KEY, []);
+  const resolvedEvents = events.filter(e => ["closed_target", "closed_stop", "closed_timeout", "ambiguous_same_bar"].includes(String(e.simulation_status || "")));
+  const analyzableEvents = resolvedEvents.filter(e => e.simulation_status !== "ambiguous_same_bar" && Number.isFinite(Number(e.r_multiple)));
+  const selectedEvents = analyzableEvents.filter(e => e.selected_for_paper === true);
+  const controlEvents = analyzableEvents.filter(e => e.selected_for_paper !== true);
   const closed = paper.filter(tradeIsClosed);
   const open = paper.filter(t => !tradeIsClosed(t));
   const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  const stdev = arr => {
+    if (arr.length < 2) return 0;
+    const m = avg(arr);
+    return Math.sqrt(avg(arr.map(x => (x - m) ** 2)));
+  };
+  const ciMean = arr => {
+    if (!arr.length) return [0, 0];
+    const m = avg(arr);
+    const se = stdev(arr) / Math.sqrt(arr.length || 1);
+    return [Number((m - 1.96 * se).toFixed(2)), Number((m + 1.96 * se).toFixed(2))];
+  };
+  const wilson = (wins, n) => {
+    if (!n) return [0, 0];
+    const z = 1.96, p = wins / n, denom = 1 + z * z / n;
+    const centre = p + z * z / (2 * n);
+    const margin = z * Math.sqrt((p * (1 - p) + z * z / (4 * n)) / n);
+    return [Number(((centre - margin) / denom * 100).toFixed(1)), Number(((centre + margin) / denom * 100).toFixed(1))];
+  };
+  const maxDrawdown = values => {
+    let equity = 0, peak = 0, maxDd = 0;
+    for (const r of values) {
+      equity += r;
+      peak = Math.max(peak, equity);
+      maxDd = Math.min(maxDd, equity - peak);
+    }
+    return Number(maxDd.toFixed(2));
+  };
   function stat(rows) {
-    const pnls = rows.map(t => Number(t.pnl_pct) || 0);
-    const wins = rows.filter(t => Number(t.pnl_pct) > 0);
-    const losses = rows.filter(t => Number(t.pnl_pct) < 0);
-    const holds = rows.map(t => Number(t.hold_days)).filter(Number.isFinite);
+    const rs = rows.map(t => Number(t.r_multiple)).filter(Number.isFinite);
+    const wins = rows.filter(t => Number(t.r_multiple) > 0);
+    const losses = rows.filter(t => Number(t.r_multiple) < 0);
+    const grossWin = wins.reduce((a, t) => a + Math.max(0, Number(t.r_multiple) || 0), 0);
+    const grossLoss = Math.abs(losses.reduce((a, t) => a + Math.min(0, Number(t.r_multiple) || 0), 0));
+    const holds = rows.map(t => Number(t.holding_period_sessions ?? t.hold_days)).filter(Number.isFinite);
+    const expCi = ciMean(rs);
+    const winCi = wilson(wins.length, rows.length);
     return {
       n:rows.length,
       win_rate:rows.length ? Number((wins.length / rows.length * 100).toFixed(1)) : 0,
-      expectancy:rows.length ? Number(avg(pnls).toFixed(2)) : 0,
-      avg_win:wins.length ? Number(avg(wins.map(t => Number(t.pnl_pct))).toFixed(2)) : null,
-      avg_loss:losses.length ? Number(avg(losses.map(t => Number(t.pnl_pct))).toFixed(2)) : null,
+      win_rate_ci:winCi,
+      expectancy_r:rs.length ? Number(avg(rs).toFixed(2)) : 0,
+      expectancy_r_ci:expCi,
+      profit_factor:grossLoss > 0 ? Number((grossWin / grossLoss).toFixed(2)) : (grossWin > 0 ? Infinity : 0),
+      max_drawdown_r:maxDrawdown(rs),
+      avg_win:wins.length ? Number(avg(wins.map(t => Number(t.r_multiple))).toFixed(2)) : null,
+      avg_loss:losses.length ? Number(avg(losses.map(t => Number(t.r_multiple))).toFixed(2)) : null,
       avg_hold:holds.length ? Math.round(avg(holds)) : null,
-      target:rows.filter(t => t.lifecycle_status === "closed_target").length,
-      stop:rows.filter(t => t.lifecycle_status === "closed_stop").length,
-      timeout:rows.filter(t => t.lifecycle_status === "closed_timeout").length,
+      target:rows.filter(t => t.simulation_status === "closed_target" || t.lifecycle_status === "closed_target").length,
+      stop:rows.filter(t => t.simulation_status === "closed_stop" || t.lifecycle_status === "closed_stop").length,
+      timeout:rows.filter(t => t.simulation_status === "closed_timeout" || t.lifecycle_status === "closed_timeout").length,
+      ambiguous:resolvedEvents.filter(t => t.simulation_status === "ambiguous_same_bar").length,
     };
   }
-  function groups(picker) {
+  function eventGroups(picker, rows = analyzableEvents) {
     const map = {};
-    for (const t of closed) (map[picker(t) || "-"] = map[picker(t) || "-"] || []).push(t);
-    return Object.entries(map).map(([key, rows]) => ({ key, ...stat(rows) })).sort((a, b) => b.n - a.n);
+    for (const e of rows) (map[picker(e) || "-"] = map[picker(e) || "-"] || []).push(e);
+    return Object.entries(map)
+      .map(([key, groupRows]) => {
+        const s = stat(groupRows);
+        const confidenceScore = s.n >= 5 ? s.expectancy_r_ci[0] : s.expectancy_r - (5 - s.n) * 0.25;
+        return { key, ...s, confidence_score:Number(confidenceScore.toFixed(2)) };
+      })
+      .sort((a, b) => b.confidence_score - a.confidence_score || b.expectancy_r - a.expectancy_r || b.n - a.n);
   }
+  const setupGroups = eventGroups(e => e.setup_type || "unknown");
+  const bestSetup = setupGroups.find(g => g.n >= 5 && g.expectancy_r_ci[0] > 0) || setupGroups[0] || null;
+  const spyReturns = analyzableEvents.map(e => Number(e.spy_comparison?.return_pct)).filter(Number.isFinite);
   return {
     total_paper:paper.length,
+    total_events:events.length,
+    resolved_events:resolvedEvents.length,
+    ambiguous_count:resolvedEvents.filter(e => e.simulation_status === "ambiguous_same_bar").length,
     open_count:open.length,
-    overall:stat(closed),
-    by_source:groups(t => t.scanner_snapshot ? `Discovery ${t.scanner_snapshot.gate_label || ""}`.trim() : "Manual"),
-    by_setup:groups(tradeSetupType),
-    by_entry:groups(tradeEntryMode),
-    by_conviction:groups(t => t.analysis_snapshot?.conviction || "-"),
+    overall:stat(analyzableEvents),
+    selected:stat(selectedEvents),
+    controls:stat(controlEvents),
+    spy_avg_return:spyReturns.length ? Number(avg(spyReturns).toFixed(2)) : null,
+    best_setup:bestSetup,
+    by_source:eventGroups(e => e.selected_for_paper ? "Selected paper" : "Matched controls"),
+    by_setup:setupGroups,
+    by_regime:eventGroups(e => e.regime_primary || "unknown"),
+    by_trigger:eventGroups(e => e.trigger_type || "unknown"),
   };
 }
 function renderPaperPerformance(stats) {
   const o = stats.overall;
-  const expCls = o.expectancy > 0 ? "good-text" : o.expectancy < 0 ? "bad-text" : "";
-  if (!stats.total_paper) {
-    return `<section class="card"><div class="card-head"><h3>Paper Performance</h3><button class="btn-ghost" data-act="run-paper-sim">Run sim</button></div><div class="empty">No paper trades yet.</div></section>`;
+  const expCls = o.expectancy_r > 0 ? "good-text" : o.expectancy_r < 0 ? "bad-text" : "";
+  if (!stats.total_events && !stats.total_paper) {
+    return `<section class="card"><div class="card-head"><h3>Walk-Forward Performance</h3><button class="btn-ghost" data-act="run-paper-sim">Run sim</button></div><div class="empty">No scan events yet.</div></section>`;
   }
   if (!o.n) {
-    return `<section class="card"><div class="card-head"><h3>Paper Performance</h3><button class="btn-ghost" data-act="run-paper-sim">Run sim</button></div><div class="empty">${stats.open_count} open paper trade${stats.open_count === 1 ? "" : "s"}, none closed yet.</div></section>`;
+    return `<section class="card"><div class="card-head"><h3>Walk-Forward Performance</h3><button class="btn-ghost" data-act="run-paper-sim">Run sim</button></div><div class="empty">${stats.total_events} detected event${stats.total_events === 1 ? "" : "s"}, none resolved yet.</div></section>`;
   }
   return `<section class="card">
-    <div class="card-head"><h3>Paper Performance</h3><button class="btn-ghost" data-act="run-paper-sim">Run sim</button></div>
+    <div class="card-head"><h3>Walk-Forward Performance</h3><button class="btn-ghost" data-act="run-paper-sim">Run sim</button></div>
     <div class="perf-headline">
-      <div><div class="expect ${expCls}">${o.expectancy >= 0 ? "+" : ""}${o.expectancy}%</div><div class="expect-label">expectancy / trade</div></div>
+      <div><div class="expect ${expCls}">${o.expectancy_r >= 0 ? "+" : ""}${o.expectancy_r}R</div><div class="expect-label">expectancy / resolved event</div></div>
       <div class="perf-side">
-        <div><span class="mini-stat-v">${o.win_rate}%</span><span class="mini-stat-l">win rate</span></div>
-        <div><span class="mini-stat-v">${o.n}</span><span class="mini-stat-l">closed</span></div>
-        <div><span class="mini-stat-v">${o.avg_hold != null ? o.avg_hold + "d" : "-"}</span><span class="mini-stat-l">avg hold</span></div>
+        <div><span class="mini-stat-v">${o.win_rate}%</span><span class="mini-stat-l">win ${o.win_rate_ci[0]}-${o.win_rate_ci[1]}%</span></div>
+        <div><span class="mini-stat-v">${o.n}</span><span class="mini-stat-l">n resolved</span></div>
+        <div><span class="mini-stat-v">${o.profit_factor === Infinity ? "Inf" : o.profit_factor}</span><span class="mini-stat-l">profit factor</span></div>
       </div>
     </div>
     <div class="breakdown">
-      <span class="meta good">Avg win ${o.avg_win != null ? fmtPct(o.avg_win, 2) : "-"}</span>
-      <span class="meta bad">Avg loss ${o.avg_loss != null ? fmtPct(o.avg_loss, 2) : "-"}</span>
+      <span class="meta">Exp CI ${o.expectancy_r_ci[0]}R to ${o.expectancy_r_ci[1]}R</span>
+      <span class="meta bad">Max DD ${o.max_drawdown_r}R</span>
+      <span class="meta good">Avg win ${o.avg_win != null ? o.avg_win + "R" : "-"}</span>
+      <span class="meta bad">Avg loss ${o.avg_loss != null ? o.avg_loss + "R" : "-"}</span>
       <span class="meta good">${o.target} target</span>
       <span class="meta bad">${o.stop} stop</span>
       <span class="meta warn">${o.timeout} timeout</span>
-      ${stats.open_count ? `<span class="meta">${stats.open_count} open</span>` : ""}
+      ${stats.ambiguous_count ? `<span class="meta warn">${stats.ambiguous_count} ambiguous</span>` : ""}
+      ${stats.spy_avg_return != null ? `<span class="meta">SPY avg ${fmtPct(stats.spy_avg_return, 2)}</span>` : ""}
     </div>
+    <div class="issue">In-sample walk-forward results are evidence to monitor, not proof of an edge. Confirm out of sample before promoting any setup.</div>
+    ${stats.best_setup ? `<div class="issue">Best setup by confidence-adjusted expectancy: ${esc(stats.best_setup.key)} (${stats.best_setup.n} resolved, ${stats.best_setup.expectancy_r >= 0 ? "+" : ""}${stats.best_setup.expectancy_r}R, CI low ${stats.best_setup.expectancy_r_ci[0]}R).</div>` : ""}
     ${groupTable("By source", stats.by_source)}
     ${groupTable("By setup", stats.by_setup)}
-    ${groupTable("By entry mode", stats.by_entry)}
-    ${groupTable("By conviction", stats.by_conviction)}
+    ${groupTable("By regime", stats.by_regime)}
+    ${groupTable("By trigger type", stats.by_trigger)}
   </section>`;
 }
 function groupTable(label, rows) {
   if (!rows.length) return "";
-  return `<table class="table"><thead><tr><th>${esc(label)}</th><th>n</th><th>Win%</th><th>Expect.</th><th>Hold</th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r.key)}</td><td>${r.n}</td><td>${r.win_rate}%</td><td class="${r.expectancy >= 0 ? "good-text" : "bad-text"}">${r.expectancy >= 0 ? "+" : ""}${r.expectancy}%</td><td>${r.avg_hold != null ? r.avg_hold + "d" : "-"}</td></tr>`).join("")}</tbody></table>`;
+  return `<table class="table"><thead><tr><th>${esc(label)}</th><th>n</th><th>Win%</th><th>Exp R</th><th>PF</th><th>DD</th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r.key)}</td><td>${r.n}</td><td>${r.win_rate}% <span class="muted">${r.win_rate_ci[0]}-${r.win_rate_ci[1]}</span></td><td class="${r.expectancy_r >= 0 ? "good-text" : "bad-text"}">${r.expectancy_r >= 0 ? "+" : ""}${r.expectancy_r}R <span class="muted">${r.expectancy_r_ci[0]}-${r.expectancy_r_ci[1]}</span></td><td>${r.profit_factor === Infinity ? "Inf" : r.profit_factor}</td><td>${r.max_drawdown_r}R</td></tr>`).join("")}</tbody></table>`;
 }
 
 function renderSettings() {
@@ -2472,7 +2878,7 @@ function renderSettings() {
         <input class="setting-input" id="minRewardRisk" type="number" min="0.5" step="0.1" value="${esc(state.investorProfile.min_reward_risk || 2)}" />
       </div>
       <div class="settings-row">
-        <div><div class="lbl">Auto-log prime paper trades</div><div class="sub">After each broad scan, prime paper-ready setups are logged automatically.</div></div>
+        <div><div class="lbl">Auto-log prime paper trades</div><div class="sub">After each full sweep, prime paper-ready setups are logged automatically.</div></div>
         <input id="autoPrimePaper" type="checkbox" ${state.investorProfile.auto_prime_paper !== false ? "checked" : ""} />
       </div>
       <div class="settings-row">
@@ -2623,6 +3029,13 @@ window.addEventListener("unhandledrejection", e => {
   console.error(e.reason);
   toast(`Error: ${e.reason?.message || e.reason}`, "error");
 });
+window.__PORTFOLIO_PAPER_TEST_EXPORTS__ = {
+  normalizeAdjustedBars,
+  simulateWalkForwardEvent,
+  simulateSpyComparison,
+  eventPlan,
+  costModel,
+};
 boot();
 </script>
 </body>
