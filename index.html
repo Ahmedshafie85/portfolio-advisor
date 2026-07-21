@@ -106,8 +106,8 @@ button { cursor:pointer; }
 .radar-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin:12px 0; }
 .radar-card { border:1px solid var(--rule-soft); border-radius:10px; background:rgba(255,255,255,.28); padding:10px; min-width:0; }
 .radar-card.ready { border-color:rgba(74,122,74,.35); background:rgba(74,122,74,.07); }
-.radar-card.building, .radar-card.pullback, .radar-card.breakout { border-color:rgba(176,141,60,.35); background:rgba(176,141,60,.07); }
-.radar-card.avoid { border-color:rgba(161,61,45,.28); background:rgba(161,61,45,.06); }
+.radar-card.building, .radar-card.pullback, .radar-card.breakout, .radar-card.armed, .radar-card.data_limited { border-color:rgba(176,141,60,.35); background:rgba(176,141,60,.07); }
+.radar-card.avoid, .radar-card.rejected { border-color:rgba(161,61,45,.28); background:rgba(161,61,45,.06); }
 .radar-k { display:block; font-family:var(--mono); color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; }
 .radar-v { display:block; font-family:var(--mono); font-size:22px; font-weight:700; margin-top:4px; }
 .radar-syms { color:var(--soft); font-size:11px; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -125,6 +125,7 @@ button { cursor:pointer; }
   border:1px solid var(--rule-soft); background:rgba(255,255,255,.32); border-radius:10px;
   padding:12px; color:var(--soft); font-size:13px; margin:12px 0;
 }
+.scan-warning { border-color:rgba(161,61,45,.45) !important; background:rgba(161,61,45,.08) !important; }
 .loading-row { display:flex; align-items:center; gap:10px; color:var(--soft); padding:18px 2px; }
 .spinner { width:16px; height:16px; border-radius:50%; border:2px solid var(--rule); border-top-color:var(--ink); animation:spin .8s linear infinite; display:inline-block; }
 @keyframes spin { to { transform:rotate(360deg); } }
@@ -612,7 +613,49 @@ async function fetchMarketScan(body) {
   if (!r.ok) throw new Error(`scan-market ${r.status}`);
   return r.json();
 }
+async function fetchScanJob(jobId) {
+  const r = await fetch(`${WORKER_URL}/scan-market/job/${encodeURIComponent(jobId)}`);
+  if (!r.ok) throw new Error(`scan job ${r.status}`);
+  return r.json();
+}
+function normalizeScanContract(scan = {}) {
+  const errors = Array.isArray(scan.errors) ? scan.errors : Array.isArray(scan.batch_errors) ? scan.batch_errors : [];
+  const diag = scan.scan_diagnostics || {};
+  const eligible = Number(diag.universe_eligible_count ?? scan.universe_size ?? scan.universe?.filtered_count ?? 0) || 0;
+  const attempted = Number(diag.attempted_count ?? scan.attempted_count ?? eligible) || 0;
+  const completion = Number(diag.completion_pct ?? (eligible ? attempted / eligible * 100 : 0));
+  const normalized = {
+    ...scan,
+    errors,
+    batch_errors: errors,
+    error_count: errors.length,
+    scan_diagnostics: {
+      universe_raw_count:Number(diag.universe_raw_count ?? scan.universe?.raw_count ?? eligible) || 0,
+      universe_eligible_count:eligible,
+      attempted_count:attempted,
+      scored_count:Number(diag.scored_count ?? scan.scored_count ?? 0) || 0,
+      failed_count:Number(diag.failed_count ?? errors.length) || 0,
+      completion_pct:Number.isFinite(completion) ? Number(completion.toFixed(1)) : 0,
+      coverage_target_pct:Number(diag.coverage_target_pct ?? 95) || 95,
+      coverage_ok:diag.coverage_ok === true || completion >= Number(diag.coverage_target_pct ?? 95),
+      returned_count:Number(diag.returned_count ?? scan.results?.length ?? 0) || 0,
+      cache_hit_count:Number(diag.cache_hit_count ?? 0) || 0,
+      live_fetch_count:Number(diag.live_fetch_count ?? 0) || 0,
+      duration_ms:Number(diag.duration_ms ?? 0) || 0,
+      market_session:String(diag.market_session || scan.market_session || "-"),
+      data_as_of_utc:diag.data_as_of_utc || scan.generated_at || null,
+      errors_by_type:diag.errors_by_type || {},
+      scan_status:diag.scan_status || scan.scan_status || (completion < 90 ? "SCAN_INCOMPLETE" : "COMPLETE"),
+      served_from_cache:diag.served_from_cache === true || scan._served === "cache" || scan._cached === true,
+      universe_source:diag.universe_source || scan.universe_source || scan.universe?.source || "",
+      full_market:diag.full_market === true || scan.universe?.full_market === true,
+    },
+  };
+  normalized.scan_status = normalized.scan_diagnostics.scan_status;
+  return normalized;
+}
 function mergeMarketScanUpdate(scan) {
+  scan = normalizeScanContract(scan);
   if (!scan) return;
   const current = state.marketScan || { results:[], reads:[] };
   const bySymbol = new Map((current.results || []).map(r => [String(r.symbol || "").toUpperCase(), r]));
@@ -635,6 +678,10 @@ function mergeMarketScanUpdate(scan) {
     reads:Array.from(reads.values()),
     ai_read_count:reads.size,
     llm_error:scan.llm_error || current.llm_error || null,
+    errors:scan.errors || current.errors || [],
+    batch_errors:scan.batch_errors || current.batch_errors || [],
+    scan_diagnostics:scan.scan_diagnostics || current.scan_diagnostics || null,
+    scan_status:scan.scan_status || current.scan_status || null,
     scan_note:scan.scan_note || current.scan_note || "",
     generated_at:scan.generated_at || current.generated_at || new Date().toISOString(),
   };
@@ -710,8 +757,13 @@ async function loadCachedScan() {
       universe_source: d.universe_source || "cached",
       universe_size: d.universe_size || results.length,
       scored_count: d.scored_count || results.length,
+      errors: d.errors_json ? JSON.parse(d.errors_json) : [],
+      batch_errors: d.errors_json ? JSON.parse(d.errors_json) : [],
+      scan_diagnostics: d.scan_diagnostics_json ? JSON.parse(d.scan_diagnostics_json) : null,
+      scan_status: d.scan_status || null,
       _cached: true,
     };
+    state.marketScan = normalizeScanContract(state.marketScan);
     state.marketScanRanAt = d.generated_at || d.updated_at || new Date().toISOString();
     updateOpportunityMemory(state.marketScan);
     renderCurrentView();
@@ -734,7 +786,7 @@ async function runMarketScan(opts = {}) {
       force: opts.force === true || opts.discover === true || !!state.marketScanFocus,
       write_reads: true,
     });
-    state.marketScan = j;
+    state.marketScan = normalizeScanContract(j);
     state.marketScanRanAt = j.generated_at || new Date().toISOString();
     updateOpportunityMemory(j);
     saveScanPaperEvents(j);
@@ -755,14 +807,38 @@ async function runRollingBroadScan() {
   state.broadScanProgress = { current:0, total:1, label:"dynamic universe", requested:0, scored:0 };
   renderCurrentView();
   try {
-    const scan = await fetchMarketScan({
+    const start = await fetchMarketScan({
       exclude_symbols:[],
       min_composite:0,
       force:true,
       write_reads:true,
       dynamic_universe:true,
       _patient:true,
+      background:true,
     });
+    let scan = null;
+    if (start.job_id) {
+      for (let i = 0; i < 90; i++) {
+        const job = await fetchScanJob(start.job_id);
+        state.broadScanProgress = {
+          current:i + 1,
+          total:90,
+          label:job.progress?.stage || job.status || "scan job",
+          requested:job.progress?.universe_eligible_count || job.progress?.attempted_count || 0,
+          scored:job.progress?.scored_count || 0,
+        };
+        renderCurrentView();
+        if (String(job.status || "").startsWith("COMPLETED")) {
+          scan = await fetchMarketScan({ force:false, write_reads:true });
+          break;
+        }
+        if (job.status === "FAILED") throw new Error(job.error || "scan job failed");
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      if (!scan) throw new Error("scan job did not finish before polling timed out");
+    } else {
+      scan = start;
+    }
     state.broadScanProgress = {
       current:1,
       total:1,
@@ -770,7 +846,7 @@ async function runRollingBroadScan() {
       requested:scan.universe_size || scan.universe?.filtered_count || 0,
       scored:scan.scored_count || scan.results?.length || 0,
     };
-    state.marketScan = scan;
+    state.marketScan = normalizeScanContract(scan);
     state.marketScanRanAt = scan.generated_at || new Date().toISOString();
     updateOpportunityMemory(scan);
     saveScanPaperEvents(scan);
@@ -1152,12 +1228,11 @@ function qualityRows(row) {
 }
 function radarBucket(row) {
   if (row?.schema_version === "CandidateV2") {
-    if (row.verdict === "READY" && row.trigger_status === "FIRED") return { id:"ready", label:"Ready now", tone:"ready" };
-    if (row.verdict === "REJECT") return { id:"avoid", label:"Avoid", tone:"avoid" };
-    if (row.trigger_status === "READY") return { id:"breakout", label:"Armed", tone:"breakout" };
-    if (row.trigger_status === "BLOCKED") return { id:"pullback", label:"Needs reset", tone:"pullback" };
-    if (row.trigger_status === "MISSING_DATA" || row.trigger_status === "STALE_DATA") return { id:"avoid", label:"Avoid", tone:"avoid" };
-    return { id:"building", label:"Building", tone:"building" };
+    if (row.verdict === "READY" && row.trigger_status === "FIRED") return { id:"ready", label:"READY", tone:"ready" };
+    if (row.trigger_status === "MISSING_DATA" || row.trigger_status === "STALE_DATA") return { id:"data_limited", label:"DATA LIMITED", tone:"pullback" };
+    if (row.trigger_status === "READY" || row.playbook_state === "ARMED") return { id:"armed", label:"ARMED", tone:"breakout" };
+    if (row.verdict === "REJECT" || row.trigger_status === "BLOCKED") return { id:"rejected", label:"REJECTED", tone:"avoid" };
+    return { id:"building", label:"BUILDING", tone:"building" };
   }
   const gate = msInvestmentGate(row);
   const plan = msPaperTestPlan(row, gate);
@@ -1165,11 +1240,12 @@ function radarBucket(row) {
   const rsi = num(row?.rsi14);
   const rr = msRiskReward(row);
   const fromHigh = num(row?.pct_from_52w_high);
-  if (plan.ok && msPrimaryScore(row) >= 75) return { id:"ready", label:"Ready now", tone:"ready" };
-  if (["falling", "bad_rr", "needs_levels"].includes(entry) || row?._soft) return { id:"avoid", label:"Avoid", tone:"avoid" };
-  if (entry === "extended" || (rsi != null && rsi >= 68) || (rr != null && rr < 1.5)) return { id:"pullback", label:"Needs pullback", tone:"pullback" };
-  if (msComponent(row, "compression") >= 7 || (fromHigh != null && fromHigh <= -2 && fromHigh >= -15)) return { id:"breakout", label:"Breakout trigger", tone:"breakout" };
-  return { id:"building", label:"Building", tone:"building" };
+  if (plan.ok && msPrimaryScore(row) >= 75) return { id:"ready", label:"READY", tone:"ready" };
+  if (["falling", "bad_rr", "needs_levels"].includes(entry) || row?._soft) return { id:"rejected", label:"REJECTED", tone:"avoid" };
+  if (!entry || rsi == null || rr == null) return { id:"data_limited", label:"DATA LIMITED", tone:"pullback" };
+  if (entry === "extended" || (rsi != null && rsi >= 68) || (rr != null && rr < 1.5)) return { id:"armed", label:"ARMED", tone:"breakout" };
+  if (msComponent(row, "compression") >= 7 || (fromHigh != null && fromHigh <= -2 && fromHigh >= -15)) return { id:"armed", label:"ARMED", tone:"breakout" };
+  return { id:"building", label:"BUILDING", tone:"building" };
 }
 function deriveTrigger(row) {
   const pb = row?.playbook || {};
@@ -1197,16 +1273,16 @@ function deriveTrigger(row) {
   if (bucket.id === "ready" && preview.target && preview.stop) {
     return { type:"ready", action:"paper-test now", trigger_price:price, invalidation:preview.stop, text:`Paper-ready at ${fmtUSD(price, 2)}; target ${fmtUSD(preview.target, 2)}, stop ${fmtUSD(preview.stop, 2)}.` };
   }
-  if (bucket.id === "pullback") {
+  if (bucket.id === "data_limited") {
     const pullback = preview.stop || num(row?.nearest_support);
-    return { type:"pullback", action:"wait for pullback", trigger_price:pullback, invalidation:pullback ? pullback * 0.97 : null, text:pullback ? `Watch pullback toward ${fmtUSD(pullback, 2)} before entry.` : "Wait for a cleaner support level before entry." };
+    return { type:"data_limited", action:"data pending", trigger_price:pullback, invalidation:pullback ? pullback * 0.97 : null, text:pullback ? `Data limited; watch reference level ${fmtUSD(pullback, 2)} but do not treat as executable.` : "Data limited; wait for required market data before entry." };
   }
-  if (bucket.id === "breakout") {
+  if (bucket.id === "armed") {
     const breakout = preview.target || num(row?.nearest_resistance);
     return { type:"breakout", action:"breakout trigger", trigger_price:breakout, invalidation:preview.stop, text:breakout ? `Trigger above ${fmtUSD(breakout, 2)} with volume; stop near ${preview.stop ? fmtUSD(preview.stop, 2) : "support"}.` : "Needs resistance level for breakout trigger." };
   }
-  if (bucket.id === "avoid") {
-    return { type:"avoid", action:"avoid", trigger_price:null, invalidation:preview.stop, text:`Avoid for now: ${gate.primary}.` };
+  if (bucket.id === "rejected") {
+    return { type:"rejected", action:"rejected", trigger_price:null, invalidation:preview.stop, text:`Rejected for now: ${gate.primary}.` };
   }
   const trigger = preview.target || num(row?.nearest_resistance);
   return { type:"building", action:"watch setup", trigger_price:trigger, invalidation:preview.stop, text:trigger ? `Building. Alert if price moves through ${fmtUSD(trigger, 2)} with confirmation.` : "Building. Needs cleaner trigger level." };
@@ -1244,7 +1320,7 @@ function refreshTriggerWatchFromScan(scan) {
   const byKey = new Map(existing.map(x => [x.key, x]));
   for (const row of rows) {
     const bucket = radarBucket(row);
-    if (bucket.id === "avoid" || bucket.id === "ready") continue;
+    if (bucket.id === "rejected" || bucket.id === "ready") continue;
     const trigger = deriveTrigger(row);
     if (!trigger.trigger_price && trigger.type !== "building") continue;
     const key = triggerKey(row.symbol, trigger);
@@ -1537,11 +1613,11 @@ function renderDiscover() {
 }
 function renderOpportunityRadar(results) {
   const buckets = [
-    ["ready", "Ready now"],
-    ["building", "Building"],
-    ["pullback", "Needs pullback"],
-    ["breakout", "Breakout trigger"],
-    ["avoid", "Avoid"],
+    ["ready", "READY"],
+    ["armed", "ARMED"],
+    ["building", "BUILDING"],
+    ["data_limited", "DATA LIMITED"],
+    ["rejected", "REJECTED"],
   ];
   return `<div class="radar-grid">${buckets.map(([id, label]) => {
     const rows = results.filter(r => radarBucket(r).id === id);
@@ -1603,6 +1679,28 @@ function renderRegimeSummary(scan) {
     </div>
   </div>`;
 }
+function renderScanDiagnostics(scan) {
+  const d = scan?.scan_diagnostics;
+  if (!d) return "";
+  const errors = Array.isArray(scan.errors) ? scan.errors : Array.isArray(scan.batch_errors) ? scan.batch_errors : [];
+  const incomplete = d.scan_status === "SCAN_INCOMPLETE" || Number(d.completion_pct) < 90;
+  const source = d.full_market ? "master universe" : (d.universe_source || scan.universe_source || "fallback");
+  const errorTypes = Object.entries(d.errors_by_type || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
+  const priceLabel = d.served_from_cache ? "cached scan" : "live request";
+  return `<div class="panel-block ${incomplete ? "scan-warning" : ""}" style="margin:12px 0;">
+    <h4>${incomplete ? "Scan incomplete" : "Scan diagnostics"}</h4>
+    <div class="read-grid">
+      <div><b>Universe:</b> ${esc(source)} · raw ${Number(d.universe_raw_count || 0).toLocaleString()} · eligible ${Number(d.universe_eligible_count || 0).toLocaleString()}</div>
+      <div><b>Coverage:</b> ${esc(d.completion_pct ?? 0)}% · target ${esc(d.coverage_target_pct || 95)}% · attempted ${Number(d.attempted_count || 0).toLocaleString()}</div>
+      <div><b>Scored:</b> ${Number(d.scored_count || 0).toLocaleString()} · failed ${Number(d.failed_count || 0).toLocaleString()} · returned ${Number(d.returned_count || 0).toLocaleString()}</div>
+      <div><b>Fetch:</b> cache ${Number(d.cache_hit_count || 0).toLocaleString()} · live ${Number(d.live_fetch_count || 0).toLocaleString()} · ${esc(priceLabel)}</div>
+      <div><b>Session:</b> ${esc(d.market_session || "-")} · data ${esc(d.data_as_of_utc || "-")}</div>
+      <div><b>Duration:</b> ${Number(d.duration_ms || 0).toLocaleString()} ms</div>
+    </div>
+    ${errorTypes ? `<div class="scan-note">Errors by type: ${esc(errorTypes)}</div>` : ""}
+    ${errors.length ? `<details class="scan-note"><summary>${errors.length} scan failure${errors.length === 1 ? "" : "s"}</summary><div class="mono" style="font-size:11px;margin-top:6px;">${esc(errors.slice(0, 80).map(e => `${e.symbol || "-"}: ${e.error || e.type || e.message || "unknown"}`).join("\n"))}${errors.length > 80 ? `\n... ${errors.length - 80} more` : ""}</div></details>` : ""}
+  </div>`;
+}
 function renderMarketScannerCard() {
   const scan = state.marketScan;
   const loading = state.marketScanLoading;
@@ -1619,9 +1717,7 @@ function renderMarketScannerCard() {
   const visible = laneResults.slice(0, 25);
   const paperReady = results.filter(r => msPaperTestPlan(r).ok).length;
   const actable = results.filter(msIsActable).length;
-  const ready = results.filter(r => !r._soft && msInvestmentGate(r).score >= 76).length;
-  const pullbacks = results.filter(r => msRowMatchesLane(r, "pullback")).length;
-  const catalysts = results.filter(r => msRowMatchesLane(r, "catalyst")).length;
+  const diag = scan?.scan_diagnostics || {};
   const sectors = ["all", ...Array.from(new Set(preFiltered.map(r => msSector(r.symbol, r)).filter(Boolean))).sort()];
   const laneButtons = MARKET_SCAN_LANES.map(([id, label]) => {
     const count = id === "all" ? preFiltered.length : preFiltered.filter(r => msRowMatchesLane(r, id)).length;
@@ -1653,12 +1749,13 @@ function renderMarketScannerCard() {
         ${filterSelect("sectorFilter", state.marketScanSectorFilter, sectors.map(s => [s, s === "all" ? "All sectors" : s]))}
       </div>
       <div class="desk-grid">
+        ${deskCell("Attempted", diag.attempted_count ?? 0)}
+        ${deskCell("Scored", diag.scored_count ?? scan?.scored_count ?? 0)}
+        ${deskCell("Failed", diag.failed_count ?? scan?.error_count ?? 0)}
+        ${deskCell("Returned", diag.returned_count ?? results.length)}
         ${deskCell("Paper-ready", paperReady)}
-        ${deskCell("Actable", actable)}
-        ${deskCell("Ready", ready)}
-        ${deskCell("Pullbacks", pullbacks)}
-        ${deskCell("Flow/catalyst", catalysts)}
       </div>
+      ${scan ? renderScanDiagnostics(scan) : ""}
       ${results.length ? renderRegimeSummary(scan) : ""}
       ${results.length ? `<div class="panel-block" style="margin:12px 0;">
         <h4>Opportunity Radar</h4>
@@ -1682,7 +1779,7 @@ function renderMarketScannerCard() {
       ${loading ? `<div class="loading-row"><span class="spinner"></span><span>${esc(loadingText)}</span></div>` : ""}
       ${!loading && !laneHadMatches && activeLane !== "all" && preFiltered.length ? `<div class="scan-note">No pure ${esc(activeLane)} setup now, showing strongest filtered candidates instead.</div>` : ""}
       ${!loading && scan?.scan_note ? `<div class="scan-note">${esc(scan.scan_note)}</div>` : ""}
-      ${!loading && scan?.batch_errors?.length ? `<div class="scan-note">${scan.batch_errors.length} sweep batch${scan.batch_errors.length === 1 ? "" : "es"} had errors; completed batches are still ranked.</div>` : ""}
+      ${!loading && scan?.batch_errors?.length ? `<div class="scan-note">${scan.batch_errors.length} symbol failure${scan.batch_errors.length === 1 ? "" : "s"}; completed symbols are still ranked.</div>` : ""}
       ${!loading && state.autoPaper.last ? `<div class="scan-note">Auto-paper: ${state.autoPaper.last.logged || 0} logged${state.autoPaper.last.symbols?.length ? ` (${esc(state.autoPaper.last.symbols.join(", "))})` : ""}${state.autoPaper.last.skipped ? `, ${state.autoPaper.last.skipped} skipped as duplicate` : ""}${state.autoPaper.last.note ? ` - ${esc(state.autoPaper.last.note)}` : ""}.</div>` : ""}
       ${!loading && visible.length ? `<div class="opp-list">${rows}</div>` : ""}
       ${!loading && scan && !visible.length ? `<div class="empty">No opportunities passed the current filters. Try All, show softer rows, or run a focused scan.</div>` : ""}
@@ -2126,6 +2223,7 @@ function renderOpportunityRow(r, rd) {
   const adv = num(r.avg_dollar_vol_20d);
   const setup = setupType(r);
   const radar = radarBucket(r);
+  const priceFreshness = r.price_freshness || (r.market_data?.price?.stale_fields?.length ? "cached" : "");
   const regimeStatus = r.regime_compatibility?.status || "";
   const rel20 = num(r.benchmark_relative_strength?.relative_20d);
   const tags = msTags(r).slice(0, 7).map(t => `<span class="tag">${esc(String(t).replace(/-/g, " "))}</span>`).join("");
@@ -2145,7 +2243,7 @@ function renderOpportunityRow(r, rd) {
         <div class="meta-row">
           <span class="meta good">${esc(msLaneFor(r))}</span>
           <span class="meta setup-chip">${esc(setup)}</span>
-          <span class="meta ${radar.id === "ready" ? "good" : radar.id === "avoid" ? "bad" : "warn"}">${esc(radar.label)}</span>
+          <span class="meta ${radar.id === "ready" ? "good" : radar.id === "rejected" ? "bad" : "warn"}">${esc(radar.label)}</span>
           <span class="meta">${esc(msSector(r.symbol, r))}</span>
           ${r.sector_rank != null ? `<span class="meta">sector #${esc(r.sector_rank)}</span>` : ""}
           ${rel20 != null ? `<span class="meta ${rel20 >= 0 ? "good" : "warn"}">vs SPY ${fmtPct(rel20)}</span>` : ""}
@@ -2154,6 +2252,7 @@ function renderOpportunityRow(r, rd) {
           ${rd ? `<span class="meta good">AI read</span>` : ""}
           ${rr != null ? `<span class="meta ${rr >= candidateMinRR() ? "good" : "warn"}">R:R ${rr.toFixed(1)}:1</span>` : ""}
           ${r.current_price != null ? `<span class="meta">px ${fmtUSD(r.current_price, 2)}</span>` : ""}
+          ${priceFreshness ? `<span class="meta ${priceFreshness === "live" ? "good" : "warn"}">${esc(priceFreshness)}</span>` : ""}
           ${r.rsi14 != null ? `<span class="meta">RSI ${Number(r.rsi14).toFixed(0)}</span>` : ""}
           ${r.return_20d != null ? `<span class="meta">${fmtPct(r.return_20d)} 20d</span>` : ""}
           ${adv != null ? `<span class="meta ${adv >= 5_000_000 ? "good" : "warn"}">$Vol ${adv >= 1_000_000 ? (adv / 1_000_000).toFixed(0) + "M" : (adv / 1_000).toFixed(0) + "K"}</span>` : ""}
@@ -3080,6 +3179,10 @@ window.__PORTFOLIO_PAPER_TEST_EXPORTS__ = {
   costModel,
   computePaperPerformance,
   deriveTrigger,
+  normalizeScanContract,
+  renderMarketScannerCard,
+  radarBucket,
+  state,
 };
 boot();
 </script>
