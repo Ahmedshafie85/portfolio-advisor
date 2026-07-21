@@ -466,6 +466,7 @@ const LOCAL_TRADES_KEY = "opportunity_paper_trades_v2";
 const TRIGGER_WATCH_KEY = "opportunity_trigger_watch_v1";
 const OPPORTUNITY_MEMORY_KEY = "opportunity_memory_v1";
 const PAPER_EVENT_LEDGER_KEY = "opportunity_paper_events_v1";
+const ACTIVE_SCAN_JOB_KEY = "portfolio_active_scan_job_v1";
 const PAPER_SIM_COSTS = Object.freeze({
   spread_pct_points: 0.08,
   slippage_pct_points: 0.15,
@@ -614,8 +615,23 @@ async function fetchMarketScan(body) {
   return r.json();
 }
 async function fetchScanJob(jobId) {
-  const r = await fetch(`${WORKER_URL}/scan-market/job/${encodeURIComponent(jobId)}`);
+  const r = await fetch(`${WORKER_URL}/scan-jobs/${encodeURIComponent(jobId)}`);
   if (!r.ok) throw new Error(`scan job ${r.status}`);
+  return r.json();
+}
+async function startScanJob(body = {}) {
+  const idToken = auth?.currentUser ? await auth.currentUser.getIdToken().catch(() => null) : null;
+  const r = await fetch(`${WORKER_URL}/scan-jobs/start`, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({ uid:state.uid, idToken, investor_profile:state.investorProfile, ...body }),
+  });
+  if (!r.ok) throw new Error(`scan-jobs/start ${r.status}`);
+  return r.json();
+}
+async function processScanJob(jobId) {
+  const r = await fetch(`${WORKER_URL}/scan-jobs/${encodeURIComponent(jobId)}/process`, { method:"POST" });
+  if (!r.ok) throw new Error(`scan-jobs/process ${r.status}`);
   return r.json();
 }
 function normalizeScanContract(scan = {}) {
@@ -807,33 +823,40 @@ async function runRollingBroadScan() {
   state.broadScanProgress = { current:0, total:1, label:"dynamic universe", requested:0, scored:0 };
   renderCurrentView();
   try {
-    const start = await fetchMarketScan({
+    const start = await startScanJob({
       exclude_symbols:[],
       min_composite:0,
-      force:true,
       write_reads:true,
       dynamic_universe:true,
       _patient:true,
-      background:true,
     });
     let scan = null;
     if (start.job_id) {
-      for (let i = 0; i < 90; i++) {
-        const job = await fetchScanJob(start.job_id);
+      localStorage.setItem(ACTIVE_SCAN_JOB_KEY, start.job_id);
+      for (let i = 0; i < 240; i++) {
+        const job = await processScanJob(start.job_id);
         state.broadScanProgress = {
           current:i + 1,
-          total:90,
+          total:Math.max(1, job.batches_total || 1),
           label:job.progress?.stage || job.status || "scan job",
-          requested:job.progress?.universe_eligible_count || job.progress?.attempted_count || 0,
-          scored:job.progress?.scored_count || 0,
+          requested:job.universe_eligible_count || job.attempted_count || 0,
+          scored:job.scored_count || 0,
         };
         renderCurrentView();
-        if (String(job.status || "").startsWith("COMPLETED")) {
+        if (job.status === "COMPLETED") {
           scan = await fetchMarketScan({ force:false, write_reads:true });
+          localStorage.removeItem(ACTIVE_SCAN_JOB_KEY);
           break;
         }
-        if (job.status === "FAILED") throw new Error(job.error || "scan job failed");
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        if (job.status === "INCOMPLETE") {
+          localStorage.removeItem(ACTIVE_SCAN_JOB_KEY);
+          throw new Error("scan incomplete; previous completed scan preserved");
+        }
+        if (job.status === "FAILED") {
+          localStorage.removeItem(ACTIVE_SCAN_JOB_KEY);
+          throw new Error(job.error || "scan job failed");
+        }
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
       if (!scan) throw new Error("scan job did not finish before polling timed out");
     } else {
@@ -854,8 +877,51 @@ async function runRollingBroadScan() {
     const suffix = auto.logged ? ` - auto-paper logged ${auto.logged}: ${auto.symbols.join(", ")}` : "";
     toast(`Dynamic sweep ranked ${(scan.results || []).length} opportunities${suffix}`);
   } catch (e) {
-    state.marketScan = { results:[], reads:[], scan_note:`Dynamic sweep failed: ${e.message || e}`, universe_source:"dynamic_point_in_time" };
+    if (state.marketScan) state.marketScan.scan_note = `Latest scan failed: ${e.message || e}. Previous completed results preserved.`;
+    else state.marketScan = { results:[], reads:[], scan_note:`Dynamic sweep failed: ${e.message || e}`, universe_source:"dynamic_point_in_time" };
     toast("Broad sweep failed", "error");
+  } finally {
+    state.marketScanLoading = false;
+    state.broadScanProgress = null;
+    renderCurrentView();
+  }
+}
+
+async function resumeActiveScanJob() {
+  const jobId = localStorage.getItem(ACTIVE_SCAN_JOB_KEY);
+  if (!jobId || state.marketScanLoading) return;
+  state.marketScanLoading = true;
+  state.broadScanProgress = { current:0, total:1, label:"resuming scan job", requested:0, scored:0 };
+  renderCurrentView();
+  try {
+    for (let i = 0; i < 240; i++) {
+      const job = await processScanJob(jobId);
+      state.broadScanProgress = {
+        current:job.batches_completed || i + 1,
+        total:Math.max(1, job.batches_total || 1),
+        label:job.stage || job.status || "scan job",
+        requested:job.universe_eligible_count || job.attempted_count || 0,
+        scored:job.scored_count || 0,
+      };
+      renderCurrentView();
+      if (job.status === "COMPLETED") {
+        localStorage.removeItem(ACTIVE_SCAN_JOB_KEY);
+        const scan = await fetchMarketScan({ force:false, write_reads:true });
+        state.marketScan = normalizeScanContract(scan);
+        state.marketScanRanAt = scan.generated_at || new Date().toISOString();
+        updateOpportunityMemory(scan);
+        saveScanPaperEvents(scan);
+        break;
+      }
+      if (job.status === "INCOMPLETE" || job.status === "FAILED") {
+        localStorage.removeItem(ACTIVE_SCAN_JOB_KEY);
+        if (state.marketScan) state.marketScan.scan_note = `Scan ${job.status.toLowerCase()}; previous completed results preserved.`;
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+  } catch (e) {
+    console.warn("Scan job resume failed", e);
   } finally {
     state.marketScanLoading = false;
     state.broadScanProgress = null;
@@ -3152,6 +3218,7 @@ async function boot() {
       state.authLabel = user.isAnonymous ? "anonymous sync" : "signed in";
       await loadInvestorProfile();
       await loadCachedScan();
+      setTimeout(resumeActiveScanJob, 0);
     }
     setReady();
   });
