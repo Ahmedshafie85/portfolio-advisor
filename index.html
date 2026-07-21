@@ -611,12 +611,23 @@ async function fetchMarketScan(body) {
     headers:{ "Content-Type":"application/json" },
     body:JSON.stringify({ uid:state.uid, idToken, investor_profile:state.investorProfile, ...body }),
   });
-  if (!r.ok) throw new Error(`scan-market ${r.status}`);
+  if (!r.ok) throw new Error(await apiErrorMessage(r, "scan-market"));
   return r.json();
+}
+async function apiErrorMessage(response, label) {
+  let detail = "";
+  try {
+    const j = await response.clone().json();
+    detail = j?.message || j?.error || j?.reason || "";
+  } catch {
+    try { detail = await response.clone().text(); } catch {}
+  }
+  detail = String(detail || "").replace(/\s+/g, " ").slice(0, 180);
+  return detail ? `${label} ${response.status}: ${detail}` : `${label} ${response.status}`;
 }
 async function fetchScanJob(jobId) {
   const r = await fetch(`${WORKER_URL}/scan-jobs/${encodeURIComponent(jobId)}`);
-  if (!r.ok) throw new Error(`scan job ${r.status}`);
+  if (!r.ok) throw new Error(await apiErrorMessage(r, "scan job"));
   return r.json();
 }
 async function startScanJob(body = {}) {
@@ -626,12 +637,12 @@ async function startScanJob(body = {}) {
     headers:{ "Content-Type":"application/json" },
     body:JSON.stringify({ uid:state.uid, idToken, investor_profile:state.investorProfile, ...body }),
   });
-  if (!r.ok) throw new Error(`scan-jobs/start ${r.status}`);
+  if (!r.ok) throw new Error(await apiErrorMessage(r, "scan-jobs/start"));
   return r.json();
 }
 async function processScanJob(jobId) {
   const r = await fetch(`${WORKER_URL}/scan-jobs/${encodeURIComponent(jobId)}/process`, { method:"POST" });
-  if (!r.ok) throw new Error(`scan-jobs/process ${r.status}`);
+  if (!r.ok) throw new Error(await apiErrorMessage(r, "scan-jobs/process"));
   return r.json();
 }
 function normalizeScanContract(scan = {}) {
